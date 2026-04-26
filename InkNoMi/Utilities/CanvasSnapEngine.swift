@@ -19,6 +19,7 @@ enum CanvasSnapEngine {
     static let defaultCanvasLogicalSize: CGFloat = 4000
     /// Distance in **canvas points** within which a snap engages (~1–2 screen pixels at 1× zoom on typical views).
     static let defaultThreshold: CGFloat = 7
+    static let defaultGridSpacing: CGFloat = 24
 
     static func participatesInSnapping(_ kind: CanvasElementKind) -> Bool {
         switch kind {
@@ -35,22 +36,36 @@ enum CanvasSnapEngine {
         }
     }
 
-    private static func xTargets(others: [CGRect], canvasSize: CGFloat) -> [CGFloat] {
+    private static func xTargets(others: [CGRect], canvasSize: CGFloat, gridEnabled: Bool, gridSpacing: CGFloat) -> [CGFloat] {
         var t: [CGFloat] = [0, canvasSize * 0.5, canvasSize]
         for r in others {
             t.append(r.minX)
             t.append(r.midX)
             t.append(r.maxX)
         }
+        if gridEnabled {
+            var x: CGFloat = 0
+            while x <= canvasSize {
+                t.append(x)
+                x += max(8, gridSpacing)
+            }
+        }
         return t
     }
 
-    private static func yTargets(others: [CGRect], canvasSize: CGFloat) -> [CGFloat] {
+    private static func yTargets(others: [CGRect], canvasSize: CGFloat, gridEnabled: Bool, gridSpacing: CGFloat) -> [CGFloat] {
         var t: [CGFloat] = [0, canvasSize * 0.5, canvasSize]
         for r in others {
             t.append(r.minY)
             t.append(r.midY)
             t.append(r.maxY)
+        }
+        if gridEnabled {
+            var y: CGFloat = 0
+            while y <= canvasSize {
+                t.append(y)
+                y += max(8, gridSpacing)
+            }
         }
         return t
     }
@@ -61,12 +76,14 @@ enum CanvasSnapEngine {
         proposed: CGRect,
         excludingElementIds: Set<UUID>,
         elements: [CanvasElementRecord],
+        gridEnabled: Bool,
+        gridSpacing: CGFloat = defaultGridSpacing,
         canvasSize: CGFloat = defaultCanvasLogicalSize,
         threshold: CGFloat = defaultThreshold
     ) -> (rect: CGRect, guides: [CanvasAlignmentGuide]) {
         let others = framesForSnapping(excludingIds: excludingElementIds, elements: elements)
-        let xT = xTargets(others: others, canvasSize: canvasSize)
-        let yT = yTargets(others: others, canvasSize: canvasSize)
+        let xT = xTargets(others: others, canvasSize: canvasSize, gridEnabled: gridEnabled, gridSpacing: gridSpacing)
+        let yT = yTargets(others: others, canvasSize: canvasSize, gridEnabled: gridEnabled, gridSpacing: gridSpacing)
 
         var r = proposed
         var guides: [CanvasAlignmentGuide] = []
@@ -93,6 +110,8 @@ enum CanvasSnapEngine {
         elements: [CanvasElementRecord],
         minWidth: CGFloat,
         minHeight: CGFloat,
+        gridEnabled: Bool,
+        gridSpacing: CGFloat = defaultGridSpacing,
         canvasSize: CGFloat = defaultCanvasLogicalSize,
         threshold: CGFloat = defaultThreshold
     ) -> (rect: CGRect, guides: [CanvasAlignmentGuide]) {
@@ -100,7 +119,7 @@ enum CanvasSnapEngine {
         var r = proposed
         var guides: [CanvasAlignmentGuide] = []
 
-        let xSnapTargets = xTargets(others: others, canvasSize: canvasSize)
+        let xSnapTargets = xTargets(others: others, canvasSize: canvasSize, gridEnabled: gridEnabled, gridSpacing: gridSpacing)
         var bestXErr = threshold
         var bestW = r.width
         var guideX: CGFloat?
@@ -120,7 +139,7 @@ enum CanvasSnapEngine {
             guides.append(CanvasAlignmentGuide(isVertical: true, position: gx))
         }
 
-        let ySnapTargets = yTargets(others: others, canvasSize: canvasSize)
+        let ySnapTargets = yTargets(others: others, canvasSize: canvasSize, gridEnabled: gridEnabled, gridSpacing: gridSpacing)
         var bestYErr = threshold
         var bestH = r.height
         var guideY: CGFloat?
@@ -140,6 +159,25 @@ enum CanvasSnapEngine {
             guides.append(CanvasAlignmentGuide(isVertical: false, position: gy))
         }
 
+        if gridEnabled {
+            let snappedMaxX = (r.maxX / gridSpacing).rounded() * gridSpacing
+            if abs(r.maxX - snappedMaxX) <= threshold {
+                let nw = snappedMaxX - r.minX
+                if nw >= minWidth {
+                    r.size.width = nw
+                    guides.append(CanvasAlignmentGuide(isVertical: true, position: snappedMaxX))
+                }
+            }
+            let snappedMaxY = (r.maxY / gridSpacing).rounded() * gridSpacing
+            if abs(r.maxY - snappedMaxY) <= threshold {
+                let nh = snappedMaxY - r.minY
+                if nh >= minHeight {
+                    r.size.height = nh
+                    guides.append(CanvasAlignmentGuide(isVertical: false, position: snappedMaxY))
+                }
+            }
+        }
+
         r.size.width = max(minWidth, min(r.width, canvasSize - r.minX))
         r.size.height = max(minHeight, min(r.height, canvasSize - r.minY))
         return (r, guides)
@@ -151,6 +189,8 @@ enum CanvasSnapEngine {
         elements: [CanvasElementRecord],
         minWidth: CGFloat,
         minHeight: CGFloat,
+        gridEnabled: Bool,
+        gridSpacing: CGFloat = defaultGridSpacing,
         canvasSize: CGFloat = defaultCanvasLogicalSize,
         threshold: CGFloat = defaultThreshold
     ) -> (rect: CGRect, guides: [CanvasAlignmentGuide]) {
@@ -160,6 +200,8 @@ enum CanvasSnapEngine {
             proposed: r0,
             excludingElementIds: [],
             elements: elements,
+            gridEnabled: gridEnabled,
+            gridSpacing: gridSpacing,
             canvasSize: canvasSize,
             threshold: threshold
         )
@@ -169,6 +211,8 @@ enum CanvasSnapEngine {
             elements: elements,
             minWidth: minWidth,
             minHeight: minHeight,
+            gridEnabled: gridEnabled,
+            gridSpacing: gridSpacing,
             canvasSize: canvasSize,
             threshold: threshold
         )

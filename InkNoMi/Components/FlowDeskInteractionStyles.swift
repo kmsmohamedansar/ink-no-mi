@@ -17,7 +17,8 @@ struct FlowDeskCanvasToolButtonStyle: ButtonStyle {
 struct FlowDeskPlainCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.88 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
     }
 }
 
@@ -35,7 +36,8 @@ struct FlowDeskHomeCardButtonStyle: ButtonStyle {
 struct FlowDeskToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.72 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
     }
 }
 

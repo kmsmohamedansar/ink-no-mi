@@ -12,6 +12,7 @@ struct ShapeCanvasItemView: View {
     @State private var moveDragTranslation: CGSize = .zero
     @State private var moveDragStartCanvasOrigin: CGPoint?
     @State private var resizeDragStartSize: CGSize?
+    @State private var isHovered = false
 
     private var payload: ShapePayload {
         element.resolvedShapePayload()
@@ -19,6 +20,10 @@ struct ShapeCanvasItemView: View {
 
     private var isSelected: Bool {
         selection.isSelected(element.id)
+    }
+
+    private var isActiveContainer: Bool {
+        boardViewModel.activeContainerShapeID == element.id
     }
 
     private var composedMoveOffset: CGSize {
@@ -35,6 +40,7 @@ struct ShapeCanvasItemView: View {
     }
 
     private var chromeCorner: CGFloat { FlowDeskTheme.shapeSelectionChromeCorner }
+    private var isConvertingIn: Bool { boardViewModel.convertingShapeIDs.contains(element.id) }
 
     var body: some View {
         ZStack {
@@ -42,10 +48,14 @@ struct ShapeCanvasItemView: View {
 
             RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
-                .opacity(isSelected ? 1 : 0)
+                .opacity(isSelected || isActiveContainer ? 1 : 0)
+                .allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+                .opacity(isHovered && !isSelected && !isActiveContainer ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .animation(.easeOut(duration: 0.18), value: isSelected)
+        .animation(.easeOut(duration: 0.18), value: isSelected || isActiveContainer)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()
@@ -65,13 +75,22 @@ struct ShapeCanvasItemView: View {
             }
         }
         .offset(composedMoveOffset)
+        .scaleEffect(isConvertingIn ? 0.95 : 1.0)
+        .opacity(isConvertingIn ? 0.76 : 1.0)
+        .animation(.easeOut(duration: 0.16), value: isConvertingIn)
         .contentShape(Rectangle())
         .onTapGesture {
             boardViewModel.stopAllInlineEditing()
             let extend = NSEvent.modifierFlags.contains(.shift)
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
+            if !extend {
+                boardViewModel.setActiveContainer(shapeID: element.id)
+            }
         }
         .simultaneousGesture(moveGesture)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             CanvasElementEditorContextMenuItems(
                 elementID: element.id,
@@ -100,12 +119,14 @@ struct ShapeCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, guides) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 if boardViewModel.optionDuplicateSourceElementID == element.id {
                     boardViewModel.setShapeFrame(
@@ -126,7 +147,7 @@ struct ShapeCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { value in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 let subjectId = boardViewModel.moveGestureSubjectElementId(viewElementId: element.id)
                 guard let subjectRec = boardViewModel.boardState.elements.first(where: { $0.id == subjectId }) else {
                     boardViewModel.resetGroupMoveState()
@@ -138,12 +159,14 @@ struct ShapeCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, _) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 let participants = boardViewModel.groupMoveParticipantIDs
                 if boardViewModel.groupMoveLeaderID == element.id,
@@ -177,12 +200,14 @@ struct ShapeCanvasItemView: View {
                 guard let start = resizeDragStartSize else { return }
                 let nw = max(CanvasShapeLayout.minWidth, Double(start.width) + Double(value.translation.width))
                 let nh = max(CanvasShapeLayout.minHeight, Double(start.height) + Double(value.translation.height))
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let (snappedSize, guides) = boardViewModel.snapResizeBottomRightFrame(
                     origin: CGPoint(x: element.x, y: element.y),
                     rawSize: CGSize(width: nw, height: nh),
                     elementId: element.id,
                     minWidth: CGFloat(CanvasShapeLayout.minWidth),
-                    minHeight: CGFloat(CanvasShapeLayout.minHeight)
+                    minHeight: CGFloat(CanvasShapeLayout.minHeight),
+                    enableSnapping: snappingEnabled
                 )
                 boardViewModel.setShapeFrame(
                     id: element.id,
@@ -194,7 +219,7 @@ struct ShapeCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { _ in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 boardViewModel.endBoardUndoCoalescing()
                 resizeDragStartSize = nil
             }

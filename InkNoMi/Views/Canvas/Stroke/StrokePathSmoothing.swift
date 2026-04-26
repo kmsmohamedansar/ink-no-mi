@@ -2,7 +2,7 @@ import CoreGraphics
 import SwiftUI
 
 enum StrokePathSmoothing {
-    /// Builds a path for stroking: smooth quad segments through samples, round caps/joins.
+    /// Builds a path for stroking using Catmull-Rom to Bezier interpolation.
     static func smoothPath(from points: [CGPoint]) -> Path {
         var path = Path()
         guard !points.isEmpty else { return path }
@@ -18,17 +18,23 @@ enum StrokePathSmoothing {
             return path
         }
 
-        for i in 1 ..< (points.count - 1) {
-            let mid = CGPoint(
-                x: (points[i].x + points[i + 1].x) * 0.5,
-                y: (points[i].y + points[i + 1].y) * 0.5
+        // Catmull-Rom spline converted into cubic Bezier segments.
+        for i in 0..<(points.count - 1) {
+            let p0 = i > 0 ? points[i - 1] : points[i]
+            let p1 = points[i]
+            let p2 = points[i + 1]
+            let p3 = (i + 2 < points.count) ? points[i + 2] : p2
+
+            let c1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
             )
-            path.addQuadCurve(to: mid, control: points[i])
+            let c2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
+            path.addCurve(to: p2, control1: c1, control2: c2)
         }
-        path.addQuadCurve(
-            to: points[points.count - 1],
-            control: points[points.count - 2]
-        )
         return path
     }
 

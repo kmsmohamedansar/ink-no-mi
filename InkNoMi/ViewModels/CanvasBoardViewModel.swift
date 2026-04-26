@@ -20,6 +20,17 @@ final class CanvasBoardViewModel {
 
     /// Active canvas tool mode.
     var canvasTool: CanvasToolMode = .select
+    /// Active shape container while user is drawing/typing inside a selected shape.
+    var activeContainerShapeID: UUID?
+    /// Transition flags used for conversion animations.
+    var convertingStrokeIDs: Set<UUID> = []
+    var convertingShapeIDs: Set<UUID> = []
+    var convertingTextIDs: Set<UUID> = []
+    /// Medium-confidence Smart Ink result shown as a ghost preview before commit.
+    var pendingSmartInkSuggestion: SmartInkSuggestion?
+    var pendingSmartInkSuggestionWorkItem: DispatchWorkItem?
+    /// Development diagnostics for Smart Ink grouping/classification/confidence.
+    var smartInkDebugLoggingEnabled: Bool = true
 
     /// Optional context panel beside the tool rail; currently unused by default.
     var canvasContextPanel: CanvasContextPanel?
@@ -96,6 +107,13 @@ final class CanvasBoardViewModel {
         editingStickyNoteElementID = nil
         editingConnectorLabelElementID = nil
         canvasTool = .select
+        activeContainerShapeID = nil
+        convertingStrokeIDs = []
+        convertingShapeIDs = []
+        convertingTextIDs = []
+        pendingSmartInkSuggestion = nil
+        pendingSmartInkSuggestionWorkItem?.cancel()
+        pendingSmartInkSuggestionWorkItem = nil
         canvasContextPanel = nil
         insertionViewportSnapshot = nil
         insertionStaggerCounter = 0
@@ -127,6 +145,13 @@ final class CanvasBoardViewModel {
         editingStickyNoteElementID = nil
         editingConnectorLabelElementID = nil
         canvasTool = .select
+        activeContainerShapeID = nil
+        convertingStrokeIDs = []
+        convertingShapeIDs = []
+        convertingTextIDs = []
+        pendingSmartInkSuggestion = nil
+        pendingSmartInkSuggestionWorkItem?.cancel()
+        pendingSmartInkSuggestionWorkItem = nil
         canvasContextPanel = nil
         insertionViewportSnapshot = nil
         insertionStaggerCounter = 0
@@ -164,6 +189,104 @@ final class CanvasBoardViewModel {
         canUndoBoard = !canvasUndoStack.isEmpty
         canRedoBoard = !canvasRedoStack.isEmpty
     }
+}
+
+extension CanvasBoardViewModel {
+    func setActiveContainer(shapeID: UUID?) {
+        guard let shapeID else {
+            activeContainerShapeID = nil
+            return
+        }
+        guard boardState.elements.contains(where: { $0.id == shapeID && $0.kind == .shape }) else {
+            activeContainerShapeID = nil
+            return
+        }
+        activeContainerShapeID = shapeID
+    }
+
+    func activeContainerRect() -> CGRect? {
+        guard let id = activeContainerShapeID,
+              let shape = boardState.elements.first(where: { $0.id == id && $0.kind == .shape }) else {
+            return nil
+        }
+        return CGRect(x: shape.x, y: shape.y, width: shape.width, height: shape.height).standardized
+    }
+
+    func parentShapeForNewElement() -> UUID? {
+        guard let rect = activeContainerRect(), rect.width > 0, rect.height > 0 else { return nil }
+        return activeContainerShapeID
+    }
+
+    func constrainPointToActiveContainer(_ point: CGPoint) -> CGPoint {
+        guard let rect = activeContainerRect() else { return point }
+        return CGPoint(
+            x: min(max(point.x, rect.minX), rect.maxX),
+            y: min(max(point.y, rect.minY), rect.maxY)
+        )
+    }
+
+    func constrainRectToActiveContainer(_ rect: CGRect) -> CGRect {
+        guard let container = activeContainerRect() else { return rect }
+        var r = rect.standardized
+        if r.minX < container.minX { r.origin.x = container.minX }
+        if r.minY < container.minY { r.origin.y = container.minY }
+        if r.maxX > container.maxX { r.origin.x = max(container.minX, container.maxX - r.width) }
+        if r.maxY > container.maxY { r.origin.y = max(container.minY, container.maxY - r.height) }
+        r.size.width = min(r.width, container.width)
+        r.size.height = min(r.height, container.height)
+        return r
+    }
+
+    func beginStrokeConversion(for ids: [UUID]) {
+        convertingStrokeIDs.formUnion(ids)
+    }
+
+    func endStrokeConversion(for ids: [UUID]) {
+        ids.forEach { convertingStrokeIDs.remove($0) }
+    }
+
+    func beginShapeConversion(for id: UUID) {
+        convertingShapeIDs.insert(id)
+    }
+
+    func endShapeConversion(for id: UUID) {
+        convertingShapeIDs.remove(id)
+    }
+
+    func beginTextConversion(for id: UUID) {
+        convertingTextIDs.insert(id)
+    }
+
+    func endTextConversion(for id: UUID) {
+        convertingTextIDs.remove(id)
+    }
+
+    func cancelPendingSmartInkSuggestion(reason: String) {
+        pendingSmartInkSuggestionWorkItem?.cancel()
+        pendingSmartInkSuggestionWorkItem = nil
+        if pendingSmartInkSuggestion != nil, smartInkDebugLoggingEnabled {
+            print("[InkNoMi SmartInk] suggestion cancelled: \(reason)")
+        }
+        pendingSmartInkSuggestion = nil
+    }
+
+    func logSmartInk(_ message: String) {
+        guard smartInkDebugLoggingEnabled else { return }
+        print("[InkNoMi SmartInk] \(message)")
+    }
+}
+
+enum SmartInkSuggestionKind: Sendable {
+    case shape(ShapeModel)
+    case text(TextElement)
+}
+
+struct SmartInkSuggestion: Sendable {
+    var id: UUID = UUID()
+    var kind: SmartInkSuggestionKind
+    var sourceStrokeIDs: [UUID]
+    var confidence: Double
+    var createdAt: Date = Date()
 }
 
 /// Canonical canvas view model surface for new canvas systems.

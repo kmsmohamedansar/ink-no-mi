@@ -155,8 +155,8 @@ struct DocumentSidebarView: View {
             }
             .padding(.vertical, 1)
             .padding(.horizontal, 6)
-            .animation(.easeOut(duration: 0.14), value: isSelected)
-            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .animation(.easeOut(duration: 0.10), value: isSelected)
+            .animation(.easeOut(duration: 0.10), value: isHovered)
     }
 
     private func rowFill(isSelected: Bool, isHovered: Bool) -> Color {
@@ -164,7 +164,7 @@ struct DocumentSidebarView: View {
             return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.3 : 0.16)
         }
         if isHovered {
-            return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.15 : 0.09)
+            return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.12 : 0.07)
         }
         return Color.clear
     }

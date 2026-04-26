@@ -30,7 +30,7 @@ enum FlowDeskLayout {
     // MARK: - Cards (same family as canvas framed elements)
 
     /// Primary corner radius for home cards, text blocks, charts, and sticky notes.
-    static let cardCornerRadius: CGFloat = 14
+    static let cardCornerRadius: CGFloat = 12
 
     static let cardBorderLineWidth: CGFloat = 1
     static let cardBorderLineWidthHover: CGFloat = 1.25
@@ -77,7 +77,7 @@ enum FlowDeskLayout {
 
     // MARK: - Selection chrome (geometry only; colors from tokens)
 
-    static let shapeSelectionCornerRadius: CGFloat = 14
+    static let shapeSelectionCornerRadius: CGFloat = 12
     static let strokeSelectionCornerRadius: CGFloat = 8
 
     // MARK: - Sidebar
@@ -90,7 +90,7 @@ enum FlowDeskLayout {
     static let sidebarEmptyHorizontalPadding: CGFloat = 12
 
     /// Sidebar row pill; matches home-adjacent rounded language (continuous curve).
-    static let sidebarRowSelectionCornerRadius: CGFloat = 9
+    static let sidebarRowSelectionCornerRadius: CGFloat = 8
     /// Leading inset for the “BOARDS”-style section label (aligns with row content).
     static let sidebarSectionHeaderLeadingPadding: CGFloat = 18
 
@@ -107,7 +107,7 @@ enum FlowDeskLayout {
 
     // MARK: - Floating panels (palette, selection bar, tips)
 
-    static let floatingPanelCornerRadius: CGFloat = 16
+    static let floatingPanelCornerRadius: CGFloat = 12
     static let floatingPanelContentPadding: CGFloat = 8
     /// Contextual toolbars anchored to the selection (compact footprint).
     static let floatingPanelToolbarPaddingH: CGFloat = 8
@@ -119,7 +119,7 @@ enum FlowDeskLayout {
     static let floatingPanelMultiSelectOuterStackSpacing: CGFloat = 7
 
     /// HUD chips, rail icon wells, template rows, placeholder element chrome (step below card radius).
-    static let chromeCompactCornerRadius: CGFloat = 10
+    static let chromeCompactCornerRadius: CGFloat = 8
     /// Inset rows inside context panels (shape picker, etc.); aligns with stroke selection handle chrome.
     static let chromeInsetCornerRadius: CGFloat = 8
     /// Dashed placement preview on the board.

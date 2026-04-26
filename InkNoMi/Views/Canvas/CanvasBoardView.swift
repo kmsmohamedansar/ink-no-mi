@@ -10,6 +10,7 @@ struct CanvasBoardView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var panDragTranslation: CGSize = .zero
+    @State private var panMomentumTask: Task<Void, Never>?
     @State private var draftCanvasPoints: [CGPoint] = []
     @State private var placementDragStart: CGPoint?
     @State private var placementPreviewRect: CGRect?
@@ -39,6 +40,37 @@ struct CanvasBoardView: View {
                             .offset(x: CGFloat(element.x), y: CGFloat(element.y))
                             .opacity(canvasReadabilityOpacity(for: element.id))
                             .zIndex(Double(element.zIndex))
+                            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    }
+
+                    if let activeContainerRect = boardViewModel.activeContainerRect() {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(tokens.selectionStrokeColor.opacity(0.72), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                            .frame(width: activeContainerRect.width, height: activeContainerRect.height)
+                            .position(x: activeContainerRect.midX, y: activeContainerRect.midY)
+                            .allowsHitTesting(false)
+                            .zIndex(470_000)
+                    }
+
+                    if boardViewModel.boardState.elements.isEmpty {
+                        Text("Select a tool to start creating")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(Color.primary.opacity(0.34))
+                            .padding(.horizontal, FlowDeskLayout.spaceL)
+                            .padding(.vertical, FlowDeskLayout.spaceM)
+                            .background(
+                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035))
+                            )
+                            .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
+                            .allowsHitTesting(false)
+                            .zIndex(200_000)
+                    }
+
+                    if let suggestion = boardViewModel.pendingSmartInkSuggestion {
+                        smartInkSuggestionOverlay(suggestion)
+                            .allowsHitTesting(false)
+                            .zIndex(475_000)
                     }
 
                     CanvasMultiSelectionBoundsOverlay(
@@ -122,11 +154,14 @@ struct CanvasBoardView: View {
                 switch boardViewModel.canvasTool {
                 case .select:
                     NSCursor.arrow.set()
-                case .pen, .pencil, .text, .stickyNote, .shape, .chart, .smartInk:
+                case .text:
+                    NSCursor.iBeam.set()
+                case .pen, .pencil, .stickyNote, .shape, .chart, .smartInk:
                     NSCursor.crosshair.set()
                 }
             }
             .simultaneousGesture(zoomGesture(currentScale: viewport.scale))
+            .animation(.easeOut(duration: 0.18), value: boardViewModel.boardState.elements.map(\.id))
             .task(id: insertionSnapshotTaskID(geo: geo, viewport: viewport, pan: panDragTranslation)) {
                 boardViewModel.syncInsertionViewportSnapshot(
                     CanvasInsertionViewportSnapshot(
@@ -200,6 +235,7 @@ struct CanvasBoardView: View {
                     boardViewModel.cancelConnectorEndpointAdjust()
                     boardViewModel.cancelConnectorDrag()
                     selection.clear()
+                    boardViewModel.setActiveContainer(shapeID: nil)
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.resetGroupMoveState()
                 }
@@ -222,7 +258,9 @@ struct CanvasBoardView: View {
                     placementDragStart = value.startLocation
                 }
                 guard let start = placementDragStart else { return }
-                let raw = placementRawRect(from: start, to: value.location)
+                let constrainedStart = boardViewModel.constrainPointToActiveContainer(start)
+                let constrainedCurrent = boardViewModel.constrainPointToActiveContainer(value.location)
+                let raw = boardViewModel.constrainRectToActiveContainer(placementRawRect(from: constrainedStart, to: constrainedCurrent))
                 let dist = hypot(value.translation.width, value.translation.height)
                 let previewFloor: CGFloat = 5
                 guard dist >= previewFloor else {
@@ -231,10 +269,12 @@ struct CanvasBoardView: View {
                     return
                 }
                 let (minW, minH) = placementMinimumSize(boardViewModel.canvasTool)
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let (snapped, guides) = boardViewModel.snapPlacementDraftRect(
                     rawRect: raw,
                     minWidth: minW,
-                    minHeight: minH
+                    minHeight: minH,
+                    enableSnapping: snappingEnabled
                 )
                 placementPreviewRect = snapped
                 boardViewModel.updateAlignmentGuides(guides)
@@ -243,34 +283,38 @@ struct CanvasBoardView: View {
                 defer {
                     placementDragStart = nil
                     placementPreviewRect = nil
-                    boardViewModel.clearAlignmentGuides()
+                    boardViewModel.clearAlignmentGuides(after: 0.14)
                 }
                 let start = placementDragStart ?? value.startLocation
+                let constrainedStart = boardViewModel.constrainPointToActiveContainer(start)
                 let dist = hypot(value.translation.width, value.translation.height)
                 let end = value.location
-                let raw = placementRawRect(from: start, to: end)
+                let constrainedEnd = boardViewModel.constrainPointToActiveContainer(end)
+                let raw = boardViewModel.constrainRectToActiveContainer(placementRawRect(from: constrainedStart, to: constrainedEnd))
                 switch boardViewModel.canvasTool {
                 case .text:
                     if dist < Self.placementTextStickyTapThreshold {
-                        boardViewModel.insertTextBlockAtCanvasPoint(start, selection: selection)
+                        boardViewModel.insertTextBlockAtCanvasPoint(constrainedStart, selection: selection)
                     } else {
                         let (minW, minH) = placementMinimumSize(.text)
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
-                            minHeight: minH
+                            minHeight: minH,
+                            enableSnapping: !NSEvent.modifierFlags.contains(.option)
                         )
                         boardViewModel.insertTextBlockInCanvasRect(snapped, selection: selection)
                     }
                 case .stickyNote:
                     if dist < Self.placementTextStickyTapThreshold {
-                        boardViewModel.insertStickyNoteAtCanvasPoint(start, selection: selection)
+                        boardViewModel.insertStickyNoteAtCanvasPoint(constrainedStart, selection: selection)
                     } else {
                         let (minW, minH) = placementMinimumSize(.stickyNote)
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
-                            minHeight: minH
+                            minHeight: minH,
+                            enableSnapping: !NSEvent.modifierFlags.contains(.option)
                         )
                         boardViewModel.insertStickyNoteInCanvasRect(snapped, selection: selection)
                     }
@@ -278,7 +322,7 @@ struct CanvasBoardView: View {
                     if dist < Self.placementShapeTapThreshold {
                         boardViewModel.insertShapeAtCanvasPoint(
                             kind: boardViewModel.placeShapeKind,
-                            point: start,
+                            point: constrainedStart,
                             selection: selection
                         )
                     } else {
@@ -286,7 +330,8 @@ struct CanvasBoardView: View {
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
-                            minHeight: minH
+                            minHeight: minH,
+                            enableSnapping: !NSEvent.modifierFlags.contains(.option)
                         )
                         boardViewModel.insertShapeInCanvasRect(
                             kind: boardViewModel.placeShapeKind,
@@ -335,8 +380,9 @@ struct CanvasBoardView: View {
                 if draftCanvasPoints.isEmpty {
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.configureStrokeStyleForActiveTool()
+                    boardViewModel.cancelPendingSmartInkSuggestion(reason: "user continued drawing")
                 }
-                let loc = value.location
+                let loc = boardViewModel.constrainPointToActiveContainer(value.location)
                 if let last = draftCanvasPoints.last {
                     if hypot(loc.x - last.x, loc.y - last.y) >= 1.5 {
                         draftCanvasPoints.append(loc)
@@ -346,7 +392,7 @@ struct CanvasBoardView: View {
                 }
             }
             .onEnded { value in
-                let loc = value.location
+                let loc = boardViewModel.constrainPointToActiveContainer(value.location)
                 if let last = draftCanvasPoints.last, hypot(last.x - loc.x, last.y - loc.y) > 0.25 {
                     draftCanvasPoints.append(loc)
                 } else if draftCanvasPoints.isEmpty {
@@ -416,6 +462,7 @@ struct CanvasBoardView: View {
     private func panGesture(viewport: ViewportState) -> some Gesture {
         DragGesture()
             .onChanged { value in
+                panMomentumTask?.cancel()
                 panDragTranslation = value.translation
             }
             .onEnded { value in
@@ -424,11 +471,31 @@ struct CanvasBoardView: View {
                 next.offsetY += Double(value.translation.height)
                 boardViewModel.setViewport(next)
                 panDragTranslation = .zero
+                let inertialX = value.predictedEndTranslation.width - value.translation.width
+                let inertialY = value.predictedEndTranslation.height - value.translation.height
+                let threshold: CGFloat = 12
+                guard hypot(inertialX, inertialY) >= threshold else { return }
+                panMomentumTask?.cancel()
+                panMomentumTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 8_000_000)
+                    var momentumViewport = boardViewModel.boardState.viewport
+                    momentumViewport.offsetX += Double(inertialX * 0.42)
+                    momentumViewport.offsetY += Double(inertialY * 0.42)
+                    withAnimation(.interpolatingSpring(stiffness: 170, damping: 24)) {
+                        boardViewModel.setViewport(momentumViewport)
+                    }
+                }
             }
     }
 
     private func zoomGesture(currentScale: Double) -> some Gesture {
         MagnifyGesture()
+            .onChanged { value in
+                var next = boardViewModel.boardState.viewport
+                let factor = Double(value.magnification)
+                next.scale = max(0.25, min(4, currentScale * factor))
+                boardViewModel.setViewport(next)
+            }
             .onEnded { value in
                 var next = boardViewModel.boardState.viewport
                 let factor = Double(value.magnification)
@@ -443,8 +510,36 @@ struct CanvasBoardView: View {
             tokens: tokens,
             colorScheme: colorScheme,
             showGrid: showGrid,
-            includeFilmGrain: true
+            includeFilmGrain: false
         )
+    }
+
+    @ViewBuilder
+    private func smartInkSuggestionOverlay(_ suggestion: SmartInkSuggestion) -> some View {
+        switch suggestion.kind {
+        case let .shape(shape):
+            ShapeCanvasShapeView(payload: suggestionPayload(for: shape))
+                .frame(width: shape.frame.width, height: shape.frame.height)
+                .position(x: shape.frame.midX, y: shape.frame.midY)
+                .opacity(0.35)
+        case let .text(text):
+            Text(text.text)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.5))
+                .frame(
+                    width: max(text.frame.width, 80),
+                    height: max(text.frame.height, 32),
+                    alignment: .leading
+                )
+                .position(x: text.frame.midX, y: text.frame.midY)
+                .opacity(0.38)
+        }
+    }
+
+    private func suggestionPayload(for shape: ShapeModel) -> ShapePayload {
+        var p = ShapePayload.default
+        p.kind = shape.kind
+        return p
     }
 
     // MARK: - Selection toolbar (view-space overlay)

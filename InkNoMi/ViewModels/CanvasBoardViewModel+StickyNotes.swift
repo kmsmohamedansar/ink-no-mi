@@ -14,17 +14,22 @@ extension CanvasBoardViewModel {
         canvasTool = .select
         dismissCanvasContextPanel()
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = StickyNotePayload.default
         payload.text = ""
         let origin = insertionOriginForNewElement(width: Self.stickyDefaultWidth, height: Self.stickyDefaultHeight)
+        let constrainedOrigin = constrainRectToActiveContainer(
+            CGRect(x: origin.x, y: origin.y, width: Self.stickyDefaultWidth, height: Self.stickyDefaultHeight)
+        ).origin
         let record = CanvasElementRecord(
             id: id,
             kind: .stickyNote,
-            x: origin.x,
-            y: origin.y,
+            x: constrainedOrigin.x,
+            y: constrainedOrigin.y,
             width: Self.stickyDefaultWidth,
             height: Self.stickyDefaultHeight,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             stickyNote: payload
         )
 
@@ -59,16 +64,21 @@ extension CanvasBoardViewModel {
             canvasLogicalSize: 4000
         )
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = StickyNotePayload.default
         payload.text = ""
+        let constrainedOrigin = constrainRectToActiveContainer(
+            CGRect(x: origin.x, y: origin.y, width: w, height: h)
+        ).origin
         let record = CanvasElementRecord(
             id: id,
             kind: .stickyNote,
-            x: origin.x,
-            y: origin.y,
+            x: constrainedOrigin.x,
+            y: constrainedOrigin.y,
             width: w,
             height: h,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             stickyNote: payload
         )
         applyBoardMutation { state in
@@ -104,16 +114,19 @@ extension CanvasBoardViewModel {
         w = max(minW, min(w, canvasMax - x))
         h = max(minH, min(h, canvasMax - y))
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = StickyNotePayload.default
         payload.text = ""
+        let constrainedRect = constrainRectToActiveContainer(CGRect(x: x, y: y, width: w, height: h))
         let record = CanvasElementRecord(
             id: id,
             kind: .stickyNote,
-            x: x,
-            y: y,
-            width: w,
-            height: h,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             stickyNote: payload
         )
         applyBoardMutation { state in

@@ -11,6 +11,7 @@ struct StrokeCanvasItemView: View {
 
     @State private var moveDragTranslation: CGSize = .zero
     @State private var moveDragStartCanvasOrigin: CGPoint?
+    @State private var isHovered = false
 
     private var payload: StrokePayload {
         element.resolvedStrokePayload()
@@ -21,6 +22,7 @@ struct StrokeCanvasItemView: View {
     }
 
     private var chromeCorner: CGFloat { FlowDeskTheme.strokeSelectionChromeCorner }
+    private var isConverting: Bool { boardViewModel.convertingStrokeIDs.contains(element.id) }
 
     var body: some View {
         ZStack {
@@ -36,8 +38,16 @@ struct StrokeCanvasItemView: View {
                     .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                     .allowsHitTesting(false)
             }
+            if isHovered && !isSelected {
+                RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
         }
         .offset(moveDragTranslation)
+        .opacity(isConverting ? 0 : 1)
+        .scaleEffect(isConverting ? 0.985 : 1)
+        .animation(.easeOut(duration: 0.16), value: isConverting)
         .contentShape(Rectangle())
         .onTapGesture {
             guard boardViewModel.canvasTool == .select else { return }
@@ -46,6 +56,9 @@ struct StrokeCanvasItemView: View {
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
         }
         .simultaneousGesture(moveGesture)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             CanvasElementEditorContextMenuItems(
                 elementID: element.id,

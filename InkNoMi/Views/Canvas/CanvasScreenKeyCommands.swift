@@ -22,6 +22,11 @@ struct CanvasScreenKeyCommands: ViewModifier {
                 }
                 if boardViewModel.canvasTool != .select {
                     boardViewModel.applyCanvasToolSelection(.select, fromKeyboard: true)
+                    boardViewModel.setActiveContainer(shapeID: nil)
+                    return .handled
+                }
+                if boardViewModel.activeContainerShapeID != nil {
+                    boardViewModel.setActiveContainer(shapeID: nil)
                     return .handled
                 }
                 return .ignored
@@ -50,6 +55,18 @@ struct CanvasScreenKeyCommands: ViewModifier {
                 if inlineEditingActive { return .ignored }
                 guard selection.hasSelection else { return .ignored }
                 boardViewModel.duplicateAllSelectedElements(selection: selection)
+                return .handled
+            }
+            .onKeyPress(keys: ["z"]) { press in
+                guard press.modifiers.contains(.command) else { return .ignored }
+                if inlineEditingActive { return .ignored }
+                if press.modifiers.contains(.shift) {
+                    guard boardViewModel.canRedoBoard else { return .ignored }
+                    boardViewModel.redoBoard()
+                } else {
+                    guard boardViewModel.canUndoBoard else { return .ignored }
+                    boardViewModel.undoBoard()
+                }
                 return .handled
             }
             .onKeyPress(keys: ["1", "2", "3"]) { press in

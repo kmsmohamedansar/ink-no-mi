@@ -13,6 +13,7 @@ struct StickyNoteCanvasItemView: View {
     @State private var moveDragTranslation: CGSize = .zero
     @State private var moveDragStartCanvasOrigin: CGPoint?
     @State private var resizeDragStartSize: CGSize?
+    @State private var isHovered: Bool = false
     @FocusState private var editorFocused: Bool
 
     private var payload: StickyNotePayload {
@@ -86,6 +87,10 @@ struct StickyNoteCanvasItemView: View {
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
+            cardShape
+                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+                .opacity(isHovered && !isSelected ? 1 : 0)
+                .allowsHitTesting(false)
         }
         .animation(.easeOut(duration: 0.18), value: isSelected)
         .overlay(alignment: .bottomTrailing) {
@@ -120,6 +125,9 @@ struct StickyNoteCanvasItemView: View {
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
         }
         .simultaneousGesture(moveGesture)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             Button("Edit") { beginEditing() }
             Divider()
@@ -196,12 +204,14 @@ struct StickyNoteCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, guides) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 if boardViewModel.optionDuplicateSourceElementID == element.id {
                     boardViewModel.setStickyNoteFrame(
@@ -223,7 +233,7 @@ struct StickyNoteCanvasItemView: View {
             }
             .onEnded { value in
                 guard !isEditing else { return }
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 let subjectId = boardViewModel.moveGestureSubjectElementId(viewElementId: element.id)
                 guard let subjectRec = boardViewModel.boardState.elements.first(where: { $0.id == subjectId }) else {
                     boardViewModel.resetGroupMoveState()
@@ -235,12 +245,14 @@ struct StickyNoteCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, _) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 let participants = boardViewModel.groupMoveParticipantIDs
                 if boardViewModel.groupMoveLeaderID == element.id,
@@ -274,12 +286,14 @@ struct StickyNoteCanvasItemView: View {
                 guard let start = resizeDragStartSize else { return }
                 let nw = max(CanvasStickyNoteLayout.minWidth, Double(start.width) + Double(value.translation.width))
                 let nh = max(CanvasStickyNoteLayout.minHeight, Double(start.height) + Double(value.translation.height))
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let (snappedSize, guides) = boardViewModel.snapResizeBottomRightFrame(
                     origin: CGPoint(x: element.x, y: element.y),
                     rawSize: CGSize(width: nw, height: nh),
                     elementId: element.id,
                     minWidth: CGFloat(CanvasStickyNoteLayout.minWidth),
-                    minHeight: CGFloat(CanvasStickyNoteLayout.minHeight)
+                    minHeight: CGFloat(CanvasStickyNoteLayout.minHeight),
+                    enableSnapping: snappingEnabled
                 )
                 boardViewModel.setStickyNoteFrame(
                     id: element.id,
@@ -291,7 +305,7 @@ struct StickyNoteCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { _ in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 boardViewModel.endBoardUndoCoalescing()
                 resizeDragStartSize = nil
             }

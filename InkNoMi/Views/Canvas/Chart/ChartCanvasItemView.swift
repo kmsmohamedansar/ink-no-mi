@@ -116,12 +116,14 @@ struct ChartCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, guides) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 if boardViewModel.optionDuplicateSourceElementID == element.id {
                     boardViewModel.setChartFrame(
@@ -142,7 +144,7 @@ struct ChartCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { value in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 let subjectId = boardViewModel.moveGestureSubjectElementId(viewElementId: element.id)
                 guard let subjectRec = boardViewModel.boardState.elements.first(where: { $0.id == subjectId }) else {
                     boardViewModel.resetGroupMoveState()
@@ -154,12 +156,14 @@ struct ChartCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, _) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 let participants = boardViewModel.groupMoveParticipantIDs
                 if boardViewModel.groupMoveLeaderID == element.id,
@@ -193,12 +197,14 @@ struct ChartCanvasItemView: View {
                 guard let start = resizeDragStartSize else { return }
                 let nw = max(CanvasChartLayout.minWidth, Double(start.width) + Double(value.translation.width))
                 let nh = max(CanvasChartLayout.minHeight, Double(start.height) + Double(value.translation.height))
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let (snappedSize, guides) = boardViewModel.snapResizeBottomRightFrame(
                     origin: CGPoint(x: element.x, y: element.y),
                     rawSize: CGSize(width: nw, height: nh),
                     elementId: element.id,
                     minWidth: CGFloat(CanvasChartLayout.minWidth),
-                    minHeight: CGFloat(CanvasChartLayout.minHeight)
+                    minHeight: CGFloat(CanvasChartLayout.minHeight),
+                    enableSnapping: snappingEnabled
                 )
                 boardViewModel.setChartFrame(
                     id: element.id,
@@ -210,7 +216,7 @@ struct ChartCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { _ in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 boardViewModel.endBoardUndoCoalescing()
                 resizeDragStartSize = nil
             }

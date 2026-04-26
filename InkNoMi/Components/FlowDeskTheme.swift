@@ -7,9 +7,9 @@ enum FlowDeskTheme {
     // MARK: - Depth (Level 2 floating panels — single shadow system)
 
     /// Tight, modern lift—subtle elevation without heavy blur.
-    static let floatingPanelShadowOpacity: Double = 0.055
-    static let floatingPanelShadowRadius: CGFloat = 10
-    static let floatingPanelShadowY: CGFloat = 3
+    static let floatingPanelShadowOpacity: Double = 0.032
+    static let floatingPanelShadowRadius: CGFloat = 7
+    static let floatingPanelShadowY: CGFloat = 2
 
     /// Home dashboard: very light top wash only (atmospheric layers reduced elsewhere).
     static func homeAtmosphereWash(colorScheme: ColorScheme) -> LinearGradient {
@@ -169,7 +169,7 @@ enum FlowDeskTheme {
         includeFilmGrain: Bool
     ) -> some View {
         let gridOpacity = tokens.gridLineOpacity * tokens.canvasGridEmphasis
-        let topWash = (colorScheme == .dark ? tokens.canvasTopWashOpacity * 0.52 : tokens.canvasTopWashOpacity) * 0.5
+        let topWash = (colorScheme == .dark ? tokens.canvasTopWashOpacity * 0.48 : tokens.canvasTopWashOpacity) * 0.42
 
         ZStack {
             tokens.canvasWorkspaceBackground
@@ -186,7 +186,7 @@ enum FlowDeskTheme {
             LinearGradient(
                 colors: [
                     Color.black.opacity(0),
-                    Color.black.opacity(tokens.canvasBottomDepthOpacity)
+                    Color.black.opacity(tokens.canvasBottomDepthOpacity * 0.68)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -208,11 +208,11 @@ enum FlowDeskTheme {
             RadialGradient(
                 colors: [
                     Color.clear,
-                    tokens.canvasGridInk.opacity(tokens.canvasVignetteOpacity)
+                    tokens.canvasGridInk.opacity(tokens.canvasVignetteOpacity * 0.55)
                 ],
                 center: .center,
-                startRadius: 280,
-                endRadius: 2_600
+                startRadius: 380,
+                endRadius: 2_900
             )
             .blendMode(.multiply)
             .allowsHitTesting(false)

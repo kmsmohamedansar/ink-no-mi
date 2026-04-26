@@ -66,6 +66,8 @@ struct CanvasElementRecord: Codable, Identifiable, Equatable, Sendable {
     var width: Double
     var height: Double
     var zIndex: Int
+    /// Optional parent shape container id. When set, this element belongs to that shape's coordinate region.
+    var parentShapeID: UUID?
     /// Populated when `kind == .textBlock`; omitted in JSON for other kinds and legacy boards.
     var textBlock: TextBlockPayload?
     /// Populated when `kind == .stickyNote`; omitted otherwise.
@@ -87,6 +89,7 @@ struct CanvasElementRecord: Codable, Identifiable, Equatable, Sendable {
         width: Double,
         height: Double,
         zIndex: Int = 0,
+        parentShapeID: UUID? = nil,
         textBlock: TextBlockPayload? = nil,
         stickyNote: StickyNotePayload? = nil,
         shapePayload: ShapePayload? = nil,
@@ -101,6 +104,7 @@ struct CanvasElementRecord: Codable, Identifiable, Equatable, Sendable {
         self.width = width
         self.height = height
         self.zIndex = zIndex
+        self.parentShapeID = parentShapeID
         self.textBlock = textBlock
         self.stickyNote = stickyNote
         self.shapePayload = shapePayload
@@ -174,6 +178,7 @@ extension CanvasElementRecord {
                 width: width,
                 height: height,
                 zIndex: zIndex,
+                parentShapeID: parentShapeID,
                 connectorPayload: p
             )
         }
@@ -185,6 +190,7 @@ extension CanvasElementRecord {
             width: width,
             height: height,
             zIndex: zIndex,
+            parentShapeID: parentShapeID,
             textBlock: textBlock,
             stickyNote: stickyNote,
             shapePayload: shapePayload,

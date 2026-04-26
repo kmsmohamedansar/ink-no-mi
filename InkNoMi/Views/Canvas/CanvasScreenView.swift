@@ -103,7 +103,14 @@ struct CanvasScreenView: View {
                         Text("Edit")
                             .font(.subheadline.weight(.medium))
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
                 }
+                .buttonStyle(FlowDeskToolbarButtonStyle())
 
                 Menu {
                     Toggle("Show grid", isOn: gridBinding)
@@ -131,8 +138,15 @@ struct CanvasScreenView: View {
                         Text("View")
                             .font(.subheadline.weight(.medium))
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
                 }
                 .help("Grid, canvas framing, insert items in view, and charts")
+                .buttonStyle(FlowDeskToolbarButtonStyle())
 
                 Menu {
                     Button("PNG…") {
@@ -155,6 +169,12 @@ struct CanvasScreenView: View {
                     Label("Export", systemImage: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .medium))
                         .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                .fill(Color.primary.opacity(0.05))
+                        )
                 }
                 .help("Save this board as PNG or PDF")
                 .buttonStyle(FlowDeskToolbarButtonStyle())

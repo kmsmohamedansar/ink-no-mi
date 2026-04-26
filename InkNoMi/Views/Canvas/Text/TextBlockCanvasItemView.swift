@@ -13,6 +13,7 @@ struct TextBlockCanvasItemView: View {
     @State private var moveDragTranslation: CGSize = .zero
     @State private var moveDragStartCanvasOrigin: CGPoint?
     @State private var resizeDragStartSize: CGSize?
+    @State private var isHovered: Bool = false
     @FocusState private var editorFocused: Bool
 
     private var isEditing: Bool {
@@ -21,6 +22,9 @@ struct TextBlockCanvasItemView: View {
 
     private var isSelected: Bool {
         selection.isSelected(element.id)
+    }
+    private var isConvertingIn: Bool {
+        boardViewModel.convertingTextIDs.contains(element.id)
     }
 
     /// Multi-select drag: leader uses local snap translation; followers mirror shared preview.
@@ -80,6 +84,10 @@ struct TextBlockCanvasItemView: View {
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+                .opacity(isHovered && !isSelected ? 1 : 0)
+                .allowsHitTesting(false)
         }
         .animation(.easeOut(duration: 0.18), value: isSelected)
         .overlay(alignment: .bottomTrailing) {
@@ -101,6 +109,9 @@ struct TextBlockCanvasItemView: View {
             }
         }
         .offset(composedMoveOffset)
+        .scaleEffect(isConvertingIn ? 0.95 : 1.0)
+        .opacity(isConvertingIn ? 0.78 : 1.0)
+        .animation(.easeOut(duration: 0.16), value: isConvertingIn)
         .contentShape(RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous))
         .highPriorityGesture(
             TapGesture(count: 2).onEnded {
@@ -114,6 +125,9 @@ struct TextBlockCanvasItemView: View {
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
         }
         .simultaneousGesture(moveGesture)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             Button("Edit") { beginEditing() }
             Divider()
@@ -193,12 +207,14 @@ struct TextBlockCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, guides) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 if boardViewModel.optionDuplicateSourceElementID == element.id {
                     boardViewModel.setTextBlockFrame(
@@ -220,7 +236,7 @@ struct TextBlockCanvasItemView: View {
             }
             .onEnded { value in
                 guard !isEditing else { return }
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 let subjectId = boardViewModel.moveGestureSubjectElementId(viewElementId: element.id)
                 guard let subjectRec = boardViewModel.boardState.elements.first(where: { $0.id == subjectId }) else {
                     boardViewModel.resetGroupMoveState()
@@ -232,12 +248,14 @@ struct TextBlockCanvasItemView: View {
                 let start = moveDragStartCanvasOrigin ?? CGPoint(x: subjectRec.x, y: subjectRec.y)
                 let rawX = start.x + value.translation.width
                 let rawY = start.y + value.translation.height
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let exclude = boardViewModel.snapExclusionsForFramedMove(leaderId: subjectId, selection: selection)
                 let (snapped, _) = boardViewModel.snapMoveFrame(
                     rawOrigin: CGPoint(x: rawX, y: rawY),
                     size: CGSize(width: subjectRec.width, height: subjectRec.height),
                     excludingElementIds: exclude,
-                    movingElementId: subjectId
+                    movingElementId: subjectId,
+                    enableSnapping: snappingEnabled
                 )
                 let participants = boardViewModel.groupMoveParticipantIDs
                 if boardViewModel.groupMoveLeaderID == element.id,
@@ -271,12 +289,14 @@ struct TextBlockCanvasItemView: View {
                 guard let start = resizeDragStartSize else { return }
                 let nw = max(CanvasTextBlockLayout.minWidth, Double(start.width) + Double(value.translation.width))
                 let nh = max(CanvasTextBlockLayout.minHeight, Double(start.height) + Double(value.translation.height))
+                let snappingEnabled = !NSEvent.modifierFlags.contains(.option)
                 let (snappedSize, guides) = boardViewModel.snapResizeBottomRightFrame(
                     origin: CGPoint(x: element.x, y: element.y),
                     rawSize: CGSize(width: nw, height: nh),
                     elementId: element.id,
                     minWidth: CGFloat(CanvasTextBlockLayout.minWidth),
-                    minHeight: CGFloat(CanvasTextBlockLayout.minHeight)
+                    minHeight: CGFloat(CanvasTextBlockLayout.minHeight),
+                    enableSnapping: snappingEnabled
                 )
                 boardViewModel.setTextBlockFrame(
                     id: element.id,
@@ -288,7 +308,7 @@ struct TextBlockCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { _ in
-                boardViewModel.clearAlignmentGuides()
+                boardViewModel.clearAlignmentGuides(after: 0.14)
                 boardViewModel.endBoardUndoCoalescing()
                 resizeDragStartSize = nil
             }

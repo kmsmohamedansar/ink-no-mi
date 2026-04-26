@@ -11,6 +11,7 @@ extension CanvasBoardViewModel {
         stopAllInlineEditing()
 
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = ChartPayload.default
         payload.kind = kind
         payload.title = kind == .bar ? "Quarterly" : "Trend"
@@ -18,14 +19,18 @@ extension CanvasBoardViewModel {
         payload.points = ChartPayload.sampleStarterPoints
 
         let origin = insertionOriginForNewElement(width: Self.chartDefaultWidth, height: Self.chartDefaultHeight)
+        let constrainedRect = constrainRectToActiveContainer(
+            CGRect(x: origin.x, y: origin.y, width: Self.chartDefaultWidth, height: Self.chartDefaultHeight)
+        )
         let record = CanvasElementRecord(
             id: id,
             kind: .chart,
-            x: origin.x,
-            y: origin.y,
-            width: Self.chartDefaultWidth,
-            height: Self.chartDefaultHeight,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             chartPayload: payload
         )
 

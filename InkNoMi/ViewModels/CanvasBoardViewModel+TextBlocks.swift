@@ -21,14 +21,19 @@ extension CanvasBoardViewModel {
         var payload = TextBlockPayload.default
         payload.text = ""
         let origin = insertionOriginForNewElement(width: Self.textBlockDefaultWidth, height: Self.textBlockDefaultHeight)
+        let parentShapeID = parentShapeForNewElement()
+        let constrainedOrigin = constrainRectToActiveContainer(
+            CGRect(x: origin.x, y: origin.y, width: Self.textBlockDefaultWidth, height: Self.textBlockDefaultHeight)
+        ).origin
         let record = CanvasElementRecord(
             id: id,
             kind: .textBlock,
-            x: origin.x,
-            y: origin.y,
+            x: constrainedOrigin.x,
+            y: constrainedOrigin.y,
             width: Self.textBlockDefaultWidth,
             height: Self.textBlockDefaultHeight,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             textBlock: payload
         )
 
@@ -63,16 +68,21 @@ extension CanvasBoardViewModel {
             canvasLogicalSize: 4000
         )
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = TextBlockPayload.default
         payload.text = ""
+        let constrainedOrigin = constrainRectToActiveContainer(
+            CGRect(x: origin.x, y: origin.y, width: w, height: h)
+        ).origin
         let record = CanvasElementRecord(
             id: id,
             kind: .textBlock,
-            x: origin.x,
-            y: origin.y,
+            x: constrainedOrigin.x,
+            y: constrainedOrigin.y,
             width: w,
             height: h,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             textBlock: payload
         )
         applyBoardMutation { state in
@@ -108,16 +118,19 @@ extension CanvasBoardViewModel {
         w = max(minW, min(w, canvasMax - x))
         h = max(minH, min(h, canvasMax - y))
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = TextBlockPayload.default
         payload.text = ""
+        let constrainedRect = constrainRectToActiveContainer(CGRect(x: x, y: y, width: w, height: h))
         let record = CanvasElementRecord(
             id: id,
             kind: .textBlock,
-            x: x,
-            y: y,
-            width: w,
-            height: h,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             textBlock: payload
         )
         applyBoardMutation { state in

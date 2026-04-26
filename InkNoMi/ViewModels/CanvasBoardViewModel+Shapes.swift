@@ -12,19 +12,22 @@ extension CanvasBoardViewModel {
         stopAllInlineEditing()
 
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = ShapePayload.default
         payload.kind = kind
 
         let (w, h) = Self.defaultSize(for: kind)
         let origin = insertionOriginForNewElement(width: w, height: h)
+        let constrainedRect = constrainRectToActiveContainer(CGRect(x: origin.x, y: origin.y, width: w, height: h))
         let record = CanvasElementRecord(
             id: id,
             kind: .shape,
-            x: origin.x,
-            y: origin.y,
-            width: w,
-            height: h,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             shapePayload: payload
         )
 
@@ -45,6 +48,7 @@ extension CanvasBoardViewModel {
     ) -> UUID {
         stopAllInlineEditing()
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = ShapePayload.default
         payload.kind = kind
         let (w, h) = Self.defaultSize(for: kind)
@@ -55,14 +59,16 @@ extension CanvasBoardViewModel {
             elementHeight: h,
             canvasLogicalSize: 4000
         )
+        let constrainedRect = constrainRectToActiveContainer(CGRect(x: origin.x, y: origin.y, width: w, height: h))
         let record = CanvasElementRecord(
             id: id,
             kind: .shape,
-            x: origin.x,
-            y: origin.y,
-            width: w,
-            height: h,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             shapePayload: payload
         )
         applyBoardMutation { state in
@@ -102,16 +108,19 @@ extension CanvasBoardViewModel {
         w = min(w, canvasMax - x)
         h = min(h, canvasMax - y)
         let id = UUID()
+        let parentShapeID = parentShapeForNewElement()
         var payload = ShapePayload.default
         payload.kind = kind
+        let constrainedRect = constrainRectToActiveContainer(CGRect(x: x, y: y, width: w, height: h))
         let record = CanvasElementRecord(
             id: id,
             kind: .shape,
-            x: x,
-            y: y,
-            width: w,
-            height: h,
+            x: constrainedRect.minX,
+            y: constrainedRect.minY,
+            width: constrainedRect.width,
+            height: constrainedRect.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeID,
             shapePayload: payload
         )
         applyBoardMutation { state in

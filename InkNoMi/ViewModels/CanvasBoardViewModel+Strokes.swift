@@ -139,7 +139,7 @@ struct BasicStrokeClassifier: StrokeClassifier {
 }
 
 struct SmartShapeRecognizer: ShapeRecognizer {
-    private let minimumRectangleConfidence = 0.72
+    private let minimumRectangleConfidence = 0.62
 
     func recognize(stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel? {
         if let rectangle = detectRectangle(in: stroke) { return rectangle }
@@ -148,23 +148,31 @@ struct SmartShapeRecognizer: ShapeRecognizer {
         return nil
     }
 
-    /// Rectangle detection: closure + corner geometry.
+    /// Rectangle detection: forgiving closure + RDP simplification + angle tolerance.
     private func detectRectangle(in stroke: FreehandStroke) -> ShapeModel? {
-        guard stroke.points.count >= 12 else { return nil }
+        guard stroke.points.count >= 10 else { return nil }
         let bounds = stroke.bounds.standardized
         guard bounds.width >= 24, bounds.height >= 24 else { return nil }
         guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
 
         let diagonal = max(1, hypot(bounds.width, bounds.height))
         let closureDistance = hypot(last.x - first.x, last.y - first.y)
-        let closureScore = max(0, 1 - (closureDistance / max(18, diagonal * 0.18)))
-        guard closureScore > 0.4 else { return nil }
+        let closureTolerance = max(24, diagonal * 0.22)
+        guard closureDistance <= closureTolerance else { return nil }
 
-        let corners = majorCorners(points: stroke.points)
-        guard corners.count >= 4 else { return nil }
-        let cornerScore = min(1, Double(corners.count) / 4)
-        let rightAngleScore = 0.9 // practical approximation from corner extraction
-        let confidence = (closureScore * 0.35) + (cornerScore * 0.25) + (rightAngleScore * 0.4)
+        let simplified = douglasPeucker(points: stroke.points, epsilon: max(5, diagonal * 0.03))
+        let normalizedCorners = distinctCornerCandidates(points: simplified)
+        guard normalizedCorners.count >= 4 else { return nil }
+
+        let quadrilateral = chooseFourCorners(from: normalizedCorners)
+        guard quadrilateral.count == 4 else { return nil }
+        let rightAngleMatches = rightAngleCount(points: quadrilateral, toleranceDegrees: 25)
+        guard rightAngleMatches >= 3 else { return nil }
+
+        let closureScore = max(0, 1 - (closureDistance / closureTolerance))
+        let cornerScore = Double(min(normalizedCorners.count, 4)) / 4.0
+        let angleScore = Double(rightAngleMatches) / 4.0
+        let confidence = (closureScore * 0.3) + (cornerScore * 0.25) + (angleScore * 0.45)
         guard confidence >= minimumRectangleConfidence else { return nil }
         return ShapeModel(kind: .rectangle, frame: bounds, confidence: confidence)
     }
@@ -175,7 +183,8 @@ struct SmartShapeRecognizer: ShapeRecognizer {
         let path = polylineLength(points: stroke.points)
         let direct = hypot(last.x - first.x, last.y - first.y)
         let straightness = direct / max(path, 0.001)
-        guard path >= 28, straightness >= 0.955 else { return nil }
+        let variance = averagePerpendicularVariance(points: stroke.points, start: first, end: last)
+        guard path >= 28, straightness >= 0.94, variance <= 5.2 else { return nil }
 
         let minX = min(first.x, last.x)
         let minY = min(first.y, last.y)
@@ -185,7 +194,8 @@ struct SmartShapeRecognizer: ShapeRecognizer {
             width: max(abs(last.x - first.x), CanvasShapeLayout.minWidth),
             height: max(abs(last.y - first.y), CanvasShapeLayout.minHeight)
         )
-        return ShapeModel(kind: .line, frame: frame, confidence: Double(straightness))
+        let confidence = min(1.0, (Double(straightness) * 0.8) + max(0, (1 - Double(variance / 10))) * 0.2)
+        return ShapeModel(kind: .line, frame: frame, confidence: confidence)
     }
 
     /// Arrow detection:
@@ -221,7 +231,7 @@ struct SmartShapeRecognizer: ShapeRecognizer {
                 width: max(union.width, CanvasShapeLayout.minWidth),
                 height: max(union.height, CanvasShapeLayout.minHeight)
             ),
-            confidence: 0.84,
+            confidence: min(0.92, max(0.55, 1 - Double(attachDistance / 90))),
             consumedStrokeElementIDs: [shaft.id]
         )
     }
@@ -318,6 +328,84 @@ struct SmartShapeRecognizer: ShapeRecognizer {
         return corners
     }
 
+    private func douglasPeucker(points: [CGPoint], epsilon: CGFloat) -> [CGPoint] {
+        guard points.count > 2 else { return points }
+        var maxDistance: CGFloat = 0
+        var index = 0
+        let start = points[0]
+        let end = points[points.count - 1]
+        for i in 1..<(points.count - 1) {
+            let distance = perpendicularDistance(point: points[i], lineStart: start, lineEnd: end)
+            if distance > maxDistance {
+                index = i
+                maxDistance = distance
+            }
+        }
+        if maxDistance > epsilon {
+            let left = douglasPeucker(points: Array(points[0...index]), epsilon: epsilon)
+            let right = douglasPeucker(points: Array(points[index...(points.count - 1)]), epsilon: epsilon)
+            return Array(left.dropLast()) + right
+        } else {
+            return [start, end]
+        }
+    }
+
+    private func perpendicularDistance(point: CGPoint, lineStart: CGPoint, lineEnd: CGPoint) -> CGFloat {
+        let dx = lineEnd.x - lineStart.x
+        let dy = lineEnd.y - lineStart.y
+        let den = max(0.0001, hypot(dx, dy))
+        return abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x) / den
+    }
+
+    private func distinctCornerCandidates(points: [CGPoint]) -> [CGPoint] {
+        guard points.count >= 4 else { return points }
+        var distinct: [CGPoint] = []
+        for p in points {
+            if distinct.allSatisfy({ hypot($0.x - p.x, $0.y - p.y) > 14 }) {
+                distinct.append(p)
+            }
+        }
+        return distinct
+    }
+
+    private func chooseFourCorners(from points: [CGPoint]) -> [CGPoint] {
+        guard points.count >= 4 else { return [] }
+        if points.count == 4 { return points }
+        let centroid = CGPoint(
+            x: points.reduce(0) { $0 + $1.x } / CGFloat(points.count),
+            y: points.reduce(0) { $0 + $1.y } / CGFloat(points.count)
+        )
+        let sorted = points.sorted {
+            hypot($0.x - centroid.x, $0.y - centroid.y) > hypot($1.x - centroid.x, $1.y - centroid.y)
+        }
+        return Array(sorted.prefix(4))
+    }
+
+    private func rightAngleCount(points: [CGPoint], toleranceDegrees: CGFloat) -> Int {
+        guard points.count == 4 else { return 0 }
+        let center = CGPoint(
+            x: points.reduce(0) { $0 + $1.x } / 4,
+            y: points.reduce(0) { $0 + $1.y } / 4
+        )
+        let ordered = points.sorted {
+            atan2($0.y - center.y, $0.x - center.x) < atan2($1.y - center.y, $1.x - center.x)
+        }
+        var rightAngles = 0
+        for i in 0..<4 {
+            let p0 = ordered[(i + 3) % 4]
+            let p1 = ordered[i]
+            let p2 = ordered[(i + 1) % 4]
+            let angle = abs(turnAngleDegrees(
+                v1: CGVector(dx: p1.x - p0.x, dy: p1.y - p0.y),
+                v2: CGVector(dx: p2.x - p1.x, dy: p2.y - p1.y)
+            ))
+            if abs(angle - 90) <= toleranceDegrees {
+                rightAngles += 1
+            }
+        }
+        return rightAngles
+    }
+
     private func sample(points: [CGPoint], step: Int) -> [CGPoint] {
         guard step > 1, points.count > step else { return points }
         var sampled: [CGPoint] = []
@@ -335,6 +423,14 @@ struct SmartShapeRecognizer: ShapeRecognizer {
             total += hypot(points[idx].x - points[idx - 1].x, points[idx].y - points[idx - 1].y)
         }
         return total
+    }
+
+    private func averagePerpendicularVariance(points: [CGPoint], start: CGPoint, end: CGPoint) -> CGFloat {
+        guard points.count > 2 else { return 0 }
+        let total = points.reduce(CGFloat.zero) { partial, point in
+            partial + perpendicularDistance(point: point, lineStart: start, lineEnd: end)
+        }
+        return total / CGFloat(points.count)
     }
 
     private func turnAngleDegrees(v1: CGVector, v2: CGVector) -> CGFloat {
@@ -426,8 +522,9 @@ struct VisionHandwritingRecognizer: HandwritingRecognizer {
         context.scaleBy(x: 1, y: -1)
 
         for stroke in strokes {
+            let normalizedPoints = denoise(points: stroke.points)
             var previous: CGPoint?
-            for point in stroke.points {
+            for point in normalizedPoints {
                 let p = CGPoint(
                     x: (point.x - bounds.minX) + padding,
                     y: (point.y - bounds.minY) + padding
@@ -441,6 +538,24 @@ struct VisionHandwritingRecognizer: HandwritingRecognizer {
             }
         }
         return context.makeImage()
+    }
+
+    private func denoise(points: [CGPoint]) -> [CGPoint] {
+        guard points.count >= 5 else { return points }
+        var smoothed: [CGPoint] = []
+        smoothed.reserveCapacity(points.count)
+        for idx in points.indices {
+            let lower = max(0, idx - 1)
+            let upper = min(points.count - 1, idx + 1)
+            let window = points[lower...upper]
+            let avgX = window.reduce(0) { $0 + $1.x } / CGFloat(window.count)
+            let avgY = window.reduce(0) { $0 + $1.y } / CGFloat(window.count)
+            let p = CGPoint(x: avgX, y: avgY)
+            if smoothed.last.map({ hypot($0.x - p.x, $0.y - p.y) < 0.9 }) != true {
+                smoothed.append(p)
+            }
+        }
+        return smoothed
     }
 }
 
@@ -503,16 +618,21 @@ struct RecognitionDebouncer: Sendable {
 
 // MARK: - Canvas stroke commit and replacement
 
+@MainActor
 extension CanvasBoardViewModel {
     private static let handwritingGroupingTimeWindow: TimeInterval = 1.2
     private static let handwritingGroupingDistance: CGFloat = 180
     private static let minimumHandwritingBoundsWidth: CGFloat = 22
     private static let minimumHandwritingBoundsHeight: CGFloat = 16
+    private static let conversionAnimationDuration: TimeInterval = 0.16
+    private static let autoConvertConfidenceThreshold = 0.8
+    private static let suggestionConfidenceThreshold = 0.5
 
     /// Temporary grouped handwriting state.
     private static var fallbackBuffer = HandwritingStrokeBuffer()
     private static var fallbackDebouncer = RecognitionDebouncer(delaySeconds: 1.0)
     private static var fallbackWorkItem: DispatchWorkItem?
+    private static var fallbackRecognitionTask: Task<TextElement?, Never>?
 
     private var handwritingBuffer: HandwritingStrokeBuffer {
         get { Self.fallbackBuffer }
@@ -527,6 +647,11 @@ extension CanvasBoardViewModel {
     private var handwritingRecognitionWorkItem: DispatchWorkItem? {
         get { Self.fallbackWorkItem }
         set { Self.fallbackWorkItem = newValue }
+    }
+
+    private var handwritingRecognitionTask: Task<TextElement?, Never>? {
+        get { Self.fallbackRecognitionTask }
+        set { Self.fallbackRecognitionTask = newValue }
     }
 
     func scheduleFreehandRecognition(
@@ -557,6 +682,7 @@ extension CanvasBoardViewModel {
         let decimated = StrokePathSmoothing.decimatedCanvasPoints(absoluteCanvasPoints, minDistance: 2)
         guard decimated.count >= 2 else { return }
         stopAllInlineEditing()
+        cancelPendingSmartInkSuggestion(reason: "new stroke began")
         let stroke = FreehandStroke(points: decimated)
 
         if canvasTool == .smartInk {
@@ -565,7 +691,16 @@ extension CanvasBoardViewModel {
                 stroke: stroke,
                 existingElements: boardState.elements
             ) {
-                insertRecognizedShape(shape, fallbackStroke: stroke, selection: selection)
+                logSmartInk("shape candidate \(shape.kind) confidence=\(String(format: "%.2f", shape.confidence))")
+                if shape.confidence >= Self.autoConvertConfidenceThreshold {
+                    insertRecognizedShape(shape, fallbackStroke: stroke, selection: selection)
+                } else if shape.confidence >= Self.suggestionConfidenceThreshold {
+                    let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
+                    let sourceIDs = shape.consumedStrokeElementIDs + [persisted.id]
+                    presentSmartInkShapeSuggestion(shape, sourceStrokeIDs: sourceIDs, selection: selection)
+                } else {
+                    _ = insertPersistedFreehandStroke(stroke, selection: selection)
+                }
                 return
             }
             let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
@@ -609,7 +744,7 @@ extension CanvasBoardViewModel {
         if handwritingBuffer.strokeElementIDs.isEmpty {
             handwritingBuffer.clear()
             handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            print("[InkNoMi OCR] stroke added to handwriting buffer id=\(persistedStrokeID.uuidString)")
+            logSmartInk("group start stroke=\(persistedStrokeID.uuidString)")
             scheduleHandwritingRecognition(selection: selection)
             return
         }
@@ -623,21 +758,21 @@ extension CanvasBoardViewModel {
 
         if canGroup {
             handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            print("[InkNoMi OCR] stroke added to handwriting buffer id=\(persistedStrokeID.uuidString)")
+            logSmartInk("group append stroke=\(persistedStrokeID.uuidString) count=\(handwritingBuffer.strokeElementIDs.count)")
             cancelPendingHandwritingRecognition(reason: "user continued writing")
             scheduleHandwritingRecognition(selection: selection)
         } else {
             performHandwritingRecognition(selection: selection)
             handwritingBuffer.clear()
             handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            print("[InkNoMi OCR] stroke added to handwriting buffer id=\(persistedStrokeID.uuidString)")
+            logSmartInk("group reset stroke=\(persistedStrokeID.uuidString)")
             scheduleHandwritingRecognition(selection: selection)
         }
     }
 
     private func scheduleHandwritingRecognition(selection: CanvasSelectionModel) {
         let delay = handwritingDebouncer.delaySeconds
-        print("[InkNoMi OCR] recognition delayed by \(delay)s")
+        logSmartInk("recognition scheduled in \(delay)s")
         let workItem = DispatchWorkItem { [weak self] in
             self?.performHandwritingRecognition(selection: selection)
         }
@@ -649,8 +784,10 @@ extension CanvasBoardViewModel {
         if let workItem = handwritingRecognitionWorkItem {
             workItem.cancel()
             handwritingRecognitionWorkItem = nil
-            print("[InkNoMi OCR] recognition cancelled because \(reason)")
+            logSmartInk("recognition cancelled: \(reason)")
         }
+        handwritingRecognitionTask?.cancel()
+        handwritingRecognitionTask = nil
     }
 
     private func performHandwritingRecognition(selection: CanvasSelectionModel) {
@@ -685,27 +822,57 @@ extension CanvasBoardViewModel {
             handwritingBuffer.clear()
             return
         }
-        print("[InkNoMi OCR] grouped bounds=\(groupedBounds.debugDescription)")
+        logSmartInk("grouped strokes=\(groupedStrokes.count) bounds=\(groupedBounds.debugDescription)")
 
-        let recognizer = VisionHandwritingRecognizer(confidenceThreshold: 0.25)
-        guard let textElement = recognizer.recognize(strokes: groupedStrokes) else {
-            // Keep raw strokes when confidence is low or OCR is uncertain.
-            handwritingBuffer.clear()
-            return
+        handwritingRecognitionTask?.cancel()
+        let recognizer = VisionHandwritingRecognizer(confidenceThreshold: 0.36)
+        let capturedIDs = ids
+        let capturedGroupedCount = groupedStrokes.count
+        let recognitionTask = Task.detached(priority: .userInitiated) {
+            recognizer.recognize(strokes: groupedStrokes)
         }
-        if textElement.text.count == 1, groupedStrokes.count >= 2, textElement.confidence < 0.72 {
-            // Conservative fallback for noisy one-letter guesses from multi-stroke handwriting.
-            handwritingBuffer.clear()
-            return
-        }
-
-        withAnimation(.easeInOut(duration: 0.18)) {
-            applyBoardMutation { state in
-                state.elements.removeAll { ids.contains($0.id) }
+        handwritingRecognitionTask = recognitionTask
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let recognizedText = await recognitionTask.value
+            self.handwritingRecognitionTask = nil
+            guard let textElement = recognizedText else {
+                // Keep raw strokes when confidence is low or OCR is uncertain.
+                self.logSmartInk("ocr none/low-confidence; keep strokes")
+                if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
+                    self.handwritingBuffer.clear()
+                }
+                return
+            }
+            self.logSmartInk("ocr text=\"\(textElement.text)\" confidence=\(String(format: "%.2f", textElement.confidence))")
+            if textElement.text.count == 1, capturedGroupedCount >= 2, textElement.confidence < 0.72 {
+                // Conservative fallback for noisy one-letter guesses from multi-stroke handwriting.
+                if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
+                    self.handwritingBuffer.clear()
+                }
+                return
+            }
+            if textElement.confidence >= Self.autoConvertConfidenceThreshold {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    self.applyBoardMutation { state in
+                        self.beginStrokeConversion(for: capturedIDs)
+                        state.elements.removeAll { capturedIDs.contains($0.id) }
+                    }
+                }
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
+                    self?.endStrokeConversion(for: capturedIDs)
+                }
+                self.insertRecognizedText(textElement, selection: selection)
+            } else if textElement.confidence >= Self.suggestionConfidenceThreshold {
+                self.presentSmartInkTextSuggestion(textElement, sourceStrokeIDs: capturedIDs, selection: selection)
+            } else {
+                self.logSmartInk("ocr confidence below threshold; keep strokes")
+            }
+            if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
+                self.handwritingBuffer.clear()
             }
         }
-        insertRecognizedText(textElement, selection: selection)
-        handwritingBuffer.clear()
     }
 
     private func insertRecognizedShape(
@@ -715,7 +882,9 @@ extension CanvasBoardViewModel {
     ) {
         let frame = shape.frame.standardized
         guard frame.width >= CanvasShapeLayout.minWidth, frame.height >= CanvasShapeLayout.minHeight else {
-            _ = insertPersistedFreehandStroke(fallbackStroke, selection: selection)
+            if !fallbackStroke.points.isEmpty {
+                _ = insertPersistedFreehandStroke(fallbackStroke, selection: selection)
+            }
             return
         }
         var payload = ShapePayload.default
@@ -729,15 +898,24 @@ extension CanvasBoardViewModel {
             width: frame.width,
             height: frame.height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeForNewElement(),
             shapePayload: payload
         )
-        withAnimation(.easeInOut(duration: 0.18)) {
+        let consumed = shape.consumedStrokeElementIDs
+        beginStrokeConversion(for: consumed)
+        beginShapeConversion(for: shapeID)
+        withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
             applyBoardMutation { state in
-                if !shape.consumedStrokeElementIDs.isEmpty {
-                    state.elements.removeAll { shape.consumedStrokeElementIDs.contains($0.id) }
+                if !consumed.isEmpty {
+                    state.elements.removeAll { consumed.contains($0.id) }
                 }
                 state.elements.append(record)
             }
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
+            self?.endStrokeConversion(for: consumed)
+            self?.endShapeConversion(for: shapeID)
         }
         selection.selectOnly(shapeID)
     }
@@ -758,17 +936,83 @@ extension CanvasBoardViewModel {
             width: width,
             height: height,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeForNewElement(),
             textBlock: payload
         )
-        withAnimation(.easeInOut(duration: 0.18)) {
+        beginTextConversion(for: textID)
+        withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
             applyBoardMutation { state in
                 state.elements.append(record)
             }
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
+            self?.endTextConversion(for: textID)
         }
         selection.selectOnly(textID)
         editingStickyNoteElementID = nil
         editingConnectorLabelElementID = nil
         editingTextElementID = textID
+    }
+
+    private func presentSmartInkShapeSuggestion(
+        _ shape: ShapeModel,
+        sourceStrokeIDs: [UUID],
+        selection: CanvasSelectionModel
+    ) {
+        pendingSmartInkSuggestionWorkItem?.cancel()
+        pendingSmartInkSuggestion = SmartInkSuggestion(
+            kind: .shape(shape),
+            sourceStrokeIDs: sourceStrokeIDs,
+            confidence: shape.confidence
+        )
+        logSmartInk("shape suggestion shown confidence=\(String(format: "%.2f", shape.confidence))")
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, let suggestion = self.pendingSmartInkSuggestion else { return }
+            guard case let .shape(suggestedShape) = suggestion.kind else { return }
+            self.beginStrokeConversion(for: suggestion.sourceStrokeIDs)
+            withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
+                self.applyBoardMutation { state in
+                    state.elements.removeAll { suggestion.sourceStrokeIDs.contains($0.id) }
+                }
+            }
+            self.insertRecognizedShape(suggestedShape, fallbackStroke: FreehandStroke(points: []), selection: selection)
+            self.pendingSmartInkSuggestion = nil
+            self.endStrokeConversion(for: suggestion.sourceStrokeIDs)
+            self.logSmartInk("shape suggestion confirmed")
+        }
+        pendingSmartInkSuggestionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
+    }
+
+    private func presentSmartInkTextSuggestion(
+        _ text: TextElement,
+        sourceStrokeIDs: [UUID],
+        selection: CanvasSelectionModel
+    ) {
+        pendingSmartInkSuggestionWorkItem?.cancel()
+        pendingSmartInkSuggestion = SmartInkSuggestion(
+            kind: .text(text),
+            sourceStrokeIDs: sourceStrokeIDs,
+            confidence: text.confidence
+        )
+        logSmartInk("text suggestion shown confidence=\(String(format: "%.2f", text.confidence))")
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, let suggestion = self.pendingSmartInkSuggestion else { return }
+            guard case let .text(suggestedText) = suggestion.kind else { return }
+            self.beginStrokeConversion(for: suggestion.sourceStrokeIDs)
+            withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
+                self.applyBoardMutation { state in
+                    state.elements.removeAll { suggestion.sourceStrokeIDs.contains($0.id) }
+                }
+            }
+            self.insertRecognizedText(suggestedText, selection: selection)
+            self.pendingSmartInkSuggestion = nil
+            self.endStrokeConversion(for: suggestion.sourceStrokeIDs)
+            self.logSmartInk("text suggestion confirmed")
+        }
+        pendingSmartInkSuggestionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
     }
 
     @discardableResult
@@ -808,6 +1052,7 @@ extension CanvasBoardViewModel {
             width: w,
             height: h,
             zIndex: nextZIndex(),
+            parentShapeID: parentShapeForNewElement(),
             strokePayload: payload
         )
         applyBoardMutation { state in
