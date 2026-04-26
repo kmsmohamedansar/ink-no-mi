@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension CanvasBoardViewModel {
     /// Switches active canvas tool and closes floating context panels.
