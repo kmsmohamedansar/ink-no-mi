@@ -2,6 +2,8 @@ import SwiftUI
 
 /// macOS canvas screen: canvas-first tools + lightweight window toolbar (Edit / View / Export).
 struct CanvasScreenView: View {
+    @Environment(PurchaseManager.self) private var purchaseManager
+
     @Bindable var document: FlowDocument
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
@@ -150,18 +152,22 @@ struct CanvasScreenView: View {
 
                 Menu {
                     Button("PNG…") {
+                        let renderScale = resolvedExportScale()
                         CanvasExportService.presentExportPanel(
                             boardState: boardViewModel.boardState,
                             documentTitle: document.title,
-                            format: .png
+                            format: .png,
+                            renderScale: renderScale
                         )
                     }
                     .help("Save the board as a PNG image")
                     Button("PDF…") {
+                        let renderScale = resolvedExportScale()
                         CanvasExportService.presentExportPanel(
                             boardState: boardViewModel.boardState,
                             documentTitle: document.title,
-                            format: .pdf
+                            format: .pdf,
+                            renderScale: renderScale
                         )
                     }
                     .help("Save the board as a one-page PDF")
@@ -191,5 +197,13 @@ struct CanvasScreenView: View {
                 boardViewModel.setViewport(viewport)
             }
         )
+    }
+
+    private func resolvedExportScale() -> CGFloat {
+        if purchaseManager.isProUser {
+            return PurchaseManager.proExportScale
+        }
+        _ = purchaseManager.requirePro(for: .highResolutionExport)
+        return PurchaseManager.freeExportScale
     }
 }

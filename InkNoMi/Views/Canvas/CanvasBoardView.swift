@@ -67,12 +67,6 @@ struct CanvasBoardView: View {
                             .zIndex(200_000)
                     }
 
-                    if let suggestion = boardViewModel.pendingSmartInkSuggestion {
-                        smartInkSuggestionOverlay(suggestion)
-                            .allowsHitTesting(false)
-                            .zIndex(475_000)
-                    }
-
                     CanvasMultiSelectionBoundsOverlay(
                         elements: boardViewModel.boardState.elements,
                         selectedIDs: selection.selectedElementIDs
@@ -107,12 +101,12 @@ struct CanvasBoardView: View {
                     }
 
                     if boardViewModel.canvasTool == .pen
-                        || boardViewModel.canvasTool == .pencil
-                        || boardViewModel.canvasTool == .smartInk {
+                        || boardViewModel.canvasTool == .pencil {
                         Color.clear
                             .contentShape(Rectangle())
                             .frame(width: canvasSize, height: canvasSize)
                             .gesture(freehandDrawGesture(selection: selection))
+                            .zIndex(700_000)
                     }
 
                     if let snapId = connectorSnapTargetElementID,
@@ -156,7 +150,7 @@ struct CanvasBoardView: View {
                     NSCursor.arrow.set()
                 case .text:
                     NSCursor.iBeam.set()
-                case .pen, .pencil, .stickyNote, .shape, .chart, .smartInk:
+                case .connect, .pen, .pencil, .stickyNote, .shape, .chart, .smartInk:
                     NSCursor.crosshair.set()
                 }
             }
@@ -238,6 +232,14 @@ struct CanvasBoardView: View {
                     boardViewModel.setActiveContainer(shapeID: nil)
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.resetGroupMoveState()
+                }
+        case .connect:
+            bg
+                .onTapGesture {
+                    boardViewModel.cancelConnectorEndpointAdjust()
+                    boardViewModel.cancelConnectorDrag()
+                    selection.clear()
+                    boardViewModel.stopAllInlineEditing()
                 }
         case .pen, .pencil, .smartInk:
             bg
@@ -341,7 +343,7 @@ struct CanvasBoardView: View {
                     }
                 case .chart:
                     _ = boardViewModel.insertChart(kind: .bar, selection: selection)
-                default:
+                case .select, .connect, .pen, .pencil, .smartInk:
                     break
                 }
             }
@@ -380,9 +382,8 @@ struct CanvasBoardView: View {
                 if draftCanvasPoints.isEmpty {
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.configureStrokeStyleForActiveTool()
-                    boardViewModel.cancelPendingSmartInkSuggestion(reason: "user continued drawing")
                 }
-                let loc = boardViewModel.constrainPointToActiveContainer(value.location)
+                let loc = value.location
                 if let last = draftCanvasPoints.last {
                     if hypot(loc.x - last.x, loc.y - last.y) >= 1.5 {
                         draftCanvasPoints.append(loc)
@@ -392,7 +393,7 @@ struct CanvasBoardView: View {
                 }
             }
             .onEnded { value in
-                let loc = boardViewModel.constrainPointToActiveContainer(value.location)
+                let loc = value.location
                 if let last = draftCanvasPoints.last, hypot(last.x - loc.x, last.y - loc.y) > 0.25 {
                     draftCanvasPoints.append(loc)
                 } else if draftCanvasPoints.isEmpty {
@@ -512,34 +513,6 @@ struct CanvasBoardView: View {
             showGrid: showGrid,
             includeFilmGrain: false
         )
-    }
-
-    @ViewBuilder
-    private func smartInkSuggestionOverlay(_ suggestion: SmartInkSuggestion) -> some View {
-        switch suggestion.kind {
-        case let .shape(shape):
-            ShapeCanvasShapeView(payload: suggestionPayload(for: shape))
-                .frame(width: shape.frame.width, height: shape.frame.height)
-                .position(x: shape.frame.midX, y: shape.frame.midY)
-                .opacity(0.35)
-        case let .text(text):
-            Text(text.text)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.primary.opacity(0.5))
-                .frame(
-                    width: max(text.frame.width, 80),
-                    height: max(text.frame.height, 32),
-                    alignment: .leading
-                )
-                .position(x: text.frame.midX, y: text.frame.midY)
-                .opacity(0.38)
-        }
-    }
-
-    private func suggestionPayload(for shape: ShapeModel) -> ShapePayload {
-        var p = ShapePayload.default
-        p.kind = shape.kind
-        return p
     }
 
     // MARK: - Selection toolbar (view-space overlay)

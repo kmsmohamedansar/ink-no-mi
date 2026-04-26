@@ -26,11 +26,6 @@ final class CanvasBoardViewModel {
     var convertingStrokeIDs: Set<UUID> = []
     var convertingShapeIDs: Set<UUID> = []
     var convertingTextIDs: Set<UUID> = []
-    /// Medium-confidence Smart Ink result shown as a ghost preview before commit.
-    var pendingSmartInkSuggestion: SmartInkSuggestion?
-    var pendingSmartInkSuggestionWorkItem: DispatchWorkItem?
-    /// Development diagnostics for Smart Ink grouping/classification/confidence.
-    var smartInkDebugLoggingEnabled: Bool = true
 
     /// Optional context panel beside the tool rail; currently unused by default.
     var canvasContextPanel: CanvasContextPanel?
@@ -42,14 +37,6 @@ final class CanvasBoardViewModel {
     var drawingStrokeColor: CanvasRGBAColor = CanvasRGBAColor(red: 0.12, green: 0.12, blue: 0.14, opacity: 1)
     var drawingLineWidth: Double = 3
     var drawingStrokeOpacity: Double = 1
-    /// Central recognition pipeline:
-    /// stroke classification -> shape recognizers -> handwriting recognizer.
-    let recognitionPipeline: RecognitionPipeline = CanvasRecognitionPipeline(
-        classifier: BasicStrokeClassifier(),
-        shapeRecognizer: SmartShapeRecognizer(),
-        handwritingRecognizer: VisionHandwritingRecognizer(confidenceThreshold: 0.25)
-    )
-
     /// Updated by `CanvasBoardView` from the visible geometry + current pan/zoom (not persisted).
     var insertionViewportSnapshot: CanvasInsertionViewportSnapshot?
     /// Increments on each insert for a slight cascade offset (resets per document session).
@@ -111,9 +98,6 @@ final class CanvasBoardViewModel {
         convertingStrokeIDs = []
         convertingShapeIDs = []
         convertingTextIDs = []
-        pendingSmartInkSuggestion = nil
-        pendingSmartInkSuggestionWorkItem?.cancel()
-        pendingSmartInkSuggestionWorkItem = nil
         canvasContextPanel = nil
         insertionViewportSnapshot = nil
         insertionStaggerCounter = 0
@@ -149,9 +133,6 @@ final class CanvasBoardViewModel {
         convertingStrokeIDs = []
         convertingShapeIDs = []
         convertingTextIDs = []
-        pendingSmartInkSuggestion = nil
-        pendingSmartInkSuggestionWorkItem?.cancel()
-        pendingSmartInkSuggestionWorkItem = nil
         canvasContextPanel = nil
         insertionViewportSnapshot = nil
         insertionStaggerCounter = 0
@@ -261,32 +242,6 @@ extension CanvasBoardViewModel {
         convertingTextIDs.remove(id)
     }
 
-    func cancelPendingSmartInkSuggestion(reason: String) {
-        pendingSmartInkSuggestionWorkItem?.cancel()
-        pendingSmartInkSuggestionWorkItem = nil
-        if pendingSmartInkSuggestion != nil, smartInkDebugLoggingEnabled {
-            print("[InkNoMi SmartInk] suggestion cancelled: \(reason)")
-        }
-        pendingSmartInkSuggestion = nil
-    }
-
-    func logSmartInk(_ message: String) {
-        guard smartInkDebugLoggingEnabled else { return }
-        print("[InkNoMi SmartInk] \(message)")
-    }
-}
-
-enum SmartInkSuggestionKind: Sendable {
-    case shape(ShapeModel)
-    case text(TextElement)
-}
-
-struct SmartInkSuggestion: Sendable {
-    var id: UUID = UUID()
-    var kind: SmartInkSuggestionKind
-    var sourceStrokeIDs: [UUID]
-    var confidence: Double
-    var createdAt: Date = Date()
 }
 
 /// Canonical canvas view model surface for new canvas systems.

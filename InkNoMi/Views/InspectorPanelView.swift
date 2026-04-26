@@ -3,6 +3,7 @@ import SwiftUI
 struct InspectorPanelView: View {
     @Environment(\.flowDeskTokens) private var tokens
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(PurchaseManager.self) private var purchaseManager
 
     @Bindable var document: FlowDocument
     @Bindable var canvasViewModel: CanvasBoardViewModel
@@ -11,36 +12,18 @@ struct InspectorPanelView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Title") {
-                    Text(document.title)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                LabeledContent("Updated") {
-                    Text(document.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                FlowDeskInspectorSectionHeader("Board")
-            }
-
-            Section {
                 LabeledContent("Zoom") {
                     Text(String(format: "%.0f%%", canvasViewModel.boardState.viewport.scale * 100))
                         .monospacedDigit()
                 }
                 Toggle("Show grid", isOn: gridBinding)
                     .tint(tokens.selectionStrokeColor)
-                LabeledContent("Elements") {
-                    Text("\(canvasViewModel.boardState.elements.count)")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
             } header: {
-                FlowDeskInspectorSectionHeader("Viewport")
+                FlowDeskInspectorSectionHeader("Canvas")
             }
 
-            Section {
+            if selection.hasSelection || selection.isMultiSelection {
+                Section {
                 if let id = selection.primarySelectedID,
                    let element = canvasViewModel.boardState.elements.first(where: { $0.id == id }) {
                     LabeledContent("Kind") {
@@ -67,19 +50,58 @@ struct InspectorPanelView: View {
                             .foregroundStyle(.tertiary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("Nothing selected—click an item on the canvas, or choose a tool to add one.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            } header: {
-                FlowDeskInspectorSectionHeader("Selection")
+                } header: {
+                    FlowDeskInspectorSectionHeader("Selection")
+                }
             }
 
             if selection.hasSelection {
                 CanvasEditorInspectorSection(canvasViewModel: canvasViewModel, selection: selection)
+            }
+
+            if selectedStrokeCount > 0 {
+                Section {
+                    Menu("Convert") {
+                        Button("Convert to Diagram") {
+                            guard purchaseManager.requirePro(for: .convertDiagram) else { return }
+                            canvasViewModel.convertSelectedStrokesToDiagram(selection: selection)
+                        }
+                        Button("Convert to Shape") {
+                            guard purchaseManager.requirePro(for: .smartConvert) else { return }
+                            canvasViewModel.convertSelectedStrokesToShape(selection: selection)
+                        }
+                        Button("Convert to Text") {
+                            guard purchaseManager.requirePro(for: .smartConvert) else { return }
+                            canvasViewModel.convertSelectedStrokesToText(selection: selection)
+                        }
+                    }
+                } header: {
+                    FlowDeskInspectorSectionHeader("Smart Convert")
+                }
+            }
+
+            if selectedStickyCount >= 2 {
+                Section {
+                    Button("Switch to Connect Tool") {
+                        canvasViewModel.applyCanvasToolSelection(.connect, fromKeyboard: false)
+                    }
+                    Menu("Organize") {
+                        Button("Tree Layout") {
+                            guard purchaseManager.requirePro(for: .mindMapAutoLayout) else { return }
+                            canvasViewModel.organizeSelectedStickyNotesAsTree(selection: selection)
+                        }
+                        Button("Radial Layout") {
+                            guard purchaseManager.requirePro(for: .mindMapAutoLayout) else { return }
+                            canvasViewModel.organizeSelectedStickyNotesRadially(selection: selection)
+                        }
+                    }
+                    Button("Group into Cluster") {
+                        canvasViewModel.clusterSelectedStickyNotes(selection: selection)
+                    }
+                } header: {
+                    FlowDeskInspectorSectionHeader("Mind Map")
+                }
             }
 
             if let id = selection.primarySelectedID,
@@ -100,7 +122,7 @@ struct InspectorPanelView: View {
                 ShapeInspectorSection(elementID: id, canvasViewModel: canvasViewModel)
             }
 
-            if canvasViewModel.canvasTool == .pen || canvasViewModel.canvasTool == .pencil || canvasViewModel.canvasTool == .smartInk {
+            if canvasViewModel.canvasTool == .pen || canvasViewModel.canvasTool == .pencil {
                 DrawingToolInspectorSection(canvasViewModel: canvasViewModel)
             }
 
@@ -157,5 +179,17 @@ struct InspectorPanelView: View {
                 canvasViewModel.setViewport(viewport)
             }
         )
+    }
+
+    private var selectedStrokeCount: Int {
+        canvasViewModel.boardState.elements.filter {
+            selection.selectedElementIDs.contains($0.id) && $0.kind == .stroke
+        }.count
+    }
+
+    private var selectedStickyCount: Int {
+        canvasViewModel.boardState.elements.filter {
+            selection.selectedElementIDs.contains($0.id) && $0.kind == .stickyNote
+        }.count
     }
 }

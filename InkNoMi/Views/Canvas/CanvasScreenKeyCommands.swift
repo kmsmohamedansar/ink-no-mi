@@ -113,9 +113,8 @@ struct CanvasScreenKeyCommands: ViewModifier {
                 }
             }
             .onKeyPress(keys: ["s"]) { press in
-                singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.smartInk, fromKeyboard: true)
-                }
+                _ = press
+                return .ignored
             }
             .onKeyPress(keys: ["p"]) { press in
                 singleKeyToolPress(press) {
@@ -130,6 +129,11 @@ struct CanvasScreenKeyCommands: ViewModifier {
             .onKeyPress(keys: ["g"]) { press in
                 singleKeyToolPress(press) {
                     boardViewModel.toggleViewportShowGrid()
+                }
+            }
+            .onKeyPress(keys: ["k"]) { press in
+                singleKeyToolPress(press) {
+                    boardViewModel.applyCanvasToolSelection(.connect, fromKeyboard: true)
                 }
             }
     }

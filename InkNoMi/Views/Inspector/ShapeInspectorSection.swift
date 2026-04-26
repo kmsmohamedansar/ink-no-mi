@@ -52,7 +52,7 @@ struct ShapeInspectorSection: View {
                     }
                 }
 
-                if shapePayload.kind == .roundedRectangle {
+                if shapePayload.kind == .roundedRectangle || shapePayload.kind == .rectangle {
                     LabeledContent("Corner radius") {
                         Stepper(
                             value: cornerRadiusBinding(fallback: shapePayload.cornerRadius),

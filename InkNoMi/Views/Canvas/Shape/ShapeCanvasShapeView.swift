@@ -37,12 +37,13 @@ struct ShapeCanvasShapeView: View {
 
     @ViewBuilder
     private func rectangleBody(rect: CGRect, lw: CGFloat) -> some View {
+        let r = min(CGFloat(payload.cornerRadius), min(rect.width, rect.height) * 0.5)
         let fill = payload.fillColor.swiftUIColor
         let stroke = payload.strokeColor.swiftUIColor
-        Rectangle()
+        RoundedRectangle(cornerRadius: r, style: .continuous)
             .path(in: rect)
             .fill(payload.supportsFill ? fill : .clear)
-        Rectangle()
+        RoundedRectangle(cornerRadius: r, style: .continuous)
             .path(in: rect)
             .stroke(stroke, style: StrokeStyle(lineWidth: lw, lineJoin: .miter))
     }

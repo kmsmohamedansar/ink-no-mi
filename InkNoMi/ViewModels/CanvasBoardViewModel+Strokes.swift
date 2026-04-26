@@ -1,12 +1,8 @@
-import AppKit
 import CoreGraphics
 import Foundation
-import SwiftUI
 #if canImport(Vision)
 import Vision
 #endif
-
-// MARK: - Recognition domain models
 
 /// Raw freehand input captured from mouse/trackpad in absolute canvas space.
 struct FreehandStroke: Equatable, Sendable {
@@ -19,650 +15,18 @@ struct FreehandStroke: Equatable, Sendable {
         self.points = points
         self.createdAt = createdAt
     }
-
-    var bounds: CGRect {
-        guard let first = points.first else { return .null }
-        return points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { partial, point in
-            partial.union(CGRect(origin: point, size: .zero))
-        }
-    }
 }
-
-struct ShapeModel: Equatable, Sendable {
-    var kind: FlowDeskShapeKind
-    var frame: CGRect
-    var confidence: Double
-    /// For multi-stroke shape recognition (e.g. arrow shaft + head), these old strokes are removed.
-    var consumedStrokeElementIDs: [UUID] = []
-}
-
-struct TextElement: Equatable, Sendable {
-    var text: String
-    var frame: CGRect
-    var confidence: Double
-}
-
-enum StrokeCandidateKind: Sendable {
-    case shapeCandidate
-    case handwritingCandidate
-    case unknown
-}
-
-enum RecognitionPipelineOutcome: Equatable, Sendable {
-    case freehand
-    case shape(ShapeModel)
-    case text(TextElement)
-}
-
-protocol StrokeClassifier {
-    func classify(stroke: FreehandStroke) -> StrokeCandidateKind
-}
-
-protocol ShapeRecognizer {
-    func recognize(stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel?
-}
-
-protocol HandwritingRecognizer {
-    /// Returns `nil` when confidence is too low.
-    func recognize(strokes: [FreehandStroke]) -> TextElement?
-}
-
-protocol RecognitionPipeline {
-    func recognizeImmediateShape(stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel?
-}
-
-struct BasicStrokeClassifier: StrokeClassifier {
-    func classify(stroke: FreehandStroke) -> StrokeCandidateKind {
-        guard stroke.points.count >= 4 else { return .unknown }
-        let bounds = stroke.bounds.standardized
-        let path = polylineLength(points: stroke.points)
-        guard path > 0 else { return .unknown }
-        let direct = directDistance(points: stroke.points)
-        let straightness = direct / path
-        let turns = turnDensity(points: stroke.points)
-        let area = bounds.width * bounds.height
-
-        // Geometric strokes skew toward shape recognition.
-        if straightness >= 0.94 || (turns >= 0.3 && bounds.width >= 40 && bounds.height >= 40) {
-            return .shapeCandidate
-        }
-        // Curvy and compact strokes skew toward handwriting recognition.
-        if straightness <= 0.9,
-           turns <= 0.28,
-           area <= 280_000,
-           bounds.width <= 1200,
-           bounds.height <= 420 {
-            return .handwritingCandidate
-        }
-        return .unknown
-    }
-
-    private func directDistance(points: [CGPoint]) -> CGFloat {
-        guard let first = points.first, let last = points.last else { return 0 }
-        return hypot(last.x - first.x, last.y - first.y)
-    }
-
-    private func polylineLength(points: [CGPoint]) -> CGFloat {
-        guard points.count > 1 else { return 0 }
-        var total: CGFloat = 0
-        for idx in 1..<points.count {
-            total += hypot(points[idx].x - points[idx - 1].x, points[idx].y - points[idx - 1].y)
-        }
-        return total
-    }
-
-    private func turnDensity(points: [CGPoint]) -> Double {
-        guard points.count >= 6 else { return 0 }
-        let sampled = stride(from: 0, to: points.count, by: 2).map { points[$0] }
-        guard sampled.count >= 5 else { return 0 }
-        var turnCount = 0
-        for idx in 2..<(sampled.count - 2) {
-            let p0 = sampled[idx - 2]
-            let p1 = sampled[idx]
-            let p2 = sampled[idx + 2]
-            let angle = abs(turnAngleDegrees(
-                v1: CGVector(dx: p1.x - p0.x, dy: p1.y - p0.y),
-                v2: CGVector(dx: p2.x - p1.x, dy: p2.y - p1.y)
-            ))
-            if angle >= 28 { turnCount += 1 }
-        }
-        return Double(turnCount) / Double(max(1, sampled.count))
-    }
-
-    private func turnAngleDegrees(v1: CGVector, v2: CGVector) -> CGFloat {
-        let n1 = hypot(v1.dx, v1.dy)
-        let n2 = hypot(v2.dx, v2.dy)
-        guard n1 > 0.0001, n2 > 0.0001 else { return 0 }
-        let dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (n1 * n2)
-        return acos(max(-1, min(1, dot))) * 180 / .pi
-    }
-}
-
-struct SmartShapeRecognizer: ShapeRecognizer {
-    private let minimumRectangleConfidence = 0.62
-
-    func recognize(stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel? {
-        if let rectangle = detectRectangle(in: stroke) { return rectangle }
-        if let arrow = detectArrow(using: stroke, existingElements: existingElements) { return arrow }
-        if let line = detectLine(in: stroke) { return line }
-        return nil
-    }
-
-    /// Rectangle detection: forgiving closure + RDP simplification + angle tolerance.
-    private func detectRectangle(in stroke: FreehandStroke) -> ShapeModel? {
-        guard stroke.points.count >= 10 else { return nil }
-        let bounds = stroke.bounds.standardized
-        guard bounds.width >= 24, bounds.height >= 24 else { return nil }
-        guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
-
-        let diagonal = max(1, hypot(bounds.width, bounds.height))
-        let closureDistance = hypot(last.x - first.x, last.y - first.y)
-        let closureTolerance = max(24, diagonal * 0.22)
-        guard closureDistance <= closureTolerance else { return nil }
-
-        let simplified = douglasPeucker(points: stroke.points, epsilon: max(5, diagonal * 0.03))
-        let normalizedCorners = distinctCornerCandidates(points: simplified)
-        guard normalizedCorners.count >= 4 else { return nil }
-
-        let quadrilateral = chooseFourCorners(from: normalizedCorners)
-        guard quadrilateral.count == 4 else { return nil }
-        let rightAngleMatches = rightAngleCount(points: quadrilateral, toleranceDegrees: 25)
-        guard rightAngleMatches >= 3 else { return nil }
-
-        let closureScore = max(0, 1 - (closureDistance / closureTolerance))
-        let cornerScore = Double(min(normalizedCorners.count, 4)) / 4.0
-        let angleScore = Double(rightAngleMatches) / 4.0
-        let confidence = (closureScore * 0.3) + (cornerScore * 0.25) + (angleScore * 0.45)
-        guard confidence >= minimumRectangleConfidence else { return nil }
-        return ShapeModel(kind: .rectangle, frame: bounds, confidence: confidence)
-    }
-
-    private func detectLine(in stroke: FreehandStroke) -> ShapeModel? {
-        guard stroke.points.count >= 2 else { return nil }
-        guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
-        let path = polylineLength(points: stroke.points)
-        let direct = hypot(last.x - first.x, last.y - first.y)
-        let straightness = direct / max(path, 0.001)
-        let variance = averagePerpendicularVariance(points: stroke.points, start: first, end: last)
-        guard path >= 28, straightness >= 0.94, variance <= 5.2 else { return nil }
-
-        let minX = min(first.x, last.x)
-        let minY = min(first.y, last.y)
-        let frame = CGRect(
-            x: minX,
-            y: minY,
-            width: max(abs(last.x - first.x), CanvasShapeLayout.minWidth),
-            height: max(abs(last.y - first.y), CanvasShapeLayout.minHeight)
-        )
-        let confidence = min(1.0, (Double(straightness) * 0.8) + max(0, (1 - Double(variance / 10))) * 0.2)
-        return ShapeModel(kind: .line, frame: frame, confidence: confidence)
-    }
-
-    /// Arrow detection:
-    /// 1) one-stroke arrow
-    /// 2) separate head stroke + nearby line shaft stroke
-    private func detectArrow(using stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel? {
-        if let oneStrokeArrow = detectSingleStrokeArrow(in: stroke) {
-            return oneStrokeArrow
-        }
-        guard isArrowHeadCandidate(stroke) else { return nil }
-        let headCenter = CGPoint(x: stroke.bounds.midX, y: stroke.bounds.midY)
-        guard let shaft = nearestLineStrokeElement(to: headCenter, in: existingElements) else { return nil }
-        let shaftPoints = absolutePoints(from: shaft)
-        guard let shaftStart = shaftPoints.first, let shaftEnd = shaftPoints.last else { return nil }
-
-        let startDistance = hypot(headCenter.x - shaftStart.x, headCenter.y - shaftStart.y)
-        let endDistance = hypot(headCenter.x - shaftEnd.x, headCenter.y - shaftEnd.y)
-        let attachDistance = min(startDistance, endDistance)
-        guard attachDistance <= 70 else { return nil }
-
-        let shaftRect = CGRect(
-            x: min(shaftStart.x, shaftEnd.x),
-            y: min(shaftStart.y, shaftEnd.y),
-            width: abs(shaftEnd.x - shaftStart.x),
-            height: abs(shaftEnd.y - shaftStart.y)
-        )
-        let union = stroke.bounds.union(shaftRect).insetBy(dx: -8, dy: -8)
-        return ShapeModel(
-            kind: .arrow,
-            frame: CGRect(
-                x: union.minX,
-                y: union.minY,
-                width: max(union.width, CanvasShapeLayout.minWidth),
-                height: max(union.height, CanvasShapeLayout.minHeight)
-            ),
-            confidence: min(0.92, max(0.55, 1 - Double(attachDistance / 90))),
-            consumedStrokeElementIDs: [shaft.id]
-        )
-    }
-
-    private func detectSingleStrokeArrow(in stroke: FreehandStroke) -> ShapeModel? {
-        guard stroke.points.count >= 8 else { return nil }
-        guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
-        let bounds = stroke.bounds.standardized
-        guard bounds.width >= 36 || bounds.height >= 36 else { return nil }
-        let path = polylineLength(points: stroke.points)
-        let direct = hypot(last.x - first.x, last.y - first.y)
-        guard path > 0, direct / path >= 0.72 else { return nil }
-
-        let sampled = sample(points: stroke.points, step: 2)
-        guard sampled.count >= 6 else { return nil }
-        let tailIndex = max(2, sampled.count - 5)
-        var sharpTurnsNearTail = 0
-        for idx in tailIndex..<(sampled.count - 2) {
-            let p0 = sampled[idx - 1]
-            let p1 = sampled[idx]
-            let p2 = sampled[idx + 1]
-            let angle = abs(turnAngleDegrees(
-                v1: CGVector(dx: p1.x - p0.x, dy: p1.y - p0.y),
-                v2: CGVector(dx: p2.x - p1.x, dy: p2.y - p1.y)
-            ))
-            if angle >= 38 { sharpTurnsNearTail += 1 }
-        }
-        guard sharpTurnsNearTail >= 1 else { return nil }
-
-        let frame = bounds.insetBy(dx: -8, dy: -8)
-        return ShapeModel(
-            kind: .arrow,
-            frame: CGRect(
-                x: frame.minX,
-                y: frame.minY,
-                width: max(frame.width, CanvasShapeLayout.minWidth),
-                height: max(frame.height, CanvasShapeLayout.minHeight)
-            ),
-            confidence: 0.8
-        )
-    }
-
-    private func isArrowHeadCandidate(_ stroke: FreehandStroke) -> Bool {
-        let bounds = stroke.bounds.standardized
-        let path = polylineLength(points: stroke.points)
-        guard path >= 10, path <= 220 else { return false }
-        guard bounds.width <= 140, bounds.height <= 140 else { return false }
-        return majorCorners(points: stroke.points).count >= 1
-    }
-
-    private func nearestLineStrokeElement(to point: CGPoint, in elements: [CanvasElementRecord]) -> CanvasElementRecord? {
-        elements
-            .filter { $0.kind == .stroke }
-            .sorted { $0.zIndex > $1.zIndex }
-            .prefix(8)
-            .compactMap { element -> (CanvasElementRecord, CGFloat)? in
-                let points = absolutePoints(from: element)
-                guard points.count >= 2, let first = points.first, let last = points.last else { return nil }
-                let path = polylineLength(points: points)
-                let direct = hypot(last.x - first.x, last.y - first.y)
-                let straightness = direct / max(path, 0.001)
-                guard straightness >= 0.95, path >= 36 else { return nil }
-                let distance = min(
-                    hypot(point.x - first.x, point.y - first.y),
-                    hypot(point.x - last.x, point.y - last.y)
-                )
-                return (element, distance)
-            }
-            .sorted { $0.1 < $1.1 }
-            .first?
-            .0
-    }
-
-    private func absolutePoints(from element: CanvasElementRecord) -> [CGPoint] {
-        element.resolvedStrokePayload().points.map {
-            CGPoint(x: CGFloat(element.x + $0.x), y: CGFloat(element.y + $0.y))
-        }
-    }
-
-    private func majorCorners(points: [CGPoint]) -> [CGPoint] {
-        let sampled = sample(points: points, step: 3)
-        guard sampled.count >= 9 else { return [] }
-        var corners: [CGPoint] = []
-        for idx in 2..<(sampled.count - 2) {
-            let p0 = sampled[idx - 2]
-            let p1 = sampled[idx]
-            let p2 = sampled[idx + 2]
-            let angle = abs(turnAngleDegrees(
-                v1: CGVector(dx: p1.x - p0.x, dy: p1.y - p0.y),
-                v2: CGVector(dx: p2.x - p1.x, dy: p2.y - p1.y)
-            ))
-            if angle > 40 { corners.append(p1) }
-        }
-        return corners
-    }
-
-    private func douglasPeucker(points: [CGPoint], epsilon: CGFloat) -> [CGPoint] {
-        guard points.count > 2 else { return points }
-        var maxDistance: CGFloat = 0
-        var index = 0
-        let start = points[0]
-        let end = points[points.count - 1]
-        for i in 1..<(points.count - 1) {
-            let distance = perpendicularDistance(point: points[i], lineStart: start, lineEnd: end)
-            if distance > maxDistance {
-                index = i
-                maxDistance = distance
-            }
-        }
-        if maxDistance > epsilon {
-            let left = douglasPeucker(points: Array(points[0...index]), epsilon: epsilon)
-            let right = douglasPeucker(points: Array(points[index...(points.count - 1)]), epsilon: epsilon)
-            return Array(left.dropLast()) + right
-        } else {
-            return [start, end]
-        }
-    }
-
-    private func perpendicularDistance(point: CGPoint, lineStart: CGPoint, lineEnd: CGPoint) -> CGFloat {
-        let dx = lineEnd.x - lineStart.x
-        let dy = lineEnd.y - lineStart.y
-        let den = max(0.0001, hypot(dx, dy))
-        return abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x) / den
-    }
-
-    private func distinctCornerCandidates(points: [CGPoint]) -> [CGPoint] {
-        guard points.count >= 4 else { return points }
-        var distinct: [CGPoint] = []
-        for p in points {
-            if distinct.allSatisfy({ hypot($0.x - p.x, $0.y - p.y) > 14 }) {
-                distinct.append(p)
-            }
-        }
-        return distinct
-    }
-
-    private func chooseFourCorners(from points: [CGPoint]) -> [CGPoint] {
-        guard points.count >= 4 else { return [] }
-        if points.count == 4 { return points }
-        let centroid = CGPoint(
-            x: points.reduce(0) { $0 + $1.x } / CGFloat(points.count),
-            y: points.reduce(0) { $0 + $1.y } / CGFloat(points.count)
-        )
-        let sorted = points.sorted {
-            hypot($0.x - centroid.x, $0.y - centroid.y) > hypot($1.x - centroid.x, $1.y - centroid.y)
-        }
-        return Array(sorted.prefix(4))
-    }
-
-    private func rightAngleCount(points: [CGPoint], toleranceDegrees: CGFloat) -> Int {
-        guard points.count == 4 else { return 0 }
-        let center = CGPoint(
-            x: points.reduce(0) { $0 + $1.x } / 4,
-            y: points.reduce(0) { $0 + $1.y } / 4
-        )
-        let ordered = points.sorted {
-            atan2($0.y - center.y, $0.x - center.x) < atan2($1.y - center.y, $1.x - center.x)
-        }
-        var rightAngles = 0
-        for i in 0..<4 {
-            let p0 = ordered[(i + 3) % 4]
-            let p1 = ordered[i]
-            let p2 = ordered[(i + 1) % 4]
-            let angle = abs(turnAngleDegrees(
-                v1: CGVector(dx: p1.x - p0.x, dy: p1.y - p0.y),
-                v2: CGVector(dx: p2.x - p1.x, dy: p2.y - p1.y)
-            ))
-            if abs(angle - 90) <= toleranceDegrees {
-                rightAngles += 1
-            }
-        }
-        return rightAngles
-    }
-
-    private func sample(points: [CGPoint], step: Int) -> [CGPoint] {
-        guard step > 1, points.count > step else { return points }
-        var sampled: [CGPoint] = []
-        for idx in stride(from: 0, to: points.count, by: step) {
-            sampled.append(points[idx])
-        }
-        if sampled.last != points.last, let last = points.last { sampled.append(last) }
-        return sampled
-    }
-
-    private func polylineLength(points: [CGPoint]) -> CGFloat {
-        guard points.count > 1 else { return 0 }
-        var total: CGFloat = 0
-        for idx in 1..<points.count {
-            total += hypot(points[idx].x - points[idx - 1].x, points[idx].y - points[idx - 1].y)
-        }
-        return total
-    }
-
-    private func averagePerpendicularVariance(points: [CGPoint], start: CGPoint, end: CGPoint) -> CGFloat {
-        guard points.count > 2 else { return 0 }
-        let total = points.reduce(CGFloat.zero) { partial, point in
-            partial + perpendicularDistance(point: point, lineStart: start, lineEnd: end)
-        }
-        return total / CGFloat(points.count)
-    }
-
-    private func turnAngleDegrees(v1: CGVector, v2: CGVector) -> CGFloat {
-        let n1 = hypot(v1.dx, v1.dy)
-        let n2 = hypot(v2.dx, v2.dy)
-        guard n1 > 0.0001, n2 > 0.0001 else { return 0 }
-        let dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (n1 * n2)
-        return acos(max(-1, min(1, dot))) * 180 / .pi
-    }
-}
-
-struct VisionHandwritingRecognizer: HandwritingRecognizer {
-    private let confidenceThreshold: Float
-
-    init(confidenceThreshold: Float) {
-        self.confidenceThreshold = confidenceThreshold
-    }
-
-    /// Runs OCR on the grouped stroke image (not on a single stroke).
-    func recognize(strokes: [FreehandStroke]) -> TextElement? {
-        #if canImport(Vision)
-        guard !strokes.isEmpty else { return nil }
-        let groupedBounds = unionBounds(strokes: strokes)
-        guard let image = renderGroupedStrokeImage(strokes: strokes, bounds: groupedBounds) else { return nil }
-
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.minimumTextHeight = 0.04
-        request.recognitionLanguages = ["en-US"]
-
-        let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        do {
-            try handler.perform([request])
-            guard let observation = request.results?.first,
-                  let top = observation.topCandidates(1).first
-            else {
-                print("[InkNoMi OCR] OCR result: none")
-                return nil
-            }
-            let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            let confidence = top.confidence
-            print("[InkNoMi OCR] OCR result: \"\(text)\" confidence=\(confidence)")
-            guard !text.isEmpty, confidence >= confidenceThreshold else { return nil }
-            return TextElement(
-                text: text,
-                frame: groupedBounds.insetBy(dx: -8, dy: -8).standardized,
-                confidence: Double(confidence)
-            )
-        } catch {
-            print("[InkNoMi OCR] OCR error: \(error.localizedDescription)")
-            return nil
-        }
-        #else
-        return nil
-        #endif
-    }
-
-    private func unionBounds(strokes: [FreehandStroke]) -> CGRect {
-        strokes.reduce(CGRect.null) { partial, stroke in
-            partial.union(stroke.bounds)
-        }.standardized
-    }
-
-    private func renderGroupedStrokeImage(strokes: [FreehandStroke], bounds: CGRect) -> CGImage? {
-        guard bounds.width > 0, bounds.height > 0 else { return nil }
-        let padding: CGFloat = 18
-        let imageSize = CGSize(width: bounds.width + (padding * 2), height: bounds.height + (padding * 2))
-
-        guard let context = CGContext(
-            data: nil,
-            width: Int(ceil(imageSize.width)),
-            height: Int(ceil(imageSize.height)),
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceGray(),
-            bitmapInfo: CGImageAlphaInfo.none.rawValue
-        ) else {
-            return nil
-        }
-
-        context.setFillColor(NSColor.white.cgColor)
-        context.fill(CGRect(origin: .zero, size: imageSize))
-        context.setStrokeColor(NSColor.black.cgColor)
-        context.setLineWidth(3.5)
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        context.translateBy(x: 0, y: imageSize.height)
-        context.scaleBy(x: 1, y: -1)
-
-        for stroke in strokes {
-            let normalizedPoints = denoise(points: stroke.points)
-            var previous: CGPoint?
-            for point in normalizedPoints {
-                let p = CGPoint(
-                    x: (point.x - bounds.minX) + padding,
-                    y: (point.y - bounds.minY) + padding
-                )
-                if let prev = previous {
-                    context.move(to: prev)
-                    context.addLine(to: p)
-                    context.strokePath()
-                }
-                previous = p
-            }
-        }
-        return context.makeImage()
-    }
-
-    private func denoise(points: [CGPoint]) -> [CGPoint] {
-        guard points.count >= 5 else { return points }
-        var smoothed: [CGPoint] = []
-        smoothed.reserveCapacity(points.count)
-        for idx in points.indices {
-            let lower = max(0, idx - 1)
-            let upper = min(points.count - 1, idx + 1)
-            let window = points[lower...upper]
-            let avgX = window.reduce(0) { $0 + $1.x } / CGFloat(window.count)
-            let avgY = window.reduce(0) { $0 + $1.y } / CGFloat(window.count)
-            let p = CGPoint(x: avgX, y: avgY)
-            if smoothed.last.map({ hypot($0.x - p.x, $0.y - p.y) < 0.9 }) != true {
-                smoothed.append(p)
-            }
-        }
-        return smoothed
-    }
-}
-
-struct CanvasRecognitionPipeline: RecognitionPipeline {
-    private let classifier: StrokeClassifier
-    private let shapeRecognizer: ShapeRecognizer
-
-    init(
-        classifier: StrokeClassifier,
-        shapeRecognizer: ShapeRecognizer,
-        handwritingRecognizer: HandwritingRecognizer
-    ) {
-        // Handwriting is intentionally buffered/debounced outside this immediate pipeline.
-        self.classifier = classifier
-        self.shapeRecognizer = shapeRecognizer
-    }
-
-    func recognizeImmediateShape(stroke: FreehandStroke, existingElements: [CanvasElementRecord]) -> ShapeModel? {
-        let kind = classifier.classify(stroke: stroke)
-        switch kind {
-        case .shapeCandidate, .unknown:
-            return shapeRecognizer.recognize(stroke: stroke, existingElements: existingElements)
-        case .handwritingCandidate:
-            return nil
-        }
-    }
-}
-
-// MARK: - Handwriting buffer + debouncer
-
-struct HandwritingStrokeBuffer: Sendable {
-    var strokeElementIDs: [UUID] = []
-    var groupedBounds: CGRect = .null
-    var lastStrokeTime: Date?
-
-    mutating func clear() {
-        strokeElementIDs = []
-        groupedBounds = .null
-        lastStrokeTime = nil
-    }
-
-    mutating func addStroke(id: UUID, bounds: CGRect, at time: Date) {
-        strokeElementIDs.append(id)
-        groupedBounds = groupedBounds.isNull ? bounds : groupedBounds.union(bounds)
-        lastStrokeTime = time
-    }
-
-    func canGroup(newBounds: CGRect, at time: Date, maxGap: TimeInterval, maxDistance: CGFloat) -> Bool {
-        guard let lastStrokeTime else { return false }
-        guard time.timeIntervalSince(lastStrokeTime) <= maxGap else { return false }
-        guard !groupedBounds.isNull else { return false }
-        let expanded = groupedBounds.insetBy(dx: -maxDistance, dy: -maxDistance)
-        return expanded.intersects(newBounds) || expanded.contains(newBounds)
-    }
-}
-
-struct RecognitionDebouncer: Sendable {
-    var delaySeconds: TimeInterval
-}
-
-// MARK: - Canvas stroke commit and replacement
 
 @MainActor
 extension CanvasBoardViewModel {
-    private static let handwritingGroupingTimeWindow: TimeInterval = 1.2
-    private static let handwritingGroupingDistance: CGFloat = 180
-    private static let minimumHandwritingBoundsWidth: CGFloat = 22
-    private static let minimumHandwritingBoundsHeight: CGFloat = 16
-    private static let conversionAnimationDuration: TimeInterval = 0.16
-    private static let autoConvertConfidenceThreshold = 0.8
-    private static let suggestionConfidenceThreshold = 0.5
-
-    /// Temporary grouped handwriting state.
-    private static var fallbackBuffer = HandwritingStrokeBuffer()
-    private static var fallbackDebouncer = RecognitionDebouncer(delaySeconds: 1.0)
-    private static var fallbackWorkItem: DispatchWorkItem?
-    private static var fallbackRecognitionTask: Task<TextElement?, Never>?
-
-    private var handwritingBuffer: HandwritingStrokeBuffer {
-        get { Self.fallbackBuffer }
-        set { Self.fallbackBuffer = newValue }
-    }
-
-    private var handwritingDebouncer: RecognitionDebouncer {
-        get { Self.fallbackDebouncer }
-        set { Self.fallbackDebouncer = newValue }
-    }
-
-    private var handwritingRecognitionWorkItem: DispatchWorkItem? {
-        get { Self.fallbackWorkItem }
-        set { Self.fallbackWorkItem = newValue }
-    }
-
-    private var handwritingRecognitionTask: Task<TextElement?, Never>? {
-        get { Self.fallbackRecognitionTask }
-        set { Self.fallbackRecognitionTask = newValue }
-    }
-
+    /// Keeps legacy call sites while routing directly to raw stroke commit.
     func scheduleFreehandRecognition(
         absoluteCanvasPoints: [CGPoint],
         selection: CanvasSelectionModel,
         delay: TimeInterval = 0.2
     ) {
-        let points = absoluteCanvasPoints
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.commitFreehandStroke(absoluteCanvasPoints: points, selection: selection)
-        }
+        _ = delay
+        commitFreehandStroke(absoluteCanvasPoints: absoluteCanvasPoints, selection: selection)
     }
 
     func configureStrokeStyleForActiveTool() {
@@ -670,7 +34,7 @@ extension CanvasBoardViewModel {
         case .pencil:
             drawingLineWidth = 1.8
             drawingStrokeOpacity = 0.62
-        case .pen, .smartInk:
+        case .pen:
             drawingLineWidth = max(drawingLineWidth, 2.6)
             drawingStrokeOpacity = max(drawingStrokeOpacity, 0.95)
         default:
@@ -678,41 +42,13 @@ extension CanvasBoardViewModel {
         }
     }
 
+    /// Pure paint behavior: always persist the stroke exactly as drawn.
     func commitFreehandStroke(absoluteCanvasPoints: [CGPoint], selection: CanvasSelectionModel) {
         let decimated = StrokePathSmoothing.decimatedCanvasPoints(absoluteCanvasPoints, minDistance: 2)
         guard decimated.count >= 2 else { return }
         stopAllInlineEditing()
-        cancelPendingSmartInkSuggestion(reason: "new stroke began")
         let stroke = FreehandStroke(points: decimated)
-
-        if canvasTool == .smartInk {
-            // In Smart Ink mode only: run immediate shape recognition, then delayed grouped handwriting OCR.
-            if let shape = recognitionPipeline.recognizeImmediateShape(
-                stroke: stroke,
-                existingElements: boardState.elements
-            ) {
-                logSmartInk("shape candidate \(shape.kind) confidence=\(String(format: "%.2f", shape.confidence))")
-                if shape.confidence >= Self.autoConvertConfidenceThreshold {
-                    insertRecognizedShape(shape, fallbackStroke: stroke, selection: selection)
-                } else if shape.confidence >= Self.suggestionConfidenceThreshold {
-                    let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
-                    let sourceIDs = shape.consumedStrokeElementIDs + [persisted.id]
-                    presentSmartInkShapeSuggestion(shape, sourceStrokeIDs: sourceIDs, selection: selection)
-                } else {
-                    _ = insertPersistedFreehandStroke(stroke, selection: selection)
-                }
-                return
-            }
-            let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
-            addStrokeToHandwritingBuffer(
-                persistedStrokeID: persisted.id,
-                strokeBounds: persisted.bounds,
-                selection: selection
-            )
-        } else {
-            // Pen/Pencil modes stay as raw drawing with no semantic conversion.
-            _ = insertPersistedFreehandStroke(stroke, selection: selection)
-        }
+        _ = insertPersistedFreehandStroke(stroke, selection: selection)
     }
 
     func updateStrokePayload(id: UUID, _ body: (inout StrokePayload) -> Void) {
@@ -735,291 +71,12 @@ extension CanvasBoardViewModel {
         }
     }
 
-    private func addStrokeToHandwritingBuffer(
-        persistedStrokeID: UUID,
-        strokeBounds: CGRect,
-        selection: CanvasSelectionModel
-    ) {
-        let now = Date()
-        if handwritingBuffer.strokeElementIDs.isEmpty {
-            handwritingBuffer.clear()
-            handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            logSmartInk("group start stroke=\(persistedStrokeID.uuidString)")
-            scheduleHandwritingRecognition(selection: selection)
-            return
-        }
-
-        let canGroup = handwritingBuffer.canGroup(
-            newBounds: strokeBounds,
-            at: now,
-            maxGap: Self.handwritingGroupingTimeWindow,
-            maxDistance: Self.handwritingGroupingDistance
-        )
-
-        if canGroup {
-            handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            logSmartInk("group append stroke=\(persistedStrokeID.uuidString) count=\(handwritingBuffer.strokeElementIDs.count)")
-            cancelPendingHandwritingRecognition(reason: "user continued writing")
-            scheduleHandwritingRecognition(selection: selection)
-        } else {
-            performHandwritingRecognition(selection: selection)
-            handwritingBuffer.clear()
-            handwritingBuffer.addStroke(id: persistedStrokeID, bounds: strokeBounds, at: now)
-            logSmartInk("group reset stroke=\(persistedStrokeID.uuidString)")
-            scheduleHandwritingRecognition(selection: selection)
-        }
-    }
-
-    private func scheduleHandwritingRecognition(selection: CanvasSelectionModel) {
-        let delay = handwritingDebouncer.delaySeconds
-        logSmartInk("recognition scheduled in \(delay)s")
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.performHandwritingRecognition(selection: selection)
-        }
-        handwritingRecognitionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-    }
-
-    private func cancelPendingHandwritingRecognition(reason: String) {
-        if let workItem = handwritingRecognitionWorkItem {
-            workItem.cancel()
-            handwritingRecognitionWorkItem = nil
-            logSmartInk("recognition cancelled: \(reason)")
-        }
-        handwritingRecognitionTask?.cancel()
-        handwritingRecognitionTask = nil
-    }
-
-    private func performHandwritingRecognition(selection: CanvasSelectionModel) {
-        handwritingRecognitionWorkItem = nil
-        let ids = handwritingBuffer.strokeElementIDs
-        guard !ids.isEmpty else { return }
-
-        let groupedElements = boardState.elements.filter { ids.contains($0.id) && $0.kind == .stroke }
-        guard !groupedElements.isEmpty else {
-            handwritingBuffer.clear()
-            return
-        }
-
-        let groupedStrokes: [FreehandStroke] = groupedElements.compactMap { element in
-            let payload = element.resolvedStrokePayload()
-            guard !payload.points.isEmpty else { return nil }
-            let points = payload.points.map {
-                CGPoint(x: CGFloat(element.x + $0.x), y: CGFloat(element.y + $0.y))
-            }
-            return FreehandStroke(points: points)
-        }
-        guard !groupedStrokes.isEmpty else {
-            handwritingBuffer.clear()
-            return
-        }
-
-        let groupedBounds = groupedStrokes.reduce(CGRect.null) { partial, stroke in
-            partial.union(stroke.bounds)
-        }.standardized
-        guard groupedBounds.width >= Self.minimumHandwritingBoundsWidth,
-              groupedBounds.height >= Self.minimumHandwritingBoundsHeight else {
-            handwritingBuffer.clear()
-            return
-        }
-        logSmartInk("grouped strokes=\(groupedStrokes.count) bounds=\(groupedBounds.debugDescription)")
-
-        handwritingRecognitionTask?.cancel()
-        let recognizer = VisionHandwritingRecognizer(confidenceThreshold: 0.36)
-        let capturedIDs = ids
-        let capturedGroupedCount = groupedStrokes.count
-        let recognitionTask = Task.detached(priority: .userInitiated) {
-            recognizer.recognize(strokes: groupedStrokes)
-        }
-        handwritingRecognitionTask = recognitionTask
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            let recognizedText = await recognitionTask.value
-            self.handwritingRecognitionTask = nil
-            guard let textElement = recognizedText else {
-                // Keep raw strokes when confidence is low or OCR is uncertain.
-                self.logSmartInk("ocr none/low-confidence; keep strokes")
-                if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
-                    self.handwritingBuffer.clear()
-                }
-                return
-            }
-            self.logSmartInk("ocr text=\"\(textElement.text)\" confidence=\(String(format: "%.2f", textElement.confidence))")
-            if textElement.text.count == 1, capturedGroupedCount >= 2, textElement.confidence < 0.72 {
-                // Conservative fallback for noisy one-letter guesses from multi-stroke handwriting.
-                if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
-                    self.handwritingBuffer.clear()
-                }
-                return
-            }
-            if textElement.confidence >= Self.autoConvertConfidenceThreshold {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    self.applyBoardMutation { state in
-                        self.beginStrokeConversion(for: capturedIDs)
-                        state.elements.removeAll { capturedIDs.contains($0.id) }
-                    }
-                }
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
-                    self?.endStrokeConversion(for: capturedIDs)
-                }
-                self.insertRecognizedText(textElement, selection: selection)
-            } else if textElement.confidence >= Self.suggestionConfidenceThreshold {
-                self.presentSmartInkTextSuggestion(textElement, sourceStrokeIDs: capturedIDs, selection: selection)
-            } else {
-                self.logSmartInk("ocr confidence below threshold; keep strokes")
-            }
-            if Set(self.handwritingBuffer.strokeElementIDs) == Set(capturedIDs) {
-                self.handwritingBuffer.clear()
-            }
-        }
-    }
-
-    private func insertRecognizedShape(
-        _ shape: ShapeModel,
-        fallbackStroke: FreehandStroke,
-        selection: CanvasSelectionModel
-    ) {
-        let frame = shape.frame.standardized
-        guard frame.width >= CanvasShapeLayout.minWidth, frame.height >= CanvasShapeLayout.minHeight else {
-            if !fallbackStroke.points.isEmpty {
-                _ = insertPersistedFreehandStroke(fallbackStroke, selection: selection)
-            }
-            return
-        }
-        var payload = ShapePayload.default
-        payload.kind = shape.kind
-        let shapeID = UUID()
-        let record = CanvasElementRecord(
-            id: shapeID,
-            kind: .shape,
-            x: frame.minX,
-            y: frame.minY,
-            width: frame.width,
-            height: frame.height,
-            zIndex: nextZIndex(),
-            parentShapeID: parentShapeForNewElement(),
-            shapePayload: payload
-        )
-        let consumed = shape.consumedStrokeElementIDs
-        beginStrokeConversion(for: consumed)
-        beginShapeConversion(for: shapeID)
-        withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
-            applyBoardMutation { state in
-                if !consumed.isEmpty {
-                    state.elements.removeAll { consumed.contains($0.id) }
-                }
-                state.elements.append(record)
-            }
-        }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
-            self?.endStrokeConversion(for: consumed)
-            self?.endShapeConversion(for: shapeID)
-        }
-        selection.selectOnly(shapeID)
-    }
-
-    private func insertRecognizedText(_ textElement: TextElement, selection: CanvasSelectionModel) {
-        guard !textElement.text.isEmpty else { return }
-        let frame = textElement.frame.standardized
-        let width = max(frame.width, CanvasTextBlockLayout.minWidth)
-        let height = max(frame.height, CanvasTextBlockLayout.minHeight)
-        var payload = TextBlockPayload.default
-        payload.text = textElement.text
-        let textID = UUID()
-        let record = CanvasElementRecord(
-            id: textID,
-            kind: .textBlock,
-            x: frame.minX,
-            y: frame.minY,
-            width: width,
-            height: height,
-            zIndex: nextZIndex(),
-            parentShapeID: parentShapeForNewElement(),
-            textBlock: payload
-        )
-        beginTextConversion(for: textID)
-        withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
-            applyBoardMutation { state in
-                state.elements.append(record)
-            }
-        }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.conversionAnimationDuration * 1_000_000_000))
-            self?.endTextConversion(for: textID)
-        }
-        selection.selectOnly(textID)
-        editingStickyNoteElementID = nil
-        editingConnectorLabelElementID = nil
-        editingTextElementID = textID
-    }
-
-    private func presentSmartInkShapeSuggestion(
-        _ shape: ShapeModel,
-        sourceStrokeIDs: [UUID],
-        selection: CanvasSelectionModel
-    ) {
-        pendingSmartInkSuggestionWorkItem?.cancel()
-        pendingSmartInkSuggestion = SmartInkSuggestion(
-            kind: .shape(shape),
-            sourceStrokeIDs: sourceStrokeIDs,
-            confidence: shape.confidence
-        )
-        logSmartInk("shape suggestion shown confidence=\(String(format: "%.2f", shape.confidence))")
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self, let suggestion = self.pendingSmartInkSuggestion else { return }
-            guard case let .shape(suggestedShape) = suggestion.kind else { return }
-            self.beginStrokeConversion(for: suggestion.sourceStrokeIDs)
-            withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
-                self.applyBoardMutation { state in
-                    state.elements.removeAll { suggestion.sourceStrokeIDs.contains($0.id) }
-                }
-            }
-            self.insertRecognizedShape(suggestedShape, fallbackStroke: FreehandStroke(points: []), selection: selection)
-            self.pendingSmartInkSuggestion = nil
-            self.endStrokeConversion(for: suggestion.sourceStrokeIDs)
-            self.logSmartInk("shape suggestion confirmed")
-        }
-        pendingSmartInkSuggestionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
-    }
-
-    private func presentSmartInkTextSuggestion(
-        _ text: TextElement,
-        sourceStrokeIDs: [UUID],
-        selection: CanvasSelectionModel
-    ) {
-        pendingSmartInkSuggestionWorkItem?.cancel()
-        pendingSmartInkSuggestion = SmartInkSuggestion(
-            kind: .text(text),
-            sourceStrokeIDs: sourceStrokeIDs,
-            confidence: text.confidence
-        )
-        logSmartInk("text suggestion shown confidence=\(String(format: "%.2f", text.confidence))")
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self, let suggestion = self.pendingSmartInkSuggestion else { return }
-            guard case let .text(suggestedText) = suggestion.kind else { return }
-            self.beginStrokeConversion(for: suggestion.sourceStrokeIDs)
-            withAnimation(.easeOut(duration: Self.conversionAnimationDuration)) {
-                self.applyBoardMutation { state in
-                    state.elements.removeAll { suggestion.sourceStrokeIDs.contains($0.id) }
-                }
-            }
-            self.insertRecognizedText(suggestedText, selection: selection)
-            self.pendingSmartInkSuggestion = nil
-            self.endStrokeConversion(for: suggestion.sourceStrokeIDs)
-            self.logSmartInk("text suggestion confirmed")
-        }
-        pendingSmartInkSuggestionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
-    }
-
     @discardableResult
     private func insertPersistedFreehandStroke(
         _ stroke: FreehandStroke,
         selection: CanvasSelectionModel
     ) -> (id: UUID, bounds: CGRect) {
+        _ = selection
         let pad = max(6, CGFloat(drawingLineWidth) * 0.5 + 4)
         let xs = stroke.points.map(\.x)
         let ys = stroke.points.map(\.y)
@@ -1052,19 +109,744 @@ extension CanvasBoardViewModel {
             width: w,
             height: h,
             zIndex: nextZIndex(),
-            parentShapeID: parentShapeForNewElement(),
+            parentShapeID: nil,
             strokePayload: payload
         )
         applyBoardMutation { state in
             state.elements.append(record)
         }
-        selection.selectOnly(id)
         return (id, CGRect(x: originX, y: originY, width: w, height: h))
     }
 }
 
 private extension Double {
     func clamped(to range: ClosedRange<Double>) -> Double {
+        min(max(self, range.lowerBound), range.upperBound)
+    }
+}
+
+@MainActor
+extension CanvasBoardViewModel {
+    func convertSelectedStrokesToShape(selection: CanvasSelectionModel) {
+        let selected = selectedStrokeRecords(selection: selection)
+        guard !selected.isEmpty else { return }
+        let strokes = selected.map(absoluteStroke(from:))
+        guard let candidate = detectBestShape(from: strokes) else { return }
+
+        var payload = ShapePayload.default
+        payload.kind = candidate.kind
+        let frame = candidate.frame.standardized
+        guard frame.width >= CanvasShapeLayout.minWidth, frame.height >= CanvasShapeLayout.minHeight else { return }
+
+        let id = UUID()
+        let sourceIDs = Set(selected.map(\.id))
+        let record = CanvasElementRecord(
+            id: id,
+            kind: .shape,
+            x: frame.minX,
+            y: frame.minY,
+            width: frame.width,
+            height: frame.height,
+            zIndex: nextZIndex(),
+            parentShapeID: nil,
+            shapePayload: payload
+        )
+        applyBoardMutation { state in
+            state.elements.removeAll { sourceIDs.contains($0.id) }
+            state.elements.append(record)
+        }
+        selection.selectOnly(id)
+    }
+
+    func convertSelectedStrokesToText(selection: CanvasSelectionModel) {
+        let selected = selectedStrokeRecords(selection: selection)
+        guard !selected.isEmpty else { return }
+        let strokes = selected.map(absoluteStroke(from:))
+        let sourceIDs = Set(selected.map(\.id))
+        Task.detached(priority: .userInitiated) { [strokes] in
+            let result = Self.recognizeText(from: strokes)
+            await MainActor.run {
+                guard let recognized = result else { return }
+                self.replaceStrokesWithText(recognized: recognized, sourceStrokeIDs: sourceIDs, selection: selection)
+            }
+        }
+    }
+
+    func convertSelectedStrokesToDiagram(selection: CanvasSelectionModel) {
+        let selected = selectedStrokeRecords(selection: selection)
+        guard selected.count >= 2 else { return }
+        let strokes = selected.map(absoluteStroke(from:))
+        let groups = groupDiagramStrokes(strokes)
+        guard groups.count >= 2 else { return }
+        let plan = buildDiagramPlan(strokes: strokes, groups: groups)
+        applyDiagramPlan(plan, selectedStrokeIDs: Set(selected.map(\.id)), selection: selection)
+    }
+}
+
+private extension CanvasBoardViewModel {
+    struct ManualShapeCandidate {
+        var kind: FlowDeskShapeKind
+        var frame: CGRect
+        var confidence: Double
+    }
+
+    struct RecognizedManualText {
+        var text: String
+        var frame: CGRect
+        var confidence: Double
+    }
+
+    struct DiagramStrokeGroup {
+        var strokeIDs: Set<UUID>
+        var bounds: CGRect
+        var centroid: CGPoint
+    }
+
+    struct DiagramElementDraft {
+        var id: UUID
+        var kind: CanvasElementKind
+        var frame: CGRect
+        var zIndex: Int
+        var shapePayload: ShapePayload?
+        var textPayload: TextBlockPayload?
+    }
+
+    struct DiagramConnectorDraft {
+        var startID: UUID
+        var endID: UUID
+        var startPoint: CGPoint
+        var endPoint: CGPoint
+        var style: ConnectorLineStyle
+    }
+
+    struct DiagramPlan {
+        var drafts: [DiagramElementDraft]
+        var connectors: [DiagramConnectorDraft]
+        var confidence: Double
+    }
+
+    enum DiagramGroupKind {
+        case rectangle(ManualShapeCandidate)
+        case arrow(ManualShapeCandidate)
+        case text(RecognizedManualText)
+    }
+
+    func selectedStrokeRecords(selection: CanvasSelectionModel) -> [CanvasElementRecord] {
+        boardState.elements.filter { selection.selectedElementIDs.contains($0.id) && $0.kind == .stroke }
+    }
+
+    func absoluteStroke(from element: CanvasElementRecord) -> FreehandStroke {
+        let payload = element.resolvedStrokePayload()
+        let points = payload.points.map { CGPoint(x: element.x + $0.x, y: element.y + $0.y) }
+        return FreehandStroke(id: element.id, points: points)
+    }
+
+    func detectBestShape(from strokes: [FreehandStroke]) -> ManualShapeCandidate? {
+        var candidates: [ManualShapeCandidate] = []
+        if strokes.count == 1, let stroke = strokes.first {
+            if let rectangle = detectRectangle(stroke) { candidates.append(rectangle) }
+            if let arrow = detectSingleStrokeArrow(stroke) { candidates.append(arrow) }
+            if let line = detectLine(stroke) { candidates.append(line) }
+        } else if let arrow = detectMultiStrokeArrow(strokes) {
+            candidates.append(arrow)
+        }
+        return candidates.sorted(by: { $0.confidence > $1.confidence }).first
+    }
+
+    func groupDiagramStrokes(_ strokes: [FreehandStroke]) -> [DiagramStrokeGroup] {
+        guard !strokes.isEmpty else { return [] }
+        let metrics: [(stroke: FreehandStroke, bounds: CGRect, centroid: CGPoint)] = strokes.compactMap { stroke in
+            guard !stroke.points.isEmpty else { return nil }
+            let bounds = boundsForPoints(stroke.points).insetBy(dx: -8, dy: -8)
+            let center = CGPoint(x: bounds.midX, y: bounds.midY)
+            return (stroke, bounds, center)
+        }
+        guard !metrics.isEmpty else { return [] }
+
+        let proximityThreshold: CGFloat = 72
+        var adjacency: [UUID: Set<UUID>] = [:]
+        for item in metrics {
+            adjacency[item.stroke.id] = []
+        }
+        for i in 0..<metrics.count {
+            for j in (i + 1)..<metrics.count {
+                let a = metrics[i]
+                let b = metrics[j]
+                let expandedIntersect = a.bounds.insetBy(dx: -14, dy: -14).intersects(b.bounds.insetBy(dx: -14, dy: -14))
+                let centerDistance = hypot(a.centroid.x - b.centroid.x, a.centroid.y - b.centroid.y)
+                let nearby = centerDistance <= proximityThreshold
+                if expandedIntersect || nearby {
+                    adjacency[a.stroke.id, default: []].insert(b.stroke.id)
+                    adjacency[b.stroke.id, default: []].insert(a.stroke.id)
+                }
+            }
+        }
+
+        var visited: Set<UUID> = []
+        var groups: [DiagramStrokeGroup] = []
+        let byID: [UUID: (stroke: FreehandStroke, bounds: CGRect, centroid: CGPoint)] = Dictionary(uniqueKeysWithValues: metrics.map { ($0.stroke.id, $0) })
+        for metric in metrics {
+            if visited.contains(metric.stroke.id) { continue }
+            var queue: [UUID] = [metric.stroke.id]
+            var ids: Set<UUID> = []
+            while let current = queue.popLast() {
+                if visited.contains(current) { continue }
+                visited.insert(current)
+                ids.insert(current)
+                for neighbor in adjacency[current, default: []] where !visited.contains(neighbor) {
+                    queue.append(neighbor)
+                }
+            }
+            let groupRects = ids.compactMap { byID[$0]?.bounds }
+            guard let first = groupRects.first else { continue }
+            let bounds = groupRects.dropFirst().reduce(first) { $0.union($1) }
+            let centers = ids.compactMap { byID[$0]?.centroid }
+            let centroid = centers.isEmpty
+                ? CGPoint(x: bounds.midX, y: bounds.midY)
+                : CGPoint(
+                    x: centers.reduce(0) { $0 + $1.x } / CGFloat(centers.count),
+                    y: centers.reduce(0) { $0 + $1.y } / CGFloat(centers.count)
+                )
+            groups.append(DiagramStrokeGroup(strokeIDs: ids, bounds: bounds, centroid: centroid))
+        }
+        return groups.sorted { lhs, rhs in
+            if lhs.centroid.y != rhs.centroid.y { return lhs.centroid.y < rhs.centroid.y }
+            return lhs.centroid.x < rhs.centroid.x
+        }
+    }
+
+    func buildDiagramPlan(strokes: [FreehandStroke], groups: [DiagramStrokeGroup]) -> DiagramPlan? {
+        guard !groups.isEmpty else { return nil }
+        let strokeMap = Dictionary(uniqueKeysWithValues: strokes.map { ($0.id, $0) })
+        var classified: [(group: DiagramStrokeGroup, kind: DiagramGroupKind, confidence: Double)] = []
+
+        for group in groups {
+            let groupStrokes = group.strokeIDs.compactMap { strokeMap[$0] }
+            guard !groupStrokes.isEmpty else { continue }
+            if let kind = classifyDiagramGroup(groupStrokes: groupStrokes, groupBounds: group.bounds) {
+                let confidence: Double
+                switch kind {
+                case .rectangle(let rect): confidence = rect.confidence
+                case .arrow(let arrow): confidence = arrow.confidence
+                case .text(let text): confidence = text.confidence
+                }
+                classified.append((group, kind, confidence))
+            }
+        }
+
+        guard !classified.isEmpty else { return nil }
+        let validRatio = Double(classified.count) / Double(max(groups.count, 1))
+        let avgConfidence = classified.reduce(0.0) { $0 + $1.confidence } / Double(classified.count)
+        let totalConfidence = (validRatio * 0.45) + (avgConfidence * 0.55)
+        guard totalConfidence >= 0.74 else { return nil }
+
+        let boxItems = classified.filter {
+            if case .rectangle = $0.kind { return true }
+            return false
+        }.sorted {
+            if $0.group.centroid.y != $1.group.centroid.y { return $0.group.centroid.y < $1.group.centroid.y }
+            return $0.group.centroid.x < $1.group.centroid.x
+        }
+
+        var boxFramesByGroup: [Set<UUID>: CGRect] = [:]
+        if !boxItems.isEmpty {
+            let laneSpacing: CGFloat = 44
+            var cursorX: CGFloat = boxItems.first?.group.bounds.minX ?? 120
+            let cursorY: CGFloat = boxItems.first?.group.bounds.minY ?? 120
+            for item in boxItems {
+                let source: CGRect
+                if case .rectangle(let shape) = item.kind {
+                    source = shape.frame.standardized
+                } else {
+                    source = item.group.bounds.standardized
+                }
+                let width = max(source.width, 110)
+                let height = max(source.height, 72)
+                let alignedY = round(cursorY / 8) * 8
+                let alignedX = round(cursorX / 8) * 8
+                let snapped = CGRect(x: alignedX, y: alignedY, width: round(width / 8) * 8, height: round(height / 8) * 8)
+                boxFramesByGroup[item.group.strokeIDs] = snapped
+                cursorX = snapped.maxX + laneSpacing
+            }
+        }
+
+        var drafts: [DiagramElementDraft] = []
+        var groupElementIDs: [Set<UUID>: UUID] = [:]
+        var runningZ = 1
+
+        for item in classified {
+            let id = UUID()
+            groupElementIDs[item.group.strokeIDs] = id
+            var frame = item.group.bounds.standardized
+            var shapePayload: ShapePayload?
+            var textPayload: TextBlockPayload?
+            var kind: CanvasElementKind = .shape
+
+            switch item.kind {
+            case .rectangle(let shape):
+                frame = boxFramesByGroup[item.group.strokeIDs] ?? shape.frame.standardized
+                var payload = ShapePayload.default
+                payload.kind = .rectangle
+                shapePayload = payload
+                kind = .shape
+            case .arrow(let arrow):
+                frame = arrow.frame.standardized
+                var payload = ShapePayload.default
+                payload.kind = .arrow
+                shapePayload = payload
+                kind = .shape
+            case .text(let recognized):
+                frame = recognized.frame.standardized
+                let width = max(frame.width, CanvasTextBlockLayout.minWidth)
+                let height = max(frame.height, CanvasTextBlockLayout.minHeight)
+                frame = CGRect(x: frame.minX, y: frame.minY, width: width, height: height)
+                var payload = TextBlockPayload.default
+                payload.text = recognized.text
+                textPayload = payload
+                kind = .textBlock
+            }
+
+            drafts.append(
+                DiagramElementDraft(
+                    id: id,
+                    kind: kind,
+                    frame: frame,
+                    zIndex: runningZ,
+                    shapePayload: shapePayload,
+                    textPayload: textPayload
+                )
+            )
+            runningZ += 1
+        }
+
+        let boxDrafts = drafts.filter {
+            $0.kind == .shape && $0.shapePayload?.kind == .rectangle
+        }
+        var connectors: [DiagramConnectorDraft] = []
+        for item in classified {
+            guard case .arrow = item.kind,
+                  let arrowID = groupElementIDs[item.group.strokeIDs],
+                  let arrowDraft = drafts.first(where: { $0.id == arrowID })
+            else { continue }
+
+            let sourceCenter = CGPoint(x: arrowDraft.frame.midX, y: arrowDraft.frame.midY)
+            let nearBoxes = boxDrafts
+                .map { box -> (draft: DiagramElementDraft, distance: CGFloat) in
+                    let c = CGPoint(x: box.frame.midX, y: box.frame.midY)
+                    return (box, hypot(c.x - sourceCenter.x, c.y - sourceCenter.y))
+                }
+                .sorted { $0.distance < $1.distance }
+
+            guard nearBoxes.count >= 2 else { continue }
+            let a = nearBoxes[0].draft
+            let b = nearBoxes[1].draft
+            if a.id == b.id { continue }
+            let connection = Self.connectorBetween(start: a, end: b)
+            connectors.append(connection)
+        }
+
+        return DiagramPlan(drafts: drafts, connectors: connectors, confidence: totalConfidence)
+    }
+
+    func classifyDiagramGroup(groupStrokes: [FreehandStroke], groupBounds: CGRect) -> DiagramGroupKind? {
+        if groupStrokes.count == 1, let stroke = groupStrokes.first, let rectangle = detectRectangle(stroke), rectangle.confidence >= 0.79 {
+            return .rectangle(rectangle)
+        }
+        if let arrow = detectMultiStrokeArrow(groupStrokes), arrow.confidence >= 0.78 {
+            return .arrow(arrow)
+        }
+        if groupStrokes.count == 1, let stroke = groupStrokes.first, let arrow = detectSingleStrokeArrow(stroke), arrow.confidence >= 0.8 {
+            return .arrow(arrow)
+        }
+        if let recognized = Self.recognizeText(from: groupStrokes), recognized.confidence >= 0.74 {
+            return .text(recognized)
+        }
+        _ = groupBounds
+        return nil
+    }
+
+    static func connectorBetween(start: DiagramElementDraft, end: DiagramElementDraft) -> DiagramConnectorDraft {
+        let startCenter = CGPoint(x: start.frame.midX, y: start.frame.midY)
+        let endCenter = CGPoint(x: end.frame.midX, y: end.frame.midY)
+        let dx = endCenter.x - startCenter.x
+        let dy = endCenter.y - startCenter.y
+        if abs(dx) >= abs(dy) {
+            let startPoint = CGPoint(x: dx >= 0 ? start.frame.maxX : start.frame.minX, y: startCenter.y)
+            let endPoint = CGPoint(x: dx >= 0 ? end.frame.minX : end.frame.maxX, y: endCenter.y)
+            return DiagramConnectorDraft(startID: start.id, endID: end.id, startPoint: startPoint, endPoint: endPoint, style: .arrow)
+        }
+        let startPoint = CGPoint(x: startCenter.x, y: dy >= 0 ? start.frame.maxY : start.frame.minY)
+        let endPoint = CGPoint(x: endCenter.x, y: dy >= 0 ? end.frame.minY : end.frame.maxY)
+        return DiagramConnectorDraft(startID: start.id, endID: end.id, startPoint: startPoint, endPoint: endPoint, style: .arrow)
+    }
+
+    func applyDiagramPlan(_ plan: DiagramPlan?, selectedStrokeIDs: Set<UUID>, selection: CanvasSelectionModel) {
+        guard let plan else { return }
+        guard plan.confidence >= 0.74 else { return }
+        guard !plan.drafts.isEmpty else { return }
+
+        let existingMaxZ = boardState.elements.map(\.zIndex).max() ?? 0
+        var records: [CanvasElementRecord] = []
+        for (index, draft) in plan.drafts.enumerated() {
+            let frame = draft.frame.standardized
+            let record = CanvasElementRecord(
+                id: draft.id,
+                kind: draft.kind,
+                x: frame.minX,
+                y: frame.minY,
+                width: max(1, frame.width),
+                height: max(1, frame.height),
+                zIndex: existingMaxZ + index + 1,
+                parentShapeID: nil,
+                textBlock: draft.textPayload,
+                shapePayload: draft.shapePayload
+            )
+            records.append(record)
+        }
+
+        let shapeRecordsByID: [UUID: CanvasElementRecord] = Dictionary(
+            uniqueKeysWithValues: records.filter { $0.kind == .shape }.map { ($0.id, $0) }
+        )
+
+        let connectorRecords: [CanvasElementRecord] = plan.connectors.compactMap { connector in
+            guard let start = shapeRecordsByID[connector.startID], let end = shapeRecordsByID[connector.endID] else { return nil }
+            let startRect = CGRect(x: start.x, y: start.y, width: start.width, height: start.height)
+            let endRect = CGRect(x: end.x, y: end.y, width: end.width, height: end.height)
+            let startEdge = edgeForPoint(connector.startPoint, rect: startRect)
+            let endEdge = edgeForPoint(connector.endPoint, rect: endRect)
+            let startT = edgeT(for: connector.startPoint, in: startRect, edge: startEdge)
+            let endT = edgeT(for: connector.endPoint, in: endRect, edge: endEdge)
+            let poly = CanvasConnectorGeometry.routingPolyline(
+                start: connector.startPoint,
+                end: connector.endPoint,
+                startEdge: startEdge,
+                endEdge: endEdge,
+                lineStyle: connector.style
+            )
+            let box = CanvasConnectorGeometry.boundingFrame(polyline: poly, padding: CanvasConnectorGeometry.framePadding)
+            let payload = ConnectorPayload(
+                startElementID: start.id,
+                endElementID: end.id,
+                startEdge: startEdge,
+                endEdge: endEdge,
+                startT: startT,
+                endT: endT,
+                style: connector.style,
+                strokeColor: FlowDeskConnectorVisuals.defaultStrokeRGBA,
+                lineWidth: FlowDeskConnectorVisuals.defaultLineWidthDouble,
+                label: ""
+            )
+            return CanvasElementRecord(
+                id: UUID(),
+                kind: .connector,
+                x: Double(box.minX),
+                y: Double(box.minY),
+                width: Double(box.width),
+                height: Double(box.height),
+                zIndex: (existingMaxZ + records.count + 1),
+                connectorPayload: payload
+            )
+        }
+
+        let newIDs = Set(records.map(\.id))
+        applyBoardMutation { state in
+            state.elements.removeAll { selectedStrokeIDs.contains($0.id) }
+            state.elements.append(contentsOf: records)
+            state.elements.append(contentsOf: connectorRecords)
+        }
+        selection.replaceSelection(newIDs)
+    }
+
+    func edgeForPoint(_ point: CGPoint, rect: CGRect) -> ConnectorEdge {
+        let distances: [(ConnectorEdge, CGFloat)] = [
+            (.top, abs(point.y - rect.minY)),
+            (.bottom, abs(point.y - rect.maxY)),
+            (.left, abs(point.x - rect.minX)),
+            (.right, abs(point.x - rect.maxX))
+        ]
+        return distances.min(by: { $0.1 < $1.1 })?.0 ?? .right
+    }
+
+    func edgeT(for point: CGPoint, in rect: CGRect, edge: ConnectorEdge) -> Double {
+        switch edge {
+        case .top, .bottom:
+            let denom = max(rect.width, 1)
+            return Double(((point.x - rect.minX) / denom).clamped(to: 0...1))
+        case .left, .right:
+            let denom = max(rect.height, 1)
+            return Double(((point.y - rect.minY) / denom).clamped(to: 0...1))
+        }
+    }
+
+    func detectRectangle(_ stroke: FreehandStroke) -> ManualShapeCandidate? {
+        guard stroke.points.count >= 8 else { return nil }
+        guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
+        let bounds = boundsForPoints(stroke.points)
+        guard bounds.width >= 28, bounds.height >= 28 else { return nil }
+
+        let perimeter = max(1, (bounds.width + bounds.height) * 2)
+        let closure = hypot(last.x - first.x, last.y - first.y)
+        let closureScore = max(0, 1 - (closure / max(22, perimeter * 0.12)))
+        guard closureScore > 0.6 else { return nil }
+
+        let simplified = douglasPeucker(points: stroke.points, epsilon: max(4, hypot(bounds.width, bounds.height) * 0.03))
+        let corners = countCorners(points: simplified, thresholdDegrees: 42)
+        let cornerScore = max(0, 1 - (abs(Double(corners) - 4) / 4))
+        let confidence = closureScore * 0.55 + cornerScore * 0.45
+        guard confidence >= 0.78 else { return nil }
+        return ManualShapeCandidate(kind: .rectangle, frame: bounds, confidence: confidence)
+    }
+
+    func detectLine(_ stroke: FreehandStroke) -> ManualShapeCandidate? {
+        guard stroke.points.count >= 2, let first = stroke.points.first, let last = stroke.points.last else { return nil }
+        let path = polylineLength(stroke.points)
+        guard path > 24 else { return nil }
+        let direct = hypot(last.x - first.x, last.y - first.y)
+        let straightness = direct / max(path, 0.001)
+        guard straightness >= 0.95 else { return nil }
+        let frame = CGRect(
+            x: min(first.x, last.x),
+            y: min(first.y, last.y),
+            width: max(abs(last.x - first.x), CanvasShapeLayout.minWidth),
+            height: max(abs(last.y - first.y), CanvasShapeLayout.minHeight)
+        )
+        return ManualShapeCandidate(kind: .line, frame: frame, confidence: min(1, Double(straightness)))
+    }
+
+    func detectSingleStrokeArrow(_ stroke: FreehandStroke) -> ManualShapeCandidate? {
+        guard stroke.points.count >= 9 else { return nil }
+        guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
+        let path = polylineLength(stroke.points)
+        let direct = hypot(last.x - first.x, last.y - first.y)
+        let straightness = direct / max(path, 0.001)
+        guard straightness >= 0.72 else { return nil }
+
+        let sampled = sample(stroke.points, step: 2)
+        guard sampled.count >= 6 else { return nil }
+        var sharpTurns = 0
+        let tailStart = max(2, sampled.count - 6)
+        for i in tailStart..<(sampled.count - 2) {
+            let a = sampled[i - 1]
+            let b = sampled[i]
+            let c = sampled[i + 1]
+            let angle = abs(turnAngleDegrees(v1: CGVector(dx: b.x - a.x, dy: b.y - a.y), v2: CGVector(dx: c.x - b.x, dy: c.y - b.y)))
+            if angle >= 38 { sharpTurns += 1 }
+        }
+        guard sharpTurns >= 1 else { return nil }
+        let frame = boundsForPoints(stroke.points).insetBy(dx: -8, dy: -8)
+        return ManualShapeCandidate(kind: .arrow, frame: frame, confidence: 0.82)
+    }
+
+    func detectMultiStrokeArrow(_ strokes: [FreehandStroke]) -> ManualShapeCandidate? {
+        let ranked = strokes
+            .map { stroke -> (stroke: FreehandStroke, straightness: CGFloat, path: CGFloat)? in
+                guard let first = stroke.points.first, let last = stroke.points.last else { return nil }
+                let path = polylineLength(stroke.points)
+                guard path >= 36 else { return nil }
+                let direct = hypot(last.x - first.x, last.y - first.y)
+                let straightness = direct / max(path, 0.001)
+                return (stroke, straightness, path)
+            }
+            .compactMap { $0 }
+            .sorted { $0.path > $1.path }
+        guard let shaft = ranked.first, shaft.straightness >= 0.92 else { return nil }
+        guard let shaftFirst = shaft.stroke.points.first, let shaftLast = shaft.stroke.points.last else { return nil }
+        let shaftEnd = shaftLast
+        let nearHead = strokes
+            .filter { $0.id != shaft.stroke.id }
+            .contains { stroke in
+                let b = boundsForPoints(stroke.points)
+                let headCenter = CGPoint(x: b.midX, y: b.midY)
+                return hypot(headCenter.x - shaftEnd.x, headCenter.y - shaftEnd.y) <= 80 && countCorners(points: stroke.points, thresholdDegrees: 35) >= 1
+            }
+        guard nearHead else { return nil }
+        let frame = boundsForPoints(strokes.flatMap(\.points)).insetBy(dx: -8, dy: -8)
+        let adjusted = CGRect(
+            x: min(frame.minX, shaftFirst.x),
+            y: min(frame.minY, shaftFirst.y),
+            width: max(frame.width, CanvasShapeLayout.minWidth),
+            height: max(frame.height, CanvasShapeLayout.minHeight)
+        )
+        return ManualShapeCandidate(kind: .arrow, frame: adjusted, confidence: 0.8)
+    }
+
+    func replaceStrokesWithText(recognized: RecognizedManualText, sourceStrokeIDs: Set<UUID>, selection: CanvasSelectionModel) {
+        guard !recognized.text.isEmpty else { return }
+        let frame = recognized.frame.standardized
+        let width = max(frame.width, CanvasTextBlockLayout.minWidth)
+        let height = max(frame.height, CanvasTextBlockLayout.minHeight)
+        var payload = TextBlockPayload.default
+        payload.text = recognized.text
+        let id = UUID()
+        let record = CanvasElementRecord(
+            id: id,
+            kind: .textBlock,
+            x: frame.minX,
+            y: frame.minY,
+            width: width,
+            height: height,
+            zIndex: nextZIndex(),
+            parentShapeID: nil,
+            textBlock: payload
+        )
+        applyBoardMutation { state in
+            state.elements.removeAll { sourceStrokeIDs.contains($0.id) }
+            state.elements.append(record)
+        }
+        selection.selectOnly(id)
+    }
+
+    static func recognizeText(from strokes: [FreehandStroke]) -> RecognizedManualText? {
+        #if canImport(Vision)
+        guard !strokes.isEmpty else { return nil }
+        let grouped = boundsForPoints(strokes.flatMap(\.points)).standardized
+        guard grouped.width >= 24, grouped.height >= 16 else { return nil }
+        guard let image = renderStrokeImage(strokes: strokes, bounds: grouped) else { return nil }
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.recognitionLanguages = ["en-US"]
+        request.minimumTextHeight = 0.03
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        do {
+            try handler.perform([request])
+            guard let observation = request.results?.first, let top = observation.topCandidates(1).first else { return nil }
+            let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            let confidence = Double(top.confidence)
+            if confidence < 0.72 { return nil }
+            if text.count == 1, strokes.count >= 2, confidence < 0.85 { return nil }
+            return RecognizedManualText(text: text, frame: grouped.insetBy(dx: -8, dy: -8), confidence: confidence)
+        } catch {
+            return nil
+        }
+        #else
+        _ = strokes
+        return nil
+        #endif
+    }
+
+    static func renderStrokeImage(strokes: [FreehandStroke], bounds: CGRect) -> CGImage? {
+        let padding: CGFloat = 18
+        let size = CGSize(width: bounds.width + padding * 2, height: bounds.height + padding * 2)
+        guard let context = CGContext(
+            data: nil,
+            width: Int(ceil(size.width)),
+            height: Int(ceil(size.height)),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return nil }
+
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(origin: .zero, size: size))
+        context.setStrokeColor(CGColor(gray: 0, alpha: 1))
+        context.setLineWidth(3.5)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.translateBy(x: 0, y: size.height)
+        context.scaleBy(x: 1, y: -1)
+
+        for stroke in strokes {
+            var prev: CGPoint?
+            for point in stroke.points {
+                let p = CGPoint(x: (point.x - bounds.minX) + padding, y: (point.y - bounds.minY) + padding)
+                if let prev {
+                    context.move(to: prev)
+                    context.addLine(to: p)
+                    context.strokePath()
+                }
+                prev = p
+            }
+        }
+        return context.makeImage()
+    }
+
+    static func boundsForPoints(_ points: [CGPoint]) -> CGRect {
+        guard let first = points.first else { return .null }
+        return points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { partial, point in
+            partial.union(CGRect(origin: point, size: .zero))
+        }
+    }
+
+    func boundsForPoints(_ points: [CGPoint]) -> CGRect {
+        Self.boundsForPoints(points)
+    }
+
+    func polylineLength(_ points: [CGPoint]) -> CGFloat {
+        guard points.count > 1 else { return 0 }
+        var total: CGFloat = 0
+        for i in 1..<points.count {
+            total += hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
+        }
+        return total
+    }
+
+    func sample(_ points: [CGPoint], step: Int) -> [CGPoint] {
+        guard step > 1, points.count > step else { return points }
+        var sampled: [CGPoint] = []
+        for index in stride(from: 0, to: points.count, by: step) {
+            sampled.append(points[index])
+        }
+        if sampled.last != points.last, let last = points.last { sampled.append(last) }
+        return sampled
+    }
+
+    func douglasPeucker(points: [CGPoint], epsilon: CGFloat) -> [CGPoint] {
+        guard points.count > 2 else { return points }
+        var maxDistance: CGFloat = 0
+        var index = 0
+        let start = points[0]
+        let end = points[points.count - 1]
+        for i in 1..<(points.count - 1) {
+            let distance = perpendicularDistance(point: points[i], lineStart: start, lineEnd: end)
+            if distance > maxDistance {
+                maxDistance = distance
+                index = i
+            }
+        }
+        if maxDistance > epsilon {
+            let left = douglasPeucker(points: Array(points[0...index]), epsilon: epsilon)
+            let right = douglasPeucker(points: Array(points[index...]), epsilon: epsilon)
+            return Array(left.dropLast()) + right
+        }
+        return [start, end]
+    }
+
+    func perpendicularDistance(point: CGPoint, lineStart: CGPoint, lineEnd: CGPoint) -> CGFloat {
+        let dx = lineEnd.x - lineStart.x
+        let dy = lineEnd.y - lineStart.y
+        let den = max(0.0001, hypot(dx, dy))
+        return abs(dy * point.x - dx * point.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x) / den
+    }
+
+    func countCorners(points: [CGPoint], thresholdDegrees: CGFloat) -> Int {
+        let sampled = sample(points, step: 2)
+        guard sampled.count >= 5 else { return 0 }
+        var corners = 0
+        for i in 1..<(sampled.count - 1) {
+            let a = sampled[i - 1]
+            let b = sampled[i]
+            let c = sampled[i + 1]
+            let angle = abs(turnAngleDegrees(v1: CGVector(dx: b.x - a.x, dy: b.y - a.y), v2: CGVector(dx: c.x - b.x, dy: c.y - b.y)))
+            if angle >= thresholdDegrees { corners += 1 }
+        }
+        return corners
+    }
+
+    func turnAngleDegrees(v1: CGVector, v2: CGVector) -> CGFloat {
+        let n1 = hypot(v1.dx, v1.dy)
+        let n2 = hypot(v2.dx, v2.dy)
+        guard n1 > 0.0001, n2 > 0.0001 else { return 0 }
+        let dot = (v1.dx * v2.dx + v1.dy * v2.dy) / (n1 * n2)
+        return acos(max(-1, min(1, dot))) * 180 / .pi
+    }
+}
+
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
         min(max(self, range.lowerBound), range.upperBound)
     }
 }

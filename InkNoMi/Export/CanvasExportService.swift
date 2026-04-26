@@ -61,9 +61,10 @@ enum CanvasExportService {
     static func presentExportPanel(
         boardState: CanvasBoardState,
         documentTitle: String,
-        format: Format
+        format: Format,
+        renderScale: CGFloat = defaultRenderScale
     ) {
-        guard let image = renderExportImage(boardState: boardState) else {
+        guard let image = renderExportImage(boardState: boardState, renderScale: renderScale) else {
             NSSound.beep()
             return
         }
@@ -101,7 +102,7 @@ enum CanvasExportService {
     // MARK: - Rendering
 
     /// Renders the content bounds (see `CanvasExportBounds`) at `defaultRenderScale`.
-    static func renderExportImage(boardState: CanvasBoardState) -> NSImage? {
+    static func renderExportImage(boardState: CanvasBoardState, renderScale: CGFloat = defaultRenderScale) -> NSImage? {
         let rect = CanvasExportBounds.exportRect(elements: boardState.elements)
         let appearance = CanvasExportAppearance.resolvedAppearance()
         let content = CanvasBoardExportContentView(
@@ -111,7 +112,7 @@ enum CanvasExportService {
             colorScheme: appearance.colorScheme
         )
         let renderer = ImageRenderer(content: content)
-        renderer.scale = defaultRenderScale
+        renderer.scale = max(0.5, renderScale)
         renderer.proposedSize = ProposedViewSize(
             width: rect.width,
             height: rect.height

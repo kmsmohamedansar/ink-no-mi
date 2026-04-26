@@ -14,6 +14,7 @@ struct StickyNoteCanvasItemView: View {
     @State private var moveDragStartCanvasOrigin: CGPoint?
     @State private var resizeDragStartSize: CGSize?
     @State private var isHovered: Bool = false
+    @State private var connectDragStartCanvasPoint: CGPoint?
     @FocusState private var editorFocused: Bool
 
     private var payload: StickyNotePayload {
@@ -125,6 +126,7 @@ struct StickyNoteCanvasItemView: View {
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
         }
         .simultaneousGesture(moveGesture)
+        .simultaneousGesture(connectGesture)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -187,6 +189,7 @@ struct StickyNoteCanvasItemView: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
+                guard boardViewModel.canvasTool == .select else { return }
                 guard !isEditing else { return }
                 if moveDragStartCanvasOrigin == nil {
                     if boardViewModel.beginOptionDuplicateIfNeeded(fromElementId: element.id, selection: selection) {
@@ -232,6 +235,7 @@ struct StickyNoteCanvasItemView: View {
                 boardViewModel.updateAlignmentGuides(guides)
             }
             .onEnded { value in
+                guard boardViewModel.canvasTool == .select else { return }
                 guard !isEditing else { return }
                 boardViewModel.clearAlignmentGuides(after: 0.14)
                 let subjectId = boardViewModel.moveGestureSubjectElementId(viewElementId: element.id)
@@ -309,5 +313,65 @@ struct StickyNoteCanvasItemView: View {
                 boardViewModel.endBoardUndoCoalescing()
                 resizeDragStartSize = nil
             }
+    }
+
+    private var connectGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard boardViewModel.canvasTool == .connect else { return }
+                guard !isEditing else { return }
+                if connectDragStartCanvasPoint == nil {
+                    selection.selectOnly(element.id)
+                    let frame = CGRect(x: element.x, y: element.y, width: element.width, height: element.height)
+                    let start = CGPoint(x: frame.midX, y: frame.midY)
+                    let target = CGPoint(x: element.x + value.startLocation.x, y: element.y + value.startLocation.y)
+                    let edge = nearestEdge(in: frame, to: target)
+                    let t = edgeT(for: target, in: frame, edge: edge)
+                    let startPoint = CanvasConnectorGeometry.pointOnElementFrame(edge: edge, t: t, rect: frame)
+                    connectDragStartCanvasPoint = startPoint
+                    let style: ConnectorLineStyle = NSEvent.modifierFlags.contains(.shift) ? .straight : .arrow
+                    boardViewModel.beginConnectorDrag(
+                        startElementID: element.id,
+                        startEdge: edge,
+                        startT: Double(t),
+                        startCanvasPoint: startPoint,
+                        style: style
+                    )
+                }
+                let current = CGPoint(x: element.x + value.location.x, y: element.y + value.location.y)
+                boardViewModel.updateConnectorDrag(currentCanvasPoint: current)
+            }
+            .onEnded { _ in
+                guard boardViewModel.canvasTool == .connect else { return }
+                defer { connectDragStartCanvasPoint = nil }
+                boardViewModel.commitConnectorDrag(selection: selection)
+            }
+    }
+
+    private func nearestEdge(in rect: CGRect, to point: CGPoint) -> ConnectorEdge {
+        let distances: [(ConnectorEdge, CGFloat)] = [
+            (.top, abs(point.y - rect.minY)),
+            (.bottom, abs(point.y - rect.maxY)),
+            (.left, abs(point.x - rect.minX)),
+            (.right, abs(point.x - rect.maxX))
+        ]
+        return distances.min(by: { $0.1 < $1.1 })?.0 ?? .right
+    }
+
+    private func edgeT(for point: CGPoint, in rect: CGRect, edge: ConnectorEdge) -> CGFloat {
+        switch edge {
+        case .top, .bottom:
+            guard rect.width > 0 else { return 0.5 }
+            return ((point.x - rect.minX) / rect.width).clamped(to: 0...1)
+        case .left, .right:
+            guard rect.height > 0 else { return 0.5 }
+            return ((point.y - rect.minY) / rect.height).clamped(to: 0...1)
+        }
+    }
+}
+
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }

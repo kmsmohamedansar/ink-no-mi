@@ -3,6 +3,7 @@ import Foundation
 /// Primary canvas interaction mode (session UI only; not persisted on `CanvasBoardState`).
 enum CanvasToolMode: String, Codable, Sendable, Hashable {
     case select
+    case connect
     case pen
     case pencil
     case text
@@ -14,7 +15,7 @@ enum CanvasToolMode: String, Codable, Sendable, Hashable {
     var isPlacementMode: Bool {
         switch self {
         case .text, .stickyNote, .shape, .chart: return true
-        case .select, .pen, .pencil, .smartInk: return false
+        case .select, .connect, .pen, .pencil, .smartInk: return false
         }
     }
 }

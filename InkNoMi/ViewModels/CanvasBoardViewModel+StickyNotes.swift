@@ -177,6 +177,81 @@ extension CanvasBoardViewModel {
             element.height = max(height, CanvasStickyNoteLayout.minHeight)
         }
     }
+
+    func organizeSelectedStickyNotesAsTree(selection: CanvasSelectionModel) {
+        let notes = boardState.elements
+            .filter { selection.selectedElementIDs.contains($0.id) && $0.kind == .stickyNote }
+            .sorted {
+                if $0.y != $1.y { return $0.y < $1.y }
+                return $0.x < $1.x
+            }
+        guard notes.count >= 2 else { return }
+        let base = notes[0]
+        let levelYStep: Double = 180
+        let siblingXStep: Double = 260
+        applyBoardMutation { state in
+            for (index, note) in notes.enumerated() {
+                guard let i = state.elements.firstIndex(where: { $0.id == note.id }) else { continue }
+                let level = Int(floor(log2(Double(index + 1))))
+                let rowStart = (1 << level) - 1
+                let col = index - rowStart
+                let itemsInRow = max(1, 1 << level)
+                let rowWidth = Double(itemsInRow - 1) * siblingXStep
+                let x = base.x + Double(col) * siblingXStep - rowWidth * 0.5
+                let y = base.y + Double(level) * levelYStep
+                state.elements[i].x = round(x / 8) * 8
+                state.elements[i].y = round(y / 8) * 8
+            }
+        }
+    }
+
+    func organizeSelectedStickyNotesRadially(selection: CanvasSelectionModel) {
+        let notes = boardState.elements
+            .filter { selection.selectedElementIDs.contains($0.id) && $0.kind == .stickyNote }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        guard notes.count >= 2 else { return }
+        let anchor = notes[0]
+        let center = CGPoint(x: anchor.x + anchor.width * 0.5, y: anchor.y + anchor.height * 0.5)
+        let radius: Double = max(220, 90 + Double(notes.count) * 12)
+        applyBoardMutation { state in
+            for (index, note) in notes.enumerated() {
+                guard let i = state.elements.firstIndex(where: { $0.id == note.id }) else { continue }
+                if index == 0 {
+                    state.elements[i].x = round((center.x - note.width * 0.5) / 8) * 8
+                    state.elements[i].y = round((center.y - note.height * 0.5) / 8) * 8
+                    continue
+                }
+                let t = Double(index - 1) / Double(max(1, notes.count - 1))
+                let angle = (Double.pi * 2 * t) - Double.pi / 2
+                let x = center.x + cos(angle) * radius - note.width * 0.5
+                let y = center.y + sin(angle) * radius - note.height * 0.5
+                state.elements[i].x = round(x / 8) * 8
+                state.elements[i].y = round(y / 8) * 8
+            }
+        }
+    }
+
+    func clusterSelectedStickyNotes(selection: CanvasSelectionModel) {
+        let notes = boardState.elements.filter { selection.selectedElementIDs.contains($0.id) && $0.kind == .stickyNote }
+        guard notes.count >= 2 else { return }
+        let anchor = notes.min(by: { $0.y == $1.y ? $0.x < $1.x : $0.y < $1.y }) ?? notes[0]
+        let centerX = anchor.x + anchor.width * 0.5
+        let centerY = anchor.y + anchor.height * 0.5
+        let columns = Int(ceil(sqrt(Double(notes.count))))
+        let gapX: Double = 28
+        let gapY: Double = 22
+        applyBoardMutation { state in
+            for (index, note) in notes.enumerated() {
+                guard let i = state.elements.firstIndex(where: { $0.id == note.id }) else { continue }
+                let row = index / columns
+                let col = index % columns
+                let x = centerX + Double(col) * (note.width + gapX) - Double(columns - 1) * (note.width + gapX) * 0.5 - note.width * 0.5
+                let y = centerY + Double(row) * (note.height + gapY) - note.height * 0.5
+                state.elements[i].x = round(x / 8) * 8
+                state.elements[i].y = round(y / 8) * 8
+            }
+        }
+    }
 }
 
 enum CanvasStickyNoteLayout {

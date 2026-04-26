@@ -6,20 +6,26 @@ import SwiftData
 @Observable
 final class DocumentListViewModel {
     private var modelContext: ModelContext?
+    var boardCreationRequiresPro = false
 
     func attach(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
 
-    func createUntitledBoard() -> FlowDocument? {
-        createBoard(from: .blankBoard)
+    func createUntitledBoard(isProUser: Bool) -> FlowDocument? {
+        createBoard(from: .blankBoard, isProUser: isProUser)
     }
 
     /// Creates a board from a home-screen template with encoded initial canvas + template metadata.
-    func createBoard(from template: FlowDeskBoardTemplate) -> FlowDocument? {
+    func createBoard(from template: FlowDeskBoardTemplate, isProUser: Bool) -> FlowDocument? {
         guard let modelContext else { return nil }
+        boardCreationRequiresPro = false
         let descriptor = FetchDescriptor<FlowDocument>()
         let count = (try? modelContext.fetch(descriptor).count) ?? 0
+        if !isProUser, count >= PurchaseManager.freeBoardLimit {
+            boardCreationRequiresPro = true
+            return nil
+        }
         let ordinal = count + 1
         let title = ordinal == 1 ? "Untitled Canvas" : "Untitled Canvas \(ordinal)"
         var state = CanvasBoardState()

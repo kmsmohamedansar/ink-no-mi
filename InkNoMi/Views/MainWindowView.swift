@@ -5,6 +5,7 @@ struct MainWindowView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(FlowDeskAppearanceStore.self) private var appearanceStore
+    @Environment(PurchaseManager.self) private var purchaseManager
 
     @Query(sort: \FlowDocument.updatedAt, order: .reverse)
     private var documents: [FlowDocument]
@@ -40,7 +41,7 @@ struct MainWindowView: View {
         .onAppear {
             documentListViewModel.attach(modelContext: modelContext)
             if selection == nil {
-                selection = documents.first ?? documentListViewModel.createUntitledBoard()
+                selection = documents.first ?? documentListViewModel.createUntitledBoard(isProUser: purchaseManager.isProUser)
             }
             syncCanvasAttachment()
         }
@@ -78,6 +79,16 @@ struct MainWindowView: View {
                 }
             )
         }
+        .sheet(isPresented: paywallPresentedBinding) {
+            ProPaywallSheet(purchaseManager: purchaseManager)
+        }
+        .alert("InkNoMi Pro", isPresented: purchaseMessageBinding) {
+            Button("OK", role: .cancel) {
+                purchaseManager.purchaseMessage = nil
+            }
+        } message: {
+            Text(purchaseManager.purchaseMessage ?? "")
+        }
     }
 
     @ViewBuilder
@@ -113,7 +124,12 @@ struct MainWindowView: View {
     }
 
     private func createBoard() {
-        guard let doc = documentListViewModel.createUntitledBoard() else { return }
+        guard let doc = documentListViewModel.createUntitledBoard(isProUser: purchaseManager.isProUser) else {
+            if documentListViewModel.boardCreationRequiresPro {
+                _ = purchaseManager.requirePro(for: .unlimitedBoards)
+            }
+            return
+        }
         selection = doc
     }
 
@@ -141,7 +157,23 @@ struct MainWindowView: View {
     }
 
     private var shouldShowInspector: Bool {
-        canvasSelection.hasSelection || canvasBoardViewModel.canvasTool == .pen || canvasBoardViewModel.canvasTool == .pencil || canvasBoardViewModel.canvasTool == .smartInk
+        canvasSelection.hasSelection || canvasBoardViewModel.canvasTool == .pen || canvasBoardViewModel.canvasTool == .pencil
+    }
+
+    private var paywallPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { purchaseManager.isPaywallPresented },
+            set: { purchaseManager.isPaywallPresented = $0 }
+        )
+    }
+
+    private var purchaseMessageBinding: Binding<Bool> {
+        Binding(
+            get: { purchaseManager.purchaseMessage != nil },
+            set: { newValue in
+                if !newValue { purchaseManager.purchaseMessage = nil }
+            }
+        )
     }
 }
 
