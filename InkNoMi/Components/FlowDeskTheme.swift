@@ -4,21 +4,31 @@ import SwiftUI
 /// Geometry and export-time constants. **Dynamic colors** come from `FlowDeskAppearanceTokens`
 /// (resolved per `ColorScheme` + user style preset) and are injected via `@Environment(\.flowDeskTokens)`.
 enum FlowDeskTheme {
+    // MARK: - Core color identity
+
+    /// Primary UI accent used across selection, highlights, and active controls.
+    static let accentBlue = Color(nsColor: NSColor(red: 0.298, green: 0.553, blue: 0.941, alpha: 1)) // ~#4C8DFF, slightly desaturated
+    static let textPrimary = Color(nsColor: NSColor(red: 0.11, green: 0.11, blue: 0.118, alpha: 1)) // #1C1C1E
+    static let textSecondary = Color(nsColor: NSColor(red: 0.42, green: 0.42, blue: 0.42, alpha: 1)) // #6B6B6B
+    static let borderLight = Color.black.opacity(0.06)
+    static let hoverNeutral = Color.black.opacity(0.04)
+
     // MARK: - Depth (Level 2 floating panels — single shadow system)
 
     /// Tight, modern lift—subtle elevation without heavy blur.
-    static let floatingPanelShadowOpacity: Double = 0.032
-    static let floatingPanelShadowRadius: CGFloat = 7
+    static let floatingPanelShadowOpacity: Double = 0.05
+    static let floatingPanelShadowRadius: CGFloat = 10
     static let floatingPanelShadowY: CGFloat = 2
 
-    /// Home dashboard: very light top wash only (atmospheric layers reduced elsewhere).
-    static func homeAtmosphereWash(colorScheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
+    /// App chrome backdrop: center reads gently brighter than edges.
+    static func homeAtmosphereWash(colorScheme: ColorScheme) -> RadialGradient {
+        RadialGradient(
             colors: colorScheme == .dark
-                ? [Color.white.opacity(0.028), Color.clear]
-                : [Color(red: 0.995, green: 0.988, blue: 0.978).opacity(0.47), Color.clear],
-            startPoint: .top,
-            endPoint: UnitPoint(x: 0.5, y: 0.44)
+                ? [Color.white.opacity(0.03), Color.clear, Color.black.opacity(0.08)]
+                : [Color.white.opacity(0.24), Color.clear, Color.black.opacity(0.045)],
+            center: .center,
+            startRadius: 120,
+            endRadius: 1600
         )
     }
 
@@ -59,8 +69,8 @@ enum FlowDeskTheme {
     static let selectionStrokeWidth: CGFloat = 1.25
     static let selectionAccentOpacity: Double = 0.92
 
-    /// Single product accent (RGB aligned with `FlowDeskAppearanceTokens` accent bases).
-    static let brandAccent = Color(nsColor: NSColor(red: 0.20, green: 0.45, blue: 0.84, alpha: 1))
+    /// Single product accent (aligned with appearance token accent bases).
+    static let brandAccent = accentBlue
 
     static var selectionStrokeColor: Color {
         brandAccent.opacity(selectionAccentOpacity)
@@ -179,19 +189,20 @@ enum FlowDeskTheme {
                     spacing: 24,
                     lineWidth: FlowDeskLayout.gridLineWidth,
                     lineOpacity: gridOpacity,
-                    gridInk: tokens.canvasGridInk
+                    gridInk: tokens.canvasGridInk,
+                    majorLineStride: 0
                 )
             }
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0),
-                    Color.black.opacity(tokens.canvasBottomDepthOpacity * 0.68)
+                    Color.white.opacity(tokens.canvasTopWashOpacity * 0.85),
+                    Color(nsColor: NSColor(red: 0.961, green: 0.949, blue: 0.918, alpha: 1)).opacity(tokens.canvasBottomDepthOpacity)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .blendMode(.multiply)
+            .blendMode(.normal)
             .allowsHitTesting(false)
 
             LinearGradient(

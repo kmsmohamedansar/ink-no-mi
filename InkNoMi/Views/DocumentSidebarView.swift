@@ -26,22 +26,24 @@ struct DocumentSidebarView: View {
             }
         }
         .background {
-            ZStack(alignment: .trailing) {
-                tokens.sidebarListTint
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(colorScheme == .dark ? 0.26 : 0.062),
-                        Color.clear
-                    ],
-                    startPoint: .trailing,
-                    endPoint: UnitPoint(x: 0.68, y: 0.5)
-                )
-                .frame(width: 26)
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(tokens.sidebarListTint)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 8)
+
+                HStack {
+                    Spacer()
+                    Rectangle()
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.035))
+                        .frame(width: 1)
+                        .padding(.vertical, 10)
+                }
                 .allowsHitTesting(false)
-                Rectangle()
-                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.04))
-                    .frame(width: 1)
-                    .allowsHitTesting(false)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -71,6 +73,7 @@ struct DocumentSidebarView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .environment(\.defaultMinListRowHeight, 36)
     }
 
     @ViewBuilder
@@ -107,7 +110,7 @@ struct DocumentSidebarView: View {
         }
         .tag(Optional(document))
         .listRowInsets(
-            EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+            EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12)
         )
         .listRowBackground(
             sidebarRowBackground(isSelected: isSelected, isHovered: isHovered)
@@ -138,7 +141,7 @@ struct DocumentSidebarView: View {
             .padding(.leading, FlowDeskLayout.sidebarSectionHeaderLeadingPadding)
             .padding(.trailing, FlowDeskLayout.sidebarRowTrailingInset)
             .padding(.top, FlowDeskLayout.spaceS)
-            .padding(.bottom, FlowDeskLayout.spaceS + 2)
+            .padding(.bottom, FlowDeskLayout.spaceXS + 2)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -153,7 +156,7 @@ struct DocumentSidebarView: View {
                         lineWidth: isSelected ? 1 : 0
                     )
             }
-            .padding(.vertical, 1)
+            .padding(.vertical, 0.5)
             .padding(.horizontal, 6)
             .animation(.easeOut(duration: 0.10), value: isSelected)
             .animation(.easeOut(duration: 0.10), value: isHovered)
@@ -161,10 +164,10 @@ struct DocumentSidebarView: View {
 
     private func rowFill(isSelected: Bool, isHovered: Bool) -> Color {
         if isSelected {
-            return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.3 : 0.16)
+            return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.24 : 0.12)
         }
         if isHovered {
-            return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.12 : 0.07)
+            return FlowDeskTheme.hoverNeutral
         }
         return Color.clear
     }

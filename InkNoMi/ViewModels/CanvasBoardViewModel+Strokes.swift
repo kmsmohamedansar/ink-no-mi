@@ -44,10 +44,10 @@ extension CanvasBoardViewModel {
 
     /// Pure paint behavior: always persist the stroke exactly as drawn.
     func commitFreehandStroke(absoluteCanvasPoints: [CGPoint], selection: CanvasSelectionModel) {
-        let decimated = StrokePathSmoothing.decimatedCanvasPoints(absoluteCanvasPoints, minDistance: 2)
-        guard decimated.count >= 2 else { return }
+        let refined = StrokePathSmoothing.finalizedStrokePoints(absoluteCanvasPoints)
+        guard refined.count >= 2 else { return }
         stopAllInlineEditing()
-        let stroke = FreehandStroke(points: decimated)
+        let stroke = FreehandStroke(points: refined)
         _ = insertPersistedFreehandStroke(stroke, selection: selection)
     }
 
@@ -121,7 +121,7 @@ extension CanvasBoardViewModel {
 
 private extension Double {
     func clamped(to range: ClosedRange<Double>) -> Double {
-        min(max(self, range.lowerBound), range.upperBound)
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
 
@@ -847,6 +847,6 @@ private extension CanvasBoardViewModel {
 
 private extension CGFloat {
     func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        min(max(self, range.lowerBound), range.upperBound)
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

@@ -44,8 +44,13 @@ struct CanvasSelectionToolbarView: View {
             } label: {
                 Image(systemName: "plus.square.on.square")
                     .font(.caption.weight(.semibold))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskToolbarButtonStyle())
             .help("Duplicate (⌘D)")
 
             Button(role: .destructive) {
@@ -53,8 +58,13 @@ struct CanvasSelectionToolbarView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.caption.weight(.semibold))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskToolbarButtonStyle())
             .help("Delete")
 
             Rectangle()

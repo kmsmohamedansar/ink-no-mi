@@ -110,6 +110,9 @@
 		A10000000000000000000089 /* CanvasZoomHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000089 /* CanvasZoomHUDView.swift */; };
 		A10000000000000000000090 /* FlowDeskConnectorVisuals.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000090 /* FlowDeskConnectorVisuals.swift */; };
 		A10000000000000000000091 /* CanvasBoardViewModel+ViewportNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000091 /* CanvasBoardViewModel+ViewportNavigation.swift */; };
+		A10000000000000000000092 /* PurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000092 /* PurchaseManager.swift */; };
+		A10000000000000000000093 /* ProPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* ProPaywallSheet.swift */; };
+		A10000000000000000000094 /* FlowDeskMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* FlowDeskMotion.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -218,6 +221,9 @@
 		A20000000000000000000089 /* CanvasZoomHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomHUDView.swift; sourceTree = "<group>"; };
 		A20000000000000000000090 /* FlowDeskConnectorVisuals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskConnectorVisuals.swift; sourceTree = "<group>"; };
 		A20000000000000000000091 /* CanvasBoardViewModel+ViewportNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasBoardViewModel+ViewportNavigation.swift"; sourceTree = "<group>"; };
+		A20000000000000000000092 /* PurchaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000093 /* ProPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProPaywallSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000094 /* FlowDeskMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskMotion.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -259,6 +265,7 @@
 				A40000000000000000000004 /* Models */,
 				A4000000000000000000000D /* Selection */,
 				A4000000000000000000000E /* Services */,
+				A4000000000000000000001A /* Monetization */,
 				A40000000000000000000011 /* Export */,
 				A40000000000000000000005 /* ViewModels */,
 				A40000000000000000000006 /* Views */,
@@ -343,6 +350,7 @@
 				A20000000000000000000058 /* FlowDeskLayout.swift */,
 				A20000000000000000000059 /* FlowDeskTypography.swift */,
 				A20000000000000000000060 /* FlowDeskInteractionStyles.swift */,
+				A20000000000000000000094 /* FlowDeskMotion.swift */,
 				A20000000000000000000043 /* FlowDeskTheme.swift */,
 				A2000000000000000000000D /* BoardEmptySelectionView.swift */,
 				A20000000000000000000016 /* CanvasElementChrome.swift */,
@@ -519,6 +527,15 @@
 			path = Connector;
 			sourceTree = "<group>";
 		};
+		A4000000000000000000001A /* Monetization */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000092 /* PurchaseManager.swift */,
+				A20000000000000000000093 /* ProPaywallSheet.swift */,
+			);
+			path = Monetization;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -641,6 +658,8 @@
 				A10000000000000000000040 /* CanvasExportService.swift in Sources */,
 				A10000000000000000000011 /* CanvasSelectionModel.swift in Sources */,
 				A10000000000000000000012 /* LibrarySeedService.swift in Sources */,
+				A10000000000000000000092 /* PurchaseManager.swift in Sources */,
+				A10000000000000000000093 /* ProPaywallSheet.swift in Sources */,
 				A10000000000000000000007 /* MainWindowView.swift in Sources */,
 				A10000000000000000000045 /* HomeView.swift in Sources */,
 				A10000000000000000000046 /* CreationCardView.swift in Sources */,
@@ -682,6 +701,7 @@
 				A10000000000000000000058 /* FlowDeskLayout.swift in Sources */,
 				A10000000000000000000059 /* FlowDeskTypography.swift in Sources */,
 				A10000000000000000000060 /* FlowDeskInteractionStyles.swift in Sources */,
+				A10000000000000000000094 /* FlowDeskMotion.swift in Sources */,
 				A10000000000000000000043 /* FlowDeskTheme.swift in Sources */,
 				A1000000000000000000000D /* BoardEmptySelectionView.swift in Sources */,
 				A10000000000000000000016 /* CanvasElementChrome.swift in Sources */,

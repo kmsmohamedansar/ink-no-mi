@@ -54,4 +54,59 @@ enum StrokePathSmoothing {
         }
         return out
     }
+
+    /// Fast live pass for in-progress feedback while drawing.
+    static func livePreviewPoints(_ raw: [CGPoint]) -> [CGPoint] {
+        let filtered = filterJitter(raw, epsilon: 0.45)
+        let decimated = decimatedCanvasPoints(filtered, minDistance: 1.2)
+        return movingAverageSmooth(decimated, passes: 1, windowRadius: 1)
+    }
+
+    /// Slightly more refined pass after stroke commit.
+    static func finalizedStrokePoints(_ raw: [CGPoint]) -> [CGPoint] {
+        let filtered = filterJitter(raw, epsilon: 0.55)
+        let decimated = decimatedCanvasPoints(filtered, minDistance: 1.6)
+        let passes = decimated.count > 800 ? 1 : 2
+        let smoothed = movingAverageSmooth(decimated, passes: passes, windowRadius: 2)
+        return decimatedCanvasPoints(smoothed, minDistance: 1.8)
+    }
+
+    private static func filterJitter(_ raw: [CGPoint], epsilon: CGFloat) -> [CGPoint] {
+        guard let first = raw.first else { return [] }
+        var out: [CGPoint] = [first]
+        for p in raw.dropFirst() {
+            if let last = out.last, hypot(p.x - last.x, p.y - last.y) < epsilon {
+                continue
+            }
+            out.append(p)
+        }
+        if let end = raw.last, let tail = out.last, hypot(tail.x - end.x, tail.y - end.y) > 0.2 {
+            out.append(end)
+        }
+        return out
+    }
+
+    private static func movingAverageSmooth(_ points: [CGPoint], passes: Int, windowRadius: Int) -> [CGPoint] {
+        guard points.count >= 4, passes > 0, windowRadius > 0 else { return points }
+        var current = points
+        let n = points.count
+        for _ in 0..<passes {
+            var next = current
+            for i in 1..<(n - 1) {
+                let lo = max(0, i - windowRadius)
+                let hi = min(n - 1, i + windowRadius)
+                let count = CGFloat(hi - lo + 1)
+                guard count > 0 else { continue }
+                var sx: CGFloat = 0
+                var sy: CGFloat = 0
+                for j in lo...hi {
+                    sx += current[j].x
+                    sy += current[j].y
+                }
+                next[i] = CGPoint(x: sx / count, y: sy / count)
+            }
+            current = next
+        }
+        return current
+    }
 }

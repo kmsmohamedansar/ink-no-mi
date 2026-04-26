@@ -9,7 +9,7 @@ struct FlowDeskCanvasToolButtonStyle: ButtonStyle {
         return configuration.label
             .scaleEffect(scale)
             // Single spring avoids competing animations (hover jitter).
-            .animation(.spring(response: 0.24, dampingFraction: 0.82), value: scale)
+            .animation(FlowDeskMotion.lightSpring, value: scale)
     }
 }
 
@@ -17,8 +17,9 @@ struct FlowDeskCanvasToolButtonStyle: ButtonStyle {
 struct FlowDeskPlainCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.94 : 1)
+            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
     }
 }
 
@@ -26,9 +27,9 @@ struct FlowDeskPlainCardButtonStyle: ButtonStyle {
 struct FlowDeskHomeCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.988 : 1)
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.94 : 1)
+            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
     }
 }
 
@@ -36,8 +37,9 @@ struct FlowDeskHomeCardButtonStyle: ButtonStyle {
 struct FlowDeskToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
     }
 }
 

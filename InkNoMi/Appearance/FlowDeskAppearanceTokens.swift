@@ -89,48 +89,48 @@ struct FlowDeskAppearanceTokens: Equatable {
     }
 
     /// Product accent — slightly richer for Miro-like interaction clarity while staying calm (not system blue).
-    private static let accentStrokeLight = Color(nsColor: NSColor(red: 0.20, green: 0.45, blue: 0.84, alpha: 1))
+    private static let accentStrokeLight = Color(nsColor: NSColor(red: 0.298, green: 0.553, blue: 0.941, alpha: 1))
     private static let accentStrokeDark = Color(nsColor: NSColor(red: 0.55, green: 0.76, blue: 1.0, alpha: 1))
 
     // MARK: - Warm Paper
 
     private static let warmPaperLight = FlowDeskAppearanceTokens(
-        workspaceBackground: Color(nsColor: NSColor(red: 0.996, green: 0.992, blue: 0.984, alpha: 1)),
-        canvasWorkspaceBackground: Color(nsColor: NSColor(red: 0.968, green: 0.964, blue: 0.956, alpha: 1)),
-        gridLineOpacity: 0.026,
-        canvasGridInk: Color(nsColor: NSColor(red: 0.33, green: 0.34, blue: 0.36, alpha: 1)),
-        canvasBottomDepthOpacity: 0.022,
-        canvasTopWashOpacity: 0.01,
-        canvasVignetteOpacity: 0.028,
+        workspaceBackground: Color(nsColor: NSColor(red: 0.956, green: 0.945, blue: 0.918, alpha: 1)), // #F4F1EA
+        canvasWorkspaceBackground: Color(nsColor: NSColor(red: 0.984, green: 0.98, blue: 0.965, alpha: 1)), // #FBFAF6
+        gridLineOpacity: 0.03,
+        canvasGridInk: Color.black,
+        canvasBottomDepthOpacity: 0.03,
+        canvasTopWashOpacity: 0.02,
+        canvasVignetteOpacity: 0.022,
         canvasGrainOpacity: 0.0,
-        canvasGridEmphasis: 0.72,
+        canvasGridEmphasis: 1.0,
         homeCardFill: Color(nsColor: NSColor(red: 1, green: 0.998, blue: 0.992, alpha: 1)),
         homeCardFillTop: Color(nsColor: NSColor(red: 1, green: 0.998, blue: 0.992, alpha: 1)),
         homeCardMaterial: .none,
-        homeCardBorderNormal: 0.14,
-        homeCardBorderHover: 0.2,
+        homeCardBorderNormal: 0.11,
+        homeCardBorderHover: 0.16,
         homeCardShadowOpacityNormal: 0.05,
         homeCardShadowOpacityHover: 0.078,
-        homeCardShadowRadiusNormal: 6,
-        homeCardShadowRadiusHover: 9,
+        homeCardShadowRadiusNormal: 10,
+        homeCardShadowRadiusHover: 12,
         canvasTextBlockFill: Color(nsColor: NSColor(red: 1, green: 0.996, blue: 0.988, alpha: 1)),
-        canvasTextBlockBorderOpacity: 0.12,
-        canvasItemShadowNormal: 0.034,
-        canvasItemShadowSelected: 0.058,
-        canvasItemShadowRadiusNormal: 4.5,
-        canvasItemShadowRadiusSelected: 6.5,
-        canvasItemShadowYNormal: 1.4,
-        canvasItemShadowYSelected: 2.0,
+        canvasTextBlockBorderOpacity: 0.1,
+        canvasItemShadowNormal: 0.05,
+        canvasItemShadowSelected: 0.07,
+        canvasItemShadowRadiusNormal: 8,
+        canvasItemShadowRadiusSelected: 10,
+        canvasItemShadowYNormal: 2,
+        canvasItemShadowYSelected: 2.5,
         chartCardFill: Color(nsColor: NSColor(red: 1, green: 0.996, blue: 0.988, alpha: 1)),
-        chartCardBorderOpacity: 0.12,
-        selectionStrokeColor: accentStrokeLight.opacity(0.94),
+        chartCardBorderOpacity: 0.1,
+        selectionStrokeColor: accentStrokeLight.opacity(0.9),
         selectionStrokeWidth: 1.25,
-        sidebarListTint: Color(nsColor: NSColor(red: 0.948, green: 0.938, blue: 0.915, alpha: 0.96)),
-        sidebarFooterUseSystemBar: true,
-        sidebarFooterMaterial: .none,
+        sidebarListTint: Color(nsColor: NSColor(red: 0.965, green: 0.956, blue: 0.932, alpha: 0.86)),
+        sidebarFooterUseSystemBar: false,
+        sidebarFooterMaterial: .thin,
         toolbarMaterial: .thin,
         toolbarFlatBackground: nil,
-        inspectorChromeBackground: Color(nsColor: NSColor(red: 0.992, green: 0.984, blue: 0.972, alpha: 0.98))
+        inspectorChromeBackground: Color(nsColor: NSColor(red: 0.992, green: 0.984, blue: 0.972, alpha: 0.88))
     )
 
     private static let warmPaperDark = FlowDeskAppearanceTokens(

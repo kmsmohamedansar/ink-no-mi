@@ -8,12 +8,17 @@ struct InkNoMiCanvasChromeColumn: View {
     @Bindable var selection: CanvasSelectionModel
     @State private var hoveredTool: CanvasToolMode?
 
+    private let rowHeight: CGFloat = 36
+
     var body: some View {
         VStack(alignment: .leading, spacing: FlowDeskLayout.spaceM) {
             VStack(alignment: .leading, spacing: FlowDeskLayout.spaceXS) {
-                ForEach(toolItems, id: \.mode) { item in
-                    labeledToolButton(item)
-                }
+                toolGroup("Selection", items: [.select])
+                toolGroup("Drawing", items: [.pen, .pencil])
+                toolGroup("Content", items: [.text, .stickyNote])
+                toolGroup("Shapes", items: [.shape])
+                toolGroup("Connections", items: [.connect])
+                toolGroup("Extras", items: [.chart, .smartInk])
             }
 
             if boardViewModel.canvasTool == .shape {
@@ -39,14 +44,20 @@ struct InkNoMiCanvasChromeColumn: View {
                 }
             }
 
-            Text(activeToolHint)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ZStack(alignment: .leading) {
+                Text(activeToolHint)
+                    .id(activeToolHint)
+                    .font(.caption)
+                    .foregroundStyle(Color.primary.opacity(0.55))
+                    .transition(.opacity)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .animation(FlowDeskMotion.standardEaseOut, value: activeToolHint)
         }
-        .padding(.leading, FlowDeskLayout.canvasChromeLeadingPadding)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 12)
         .frame(maxHeight: .infinity, alignment: .center)
-        .frame(width: 188, alignment: .leading)
+        .frame(width: 210, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Canvas tools")
         .flowDeskFloatingPanelChrome(shadowStyle: .toolPalette)
@@ -66,6 +77,21 @@ struct InkNoMiCanvasChromeColumn: View {
         ]
     }
 
+    @ViewBuilder
+    private func toolGroup(_ title: String, items: [CanvasToolMode]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.primary.opacity(0.45))
+                .padding(.leading, 8)
+            ForEach(items, id: \.self) { mode in
+                if let item = toolItems.first(where: { $0.mode == mode }) {
+                    labeledToolButton(item)
+                }
+            }
+        }
+    }
+
     private func labeledToolButton(_ item: ToolItem) -> some View {
         let active = boardViewModel.canvasTool == item.mode
         let hovered = hoveredTool == item.mode
@@ -76,6 +102,7 @@ struct InkNoMiCanvasChromeColumn: View {
             HStack(spacing: FlowDeskLayout.spaceS) {
                 Image(systemName: item.symbol)
                     .frame(width: 18)
+                    .font(.system(size: 13, weight: active ? .semibold : .regular))
                 Text(item.label)
                     .font(.subheadline.weight(active ? .semibold : .regular))
                 if !item.enabled {
@@ -91,15 +118,17 @@ struct InkNoMiCanvasChromeColumn: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 8)
+            .frame(height: rowHeight)
             .padding(.horizontal, 10)
             .foregroundStyle(active ? tokens.selectionStrokeColor : Color.primary.opacity(0.84))
+            .scaleEffect(active ? 1.01 : 1.0)
+            .offset(x: active ? 1 : 0)
             .background {
                 RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                    .fill(active ? tokens.selectionStrokeColor.opacity(0.12) : (hovered ? Color.primary.opacity(0.045) : Color.clear))
+                    .fill(active ? tokens.selectionStrokeColor.opacity(0.14) : (hovered ? Color.primary.opacity(0.055) : Color.clear))
                     .overlay {
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.28) : Color.primary.opacity(0.08), lineWidth: 0.8)
+                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.32) : Color.primary.opacity(0.07), lineWidth: 0.8)
                     }
             }
         }
@@ -108,8 +137,8 @@ struct InkNoMiCanvasChromeColumn: View {
         .onHover { inside in
             hoveredTool = inside ? item.mode : nil
         }
-        .animation(.easeOut(duration: 0.10), value: active)
-        .animation(.easeOut(duration: 0.10), value: hovered)
+        .animation(FlowDeskMotion.standardEaseOut, value: active)
+        .animation(FlowDeskMotion.quickEaseOut, value: hovered)
         .opacity(item.enabled ? 1 : 0.55)
         .disabled(!item.enabled)
     }
@@ -157,6 +186,8 @@ struct InkNoMiCanvasChromeColumn: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(active ? tokens.selectionStrokeColor : Color.primary.opacity(0.85))
+        .scaleEffect(active ? 1.01 : 1)
+        .animation(FlowDeskMotion.standardEaseOut, value: active)
     }
 
     private var activeToolHint: String {

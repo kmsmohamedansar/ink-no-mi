@@ -93,12 +93,13 @@ struct StickyNoteCanvasItemView: View {
                 .opacity(isHovered && !isSelected ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .animation(.easeOut(duration: 0.18), value: isSelected)
+        .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !isEditing, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()
                     .padding(FlowDeskLayout.canvasSelectionChromeInset)
                     .gesture(resizeGesture)
+                    .transition(FlowDeskMotion.handleTransition)
             }
         }
         .overlay {
@@ -110,6 +111,7 @@ struct StickyNoteCanvasItemView: View {
                 )
                 .allowsHitTesting(true)
                 .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                .transition(FlowDeskMotion.handleTransition)
             }
         }
         .offset(composedMoveOffset)
@@ -372,6 +374,6 @@ struct StickyNoteCanvasItemView: View {
 
 private extension CGFloat {
     func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        min(max(self, range.lowerBound), range.upperBound)
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

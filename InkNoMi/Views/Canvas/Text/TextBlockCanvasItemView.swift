@@ -89,12 +89,13 @@ struct TextBlockCanvasItemView: View {
                 .opacity(isHovered && !isSelected ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .animation(.easeOut(duration: 0.18), value: isSelected)
+        .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !isEditing, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()
                     .padding(FlowDeskLayout.canvasSelectionChromeInset)
                     .gesture(resizeGesture)
+                    .transition(FlowDeskMotion.handleTransition)
             }
         }
         .overlay {
@@ -106,12 +107,13 @@ struct TextBlockCanvasItemView: View {
                 )
                 .allowsHitTesting(true)
                 .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                .transition(FlowDeskMotion.handleTransition)
             }
         }
         .offset(composedMoveOffset)
         .scaleEffect(isConvertingIn ? 0.95 : 1.0)
         .opacity(isConvertingIn ? 0.78 : 1.0)
-        .animation(.easeOut(duration: 0.16), value: isConvertingIn)
+        .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)
         .contentShape(RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous))
         .highPriorityGesture(
             TapGesture(count: 2).onEnded {

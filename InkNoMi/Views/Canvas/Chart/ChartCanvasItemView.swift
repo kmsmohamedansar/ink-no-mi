@@ -72,12 +72,13 @@ struct ChartCanvasItemView: View {
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .animation(.easeOut(duration: 0.18), value: isSelected)
+        .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()
                     .padding(FlowDeskLayout.canvasSelectionChromeInset)
                     .gesture(resizeGesture)
+                    .transition(FlowDeskMotion.handleTransition)
             }
         }
         .offset(composedMoveOffset)

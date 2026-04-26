@@ -55,12 +55,13 @@ struct ShapeCanvasItemView: View {
                 .opacity(isHovered && !isSelected && !isActiveContainer ? 1 : 0)
                 .allowsHitTesting(false)
         }
-        .animation(.easeOut(duration: 0.18), value: isSelected || isActiveContainer)
+        .animation(FlowDeskMotion.standardEaseOut, value: isSelected || isActiveContainer)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()
                     .padding(FlowDeskLayout.canvasSelectionChromeInset)
                     .gesture(resizeGesture)
+                    .transition(FlowDeskMotion.handleTransition)
             }
         }
         .overlay {
@@ -72,12 +73,13 @@ struct ShapeCanvasItemView: View {
                 )
                 .allowsHitTesting(true)
                 .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                .transition(FlowDeskMotion.handleTransition)
             }
         }
         .offset(composedMoveOffset)
         .scaleEffect(isConvertingIn ? 0.95 : 1.0)
         .opacity(isConvertingIn ? 0.76 : 1.0)
-        .animation(.easeOut(duration: 0.16), value: isConvertingIn)
+        .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)
         .contentShape(Rectangle())
         .onTapGesture {
             boardViewModel.stopAllInlineEditing()

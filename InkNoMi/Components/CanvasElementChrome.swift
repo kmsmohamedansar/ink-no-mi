@@ -16,15 +16,15 @@ struct CanvasElementChrome: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: corner, style: .continuous)
                         .strokeBorder(
-                            isSelected ? tokens.selectionStrokeColor : Color.primary.opacity(0.14),
-                            lineWidth: isSelected ? FlowDeskLayout.chromeHairlineBorderWidth + 0.5 : FlowDeskLayout.chromeHairlineBorderWidth
+                            isSelected ? tokens.selectionStrokeColor.opacity(0.92) : Color.primary.opacity(0.08),
+                            lineWidth: isSelected ? FlowDeskLayout.chromeHairlineBorderWidth + 0.35 : FlowDeskLayout.chromeHairlineBorderWidth
                         )
                 }
                 .shadow(
-                    color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.07),
-                    radius: 5,
+                    color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.05),
+                    radius: 4,
                     x: 0,
-                    y: 2
+                    y: 1.5
                 )
 
             VStack(alignment: .leading, spacing: FlowDeskLayout.spaceXS) {

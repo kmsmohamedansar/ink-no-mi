@@ -40,7 +40,7 @@ struct CanvasBoardView: View {
                             .offset(x: CGFloat(element.x), y: CGFloat(element.y))
                             .opacity(canvasReadabilityOpacity(for: element.id))
                             .zIndex(Double(element.zIndex))
-                            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                            .transition(FlowDeskMotion.insertTransition)
                     }
 
                     if let activeContainerRect = boardViewModel.activeContainerRect() {
@@ -54,14 +54,8 @@ struct CanvasBoardView: View {
 
                     if boardViewModel.boardState.elements.isEmpty {
                         Text("Select a tool to start creating")
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(Color.primary.opacity(0.34))
-                            .padding(.horizontal, FlowDeskLayout.spaceL)
-                            .padding(.vertical, FlowDeskLayout.spaceM)
-                            .background(
-                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035))
-                            )
+                            .font(.footnote.weight(.regular))
+                            .foregroundStyle(Color.primary.opacity(0.28))
                             .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
                             .allowsHitTesting(false)
                             .zIndex(200_000)
@@ -155,7 +149,7 @@ struct CanvasBoardView: View {
                 }
             }
             .simultaneousGesture(zoomGesture(currentScale: viewport.scale))
-            .animation(.easeOut(duration: 0.18), value: boardViewModel.boardState.elements.map(\.id))
+            .animation(FlowDeskMotion.standardEaseOut, value: boardViewModel.boardState.elements.map(\.id))
             .task(id: insertionSnapshotTaskID(geo: geo, viewport: viewport, pan: panDragTranslation)) {
                 boardViewModel.syncInsertionViewportSnapshot(
                     CanvasInsertionViewportSnapshot(

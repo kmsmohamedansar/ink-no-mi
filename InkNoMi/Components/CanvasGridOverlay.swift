@@ -43,7 +43,7 @@ struct CanvasGridOverlay: View {
                 row += 1
             }
             let minorColor = gridInk.opacity(lineOpacity)
-            let majorColor = gridInk.opacity(min(lineOpacity * 1.55, 0.22))
+            let majorColor = gridInk.opacity(min(lineOpacity * 1.2, 0.08))
             context.stroke(minor, with: .color(minorColor), lineWidth: lineWidth)
             context.stroke(major, with: .color(majorColor), lineWidth: lineWidth * 1.15)
         }

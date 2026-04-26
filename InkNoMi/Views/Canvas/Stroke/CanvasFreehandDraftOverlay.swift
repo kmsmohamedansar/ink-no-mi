@@ -8,7 +8,8 @@ struct CanvasFreehandDraftOverlay: View {
     let opacity: Double
 
     var body: some View {
-        let path = StrokePathSmoothing.smoothPath(from: canvasPoints)
+        let previewPoints = StrokePathSmoothing.livePreviewPoints(canvasPoints)
+        let path = StrokePathSmoothing.smoothPath(from: previewPoints)
         path
             .stroke(
                 color.swiftUIColor.opacity(opacity),
