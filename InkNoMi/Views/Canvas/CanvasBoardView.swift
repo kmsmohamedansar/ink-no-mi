@@ -7,13 +7,15 @@ struct CanvasBoardView: View {
     @Bindable var selection: CanvasSelectionModel
 
     @Environment(\.flowDeskTokens) private var tokens
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var panDragTranslation: CGSize = .zero
     @State private var panMomentumTask: Task<Void, Never>?
     @State private var draftCanvasPoints: [CGPoint] = []
     @State private var placementDragStart: CGPoint?
     @State private var placementPreviewRect: CGRect?
+    @State private var canvasTapRipplePoint: CGPoint = .zero
+    @State private var showCanvasTapRipple = false
+    @State private var canvasTapRippleExpanded = false
 
     private let canvasSize: CGFloat = 4000
 
@@ -34,11 +36,25 @@ struct CanvasBoardView: View {
                 ZStack(alignment: .topLeading) {
                     canvasBackgroundLayer(viewport: viewport, selection: selection)
 
+                    if showCanvasTapRipple {
+                        Circle()
+                            .strokeBorder(tokens.selectionStrokeColor.opacity(0.24), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .position(canvasTapRipplePoint)
+                            .scaleEffect(canvasTapRippleExpanded ? 2.2 : 0.35)
+                            .opacity(canvasTapRippleExpanded ? 0 : 0.22)
+                            .blendMode(.plusLighter)
+                            .allowsHitTesting(false)
+                            .animation(FlowDeskMotion.smoothEaseOut, value: canvasTapRippleExpanded)
+                            .zIndex(120_000)
+                    }
+
                     ForEach(sortedElements) { element in
                         canvasElementView(for: element)
                             .frame(width: CGFloat(element.width), height: CGFloat(element.height))
                             .offset(x: CGFloat(element.x), y: CGFloat(element.y))
                             .opacity(canvasReadabilityOpacity(for: element.id))
+                            .shadow(color: elementShadowColor(for: element), radius: DS.Shadow.soft.radius, x: 0, y: 2)
                             .zIndex(Double(element.zIndex))
                             .transition(FlowDeskMotion.insertTransition)
                     }
@@ -53,9 +69,9 @@ struct CanvasBoardView: View {
                     }
 
                     if boardViewModel.boardState.elements.isEmpty {
-                        Text("Select a tool to start creating")
-                            .font(.footnote.weight(.regular))
-                            .foregroundStyle(Color.primary.opacity(0.28))
+                        Text("Start drawing or select a tool")
+                            .font(.system(size: 14))
+                            .foregroundStyle(DS.Color.textSecondary.opacity(0.5))
                             .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
                             .allowsHitTesting(false)
                             .zIndex(200_000)
@@ -144,7 +160,9 @@ struct CanvasBoardView: View {
                     NSCursor.arrow.set()
                 case .text:
                     NSCursor.iBeam.set()
-                case .connect, .pen, .pencil, .stickyNote, .shape, .chart, .smartInk:
+                case .connect:
+                    NSCursor.pointingHand.set()
+                case .pen, .pencil, .stickyNote, .shape, .chart, .smartInk:
                     NSCursor.crosshair.set()
                 }
             }
@@ -167,6 +185,17 @@ struct CanvasBoardView: View {
 
     private func insertionSnapshotTaskID(geo: GeometryProxy, viewport: ViewportState, pan: CGSize) -> String {
         "\(geo.size.width),\(geo.size.height),\(viewport.offsetX),\(viewport.offsetY),\(viewport.scale),\(pan.width),\(pan.height)"
+    }
+
+    private func elementShadowColor(for element: CanvasElementRecord) -> Color {
+        switch element.kind {
+        case .textBlock, .stickyNote, .shape, .chart:
+            return DS.Shadow.soft.color
+        case .stroke, .connector:
+            return .clear
+        @unknown default:
+            return .clear
+        }
     }
 
     /// While something is selected, deemphasize items that are not the selection, an incident link, or an endpoint of an incident link. Disabled during connector drag/adjust so snap targets stay clear.
@@ -219,6 +248,7 @@ struct CanvasBoardView: View {
         case .select:
             bg
                 .gesture(panGesture(viewport: viewport))
+                .simultaneousGesture(canvasTapRippleGesture)
                 .onTapGesture {
                     boardViewModel.cancelConnectorEndpointAdjust()
                     boardViewModel.cancelConnectorDrag()
@@ -229,6 +259,7 @@ struct CanvasBoardView: View {
                 }
         case .connect:
             bg
+                .simultaneousGesture(canvasTapRippleGesture)
                 .onTapGesture {
                     boardViewModel.cancelConnectorEndpointAdjust()
                     boardViewModel.cancelConnectorDrag()
@@ -501,12 +532,75 @@ struct CanvasBoardView: View {
 
     @ViewBuilder
     private func canvasBackground(showGrid: Bool) -> some View {
-        FlowDeskTheme.canvasWorkspaceMatBackground(
-            tokens: tokens,
-            colorScheme: colorScheme,
-            showGrid: showGrid,
-            includeFilmGrain: false
-        )
+        ZStack {
+            DS.Color.canvas
+
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.6),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 40,
+                endRadius: 1600
+            )
+            .blendMode(.softLight)
+            .allowsHitTesting(false)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.4),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blendMode(.softLight)
+            .allowsHitTesting(false)
+
+            RadialGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.045)
+                ],
+                center: .center,
+                startRadius: 520,
+                endRadius: 2400
+            )
+            .blendMode(.multiply)
+            .allowsHitTesting(false)
+
+            if showGrid {
+                CanvasGridView(
+                    spacing: 32,
+                    lineWidth: 0.5,
+                    lineOpacity: 0.03,
+                    gridInk: .black,
+                    majorLineStride: 0
+                )
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var canvasTapRippleGesture: some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                triggerCanvasTapRipple(at: value.location)
+            }
+    }
+
+    private func triggerCanvasTapRipple(at point: CGPoint) {
+        canvasTapRipplePoint = point
+        showCanvasTapRipple = true
+        canvasTapRippleExpanded = false
+        DispatchQueue.main.async {
+            canvasTapRippleExpanded = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                showCanvasTapRipple = false
+                canvasTapRippleExpanded = false
+            }
+        }
     }
 
     // MARK: - Selection toolbar (view-space overlay)

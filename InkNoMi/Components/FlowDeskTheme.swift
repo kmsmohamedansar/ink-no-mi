@@ -7,18 +7,19 @@ enum FlowDeskTheme {
     // MARK: - Core color identity
 
     /// Primary UI accent used across selection, highlights, and active controls.
-    static let accentBlue = Color(nsColor: NSColor(red: 0.298, green: 0.553, blue: 0.941, alpha: 1)) // ~#4C8DFF, slightly desaturated
-    static let textPrimary = Color(nsColor: NSColor(red: 0.11, green: 0.11, blue: 0.118, alpha: 1)) // #1C1C1E
-    static let textSecondary = Color(nsColor: NSColor(red: 0.42, green: 0.42, blue: 0.42, alpha: 1)) // #6B6B6B
-    static let borderLight = Color.black.opacity(0.06)
-    static let hoverNeutral = Color.black.opacity(0.04)
+    static let accentBlue = DS.Color.accent
+    static let accentGold = DS.Color.accentWarm
+    static let textPrimary = DS.Color.textPrimary
+    static let textSecondary = DS.Color.textSecondary
+    static let borderLight = DS.Color.border
+    static let hoverNeutral = DS.Color.hover
 
     // MARK: - Depth (Level 2 floating panels — single shadow system)
 
     /// Tight, modern lift—subtle elevation without heavy blur.
     static let floatingPanelShadowOpacity: Double = 0.05
-    static let floatingPanelShadowRadius: CGFloat = 10
-    static let floatingPanelShadowY: CGFloat = 2
+    static let floatingPanelShadowRadius: CGFloat = DS.Shadow.soft.radius
+    static let floatingPanelShadowY: CGFloat = DS.Shadow.soft.y
 
     /// App chrome backdrop: center reads gently brighter than edges.
     static func homeAtmosphereWash(colorScheme: ColorScheme) -> RadialGradient {
@@ -176,10 +177,13 @@ enum FlowDeskTheme {
         tokens: FlowDeskAppearanceTokens,
         colorScheme: ColorScheme,
         showGrid: Bool,
+        spotlightCenter: UnitPoint,
         includeFilmGrain: Bool
     ) -> some View {
-        let gridOpacity = tokens.gridLineOpacity * tokens.canvasGridEmphasis
+        let gridOpacity = tokens.gridLineOpacity * tokens.canvasGridEmphasis * 0.68
         let topWash = (colorScheme == .dark ? tokens.canvasTopWashOpacity * 0.48 : tokens.canvasTopWashOpacity) * 0.42
+        let spotlightOpacity = colorScheme == .dark ? 0.06 : 0.12
+        let vignetteOpacity = tokens.canvasVignetteOpacity * (colorScheme == .dark ? 1.08 : 1.22)
 
         ZStack {
             tokens.canvasWorkspaceBackground
@@ -193,6 +197,20 @@ enum FlowDeskTheme {
                     majorLineStride: 0
                 )
             }
+
+            // Layer 2: radial center lift + edge falloff, anchored to viewport center.
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(spotlightOpacity),
+                    Color.white.opacity(spotlightOpacity * 0.45),
+                    Color.clear
+                ],
+                center: spotlightCenter,
+                startRadius: 60,
+                endRadius: 760
+            )
+            .blendMode(.softLight)
+            .allowsHitTesting(false)
 
             LinearGradient(
                 colors: [
@@ -224,6 +242,20 @@ enum FlowDeskTheme {
                 center: .center,
                 startRadius: 380,
                 endRadius: 2_900
+            )
+            .blendMode(.multiply)
+            .opacity(vignetteOpacity > 0 ? 1 : 0)
+            .allowsHitTesting(false)
+
+            // Layer 3: extremely subtle edge dimming around the current viewport focus.
+            RadialGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(vignetteOpacity * 0.42)
+                ],
+                center: spotlightCenter,
+                startRadius: 460,
+                endRadius: 2_200
             )
             .blendMode(.multiply)
             .allowsHitTesting(false)

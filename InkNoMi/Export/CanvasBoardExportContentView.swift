@@ -42,6 +42,7 @@ struct CanvasBoardExportContentView: View {
             tokens: tokens,
             colorScheme: colorScheme,
             showGrid: showGrid,
+            spotlightCenter: .center,
             includeFilmGrain: false
         )
     }

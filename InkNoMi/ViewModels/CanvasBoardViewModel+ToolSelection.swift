@@ -13,7 +13,9 @@ extension CanvasBoardViewModel {
         if mode == .shape, rectanglePlacementShape {
             placeShapeKind = .rectangle
         }
-        canvasTool = mode
+        withAnimation(FlowDeskMotion.smoothEaseOut) {
+            canvasTool = mode
+        }
         canvasContextPanel = nil
     }
 }

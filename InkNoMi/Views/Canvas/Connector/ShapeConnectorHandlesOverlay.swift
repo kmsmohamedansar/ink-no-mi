@@ -11,7 +11,7 @@ struct ShapeConnectorHandlesOverlay: View {
 
     @State private var hoveredEdge: ConnectorEdge?
 
-    private let dotSize: CGFloat = 9
+    private let dotSize: CGFloat = 7
 
     var body: some View {
         GeometryReader { geo in
@@ -41,7 +41,7 @@ struct ShapeConnectorHandlesOverlay: View {
         )
         let style: ConnectorLineStyle = NSEvent.modifierFlags.contains(.shift) ? .straight : .arrow
         let isHover = hoveredEdge == edge
-        let visualDiameter = dotSize * (isHover ? 1.2 : 1)
+        let visualDiameter = isHover ? 8 : 6
         return ZStack {
             if isHover {
                 Circle()

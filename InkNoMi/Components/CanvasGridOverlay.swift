@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Lightweight grid drawn in the canvas coordinate space (scales with the board).
-struct CanvasGridOverlay: View {
+/// Lightweight grid drawn in canvas coordinate space (scales with board zoom).
+struct CanvasGridView: View {
     var spacing: CGFloat
     /// Softer than hairline for a premium “space” read.
     var lineWidth: CGFloat
@@ -49,3 +49,6 @@ struct CanvasGridOverlay: View {
         }
     }
 }
+
+/// Backward compatibility shim for older references.
+typealias CanvasGridOverlay = CanvasGridView

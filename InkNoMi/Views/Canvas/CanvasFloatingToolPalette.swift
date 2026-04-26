@@ -48,19 +48,23 @@ struct InkNoMiCanvasChromeColumn: View {
                 Text(activeToolHint)
                     .id(activeToolHint)
                     .font(.caption)
-                    .foregroundStyle(Color.primary.opacity(0.55))
+                    .foregroundStyle(DS.Color.textSecondary.opacity(0.72))
                     .transition(.opacity)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .animation(FlowDeskMotion.standardEaseOut, value: activeToolHint)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 12)
-        .frame(maxHeight: .infinity, alignment: .center)
-        .frame(width: 210, alignment: .leading)
+        .padding(.horizontal, DS.Spacing.md)
+        .padding(.vertical, DS.Spacing.md)
+        .frame(width: 216, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Canvas tools")
-        .flowDeskFloatingPanelChrome(shadowStyle: .toolPalette)
+        .flowDeskFloatingPanelChrome(
+            cornerRadius: DS.Radius.large,
+            shadowStyle: .toolPalette,
+            lightTintOpacity: 0.08,
+            darkTintOpacity: 0.07
+        )
     }
 
     private var toolItems: [ToolItem] {
@@ -82,7 +86,9 @@ struct InkNoMiCanvasChromeColumn: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color.primary.opacity(0.45))
+                .foregroundStyle(DS.Color.textSecondary.opacity(0.85))
+                .textCase(.uppercase)
+                .tracking(0.55)
                 .padding(.leading, 8)
             ForEach(items, id: \.self) { mode in
                 if let item = toolItems.first(where: { $0.mode == mode }) {
@@ -119,25 +125,33 @@ struct InkNoMiCanvasChromeColumn: View {
                 Spacer(minLength: 0)
             }
             .frame(height: rowHeight)
-            .padding(.horizontal, 10)
-            .foregroundStyle(active ? tokens.selectionStrokeColor : Color.primary.opacity(0.84))
+            .padding(.horizontal, DS.Spacing.md - 2)
+            .foregroundStyle(active ? tokens.selectionStrokeColor : DS.Color.textPrimary.opacity(0.84))
             .scaleEffect(active ? 1.01 : 1.0)
             .offset(x: active ? 1 : 0)
             .background {
                 RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                    .fill(active ? tokens.selectionStrokeColor.opacity(0.14) : (hovered ? Color.primary.opacity(0.055) : Color.clear))
+                    .fill(active ? DS.Color.accent.opacity(0.1) : (hovered ? DS.Color.hover : Color.clear))
                     .overlay {
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.32) : Color.primary.opacity(0.07), lineWidth: 0.8)
+                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.32) : DS.Color.border.opacity(1.15), lineWidth: 0.8)
                     }
             }
+            .shadow(
+                color: active ? tokens.selectionStrokeColor.opacity(0.20) : Color.clear,
+                radius: active ? 7 : 0,
+                x: 0,
+                y: active ? 1 : 0
+            )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CanvasToolButtonStyle(isActive: active, isHovered: hovered))
         .help(tooltip(for: item))
         .onHover { inside in
-            hoveredTool = inside ? item.mode : nil
+            withAnimation(FlowDeskMotion.quickEaseOut) {
+                hoveredTool = inside ? item.mode : nil
+            }
         }
-        .animation(FlowDeskMotion.standardEaseOut, value: active)
+        .animation(FlowDeskMotion.smoothEaseOut, value: active)
         .animation(FlowDeskMotion.quickEaseOut, value: hovered)
         .opacity(item.enabled ? 1 : 0.55)
         .disabled(!item.enabled)
@@ -192,14 +206,14 @@ struct InkNoMiCanvasChromeColumn: View {
 
     private var activeToolHint: String {
         switch boardViewModel.canvasTool {
-        case .select: return "Select: move and edit elements"
-        case .connect: return "Connect: drag from one note to another"
-        case .pen: return "Pen: draw freely"
-        case .pencil: return "Pencil: draw lighter strokes"
-        case .text: return "Text: click anywhere to type"
-        case .stickyNote: return "Note: click to place a blank note"
-        case .shape: return "Shapes: click or drag to place shapes"
-        case .chart: return "Chart: click to create a chart block"
+        case .select: return "Select and edit"
+        case .connect: return "Connect notes"
+        case .pen: return "Draw with pen"
+        case .pencil: return "Draw with pencil"
+        case .text: return "Add text"
+        case .stickyNote: return "Add note"
+        case .shape: return "Insert shapes"
+        case .chart: return "Insert chart"
         case .smartInk: return "Smart Ink: coming soon"
         }
     }
@@ -222,6 +236,19 @@ struct InkNoMiCanvasChromeColumn: View {
         case .chart: return "Chart"
         case .smartInk: return "Smart Ink (Coming Soon)"
         }
+    }
+}
+
+private struct CanvasToolButtonStyle: ButtonStyle {
+    let isActive: Bool
+    let isHovered: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : (isActive ? 1.01 : 1.0))
+            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
+            .animation(FlowDeskMotion.quickEaseOut, value: isHovered)
+            .animation(FlowDeskMotion.smoothEaseOut, value: isActive)
     }
 }
 

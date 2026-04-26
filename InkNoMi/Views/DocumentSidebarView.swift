@@ -14,7 +14,7 @@ struct DocumentSidebarView: View {
     @State private var hoveredDocumentID: UUID?
 
     private var sectionHeaderForeground: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.58 : 0.45)
+        DS.Color.textSecondary.opacity(colorScheme == .dark ? 0.74 : 0.72)
     }
 
     var body: some View {
@@ -32,16 +32,26 @@ struct DocumentSidebarView: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(tokens.sidebarListTint)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(DS.Color.hover.opacity(colorScheme == .dark ? 2.0 : 0.75))
+                            }
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 8)
+                    .shadow(
+                        color: DS.Shadow.soft.color.opacity(colorScheme == .dark ? 1.6 : 1.05),
+                        radius: DS.Shadow.soft.radius * 0.9,
+                        x: DS.Shadow.soft.x,
+                        y: 1
+                    )
+            .padding(.horizontal, DS.Spacing.sm - 2)
+            .padding(.vertical, DS.Spacing.sm)
 
                 HStack {
                     Spacer()
                     Rectangle()
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.035))
+                        .fill(DS.Color.border.opacity(colorScheme == .dark ? 1.7 : 0.58))
                         .frame(width: 1)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, DS.Spacing.md - 2)
                 }
                 .allowsHitTesting(false)
             }
@@ -73,7 +83,7 @@ struct DocumentSidebarView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, 36)
+        .environment(\.defaultMinListRowHeight, 40)
     }
 
     @ViewBuilder
@@ -151,15 +161,34 @@ struct DocumentSidebarView: View {
             .fill(rowFill(isSelected: isSelected, isHovered: isHovered))
             .overlay {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                tokens.selectionStrokeColor.opacity(isHovered && !isSelected ? 0.10 : 0),
+                                Color.white.opacity(isHovered && !isSelected ? 0.05 : 0)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .strokeBorder(
                         isSelected ? tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.5 : 0.44) : Color.clear,
                         lineWidth: isSelected ? 1 : 0
                     )
             }
+            .shadow(
+                color: isSelected ? tokens.selectionStrokeColor.opacity(0.16) : Color.clear,
+                radius: isSelected ? 6 : 0,
+                x: 0,
+                y: isSelected ? 1 : 0
+            )
             .padding(.vertical, 0.5)
             .padding(.horizontal, 6)
-            .animation(.easeOut(duration: 0.10), value: isSelected)
-            .animation(.easeOut(duration: 0.10), value: isHovered)
+            .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
+            .animation(FlowDeskMotion.standardEaseOut, value: isHovered)
     }
 
     private func rowFill(isSelected: Bool, isHovered: Bool) -> Color {

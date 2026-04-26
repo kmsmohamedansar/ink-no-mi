@@ -38,7 +38,7 @@ struct ViewportState: Codable, Equatable, Sendable {
     var offsetY: Double
     var showGrid: Bool
 
-    init(scale: Double = 1, offsetX: Double = 0, offsetY: Double = 0, showGrid: Bool = true) {
+    init(scale: Double = 1, offsetX: Double = 0, offsetY: Double = 0, showGrid: Bool = false) {
         self.scale = scale
         self.offsetX = offsetX
         self.offsetY = offsetY

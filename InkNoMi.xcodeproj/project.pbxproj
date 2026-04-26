@@ -113,6 +113,7 @@
 		A10000000000000000000092 /* PurchaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000092 /* PurchaseManager.swift */; };
 		A10000000000000000000093 /* ProPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* ProPaywallSheet.swift */; };
 		A10000000000000000000094 /* FlowDeskMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* FlowDeskMotion.swift */; };
+		A10000000000000000000095 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* DesignSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -224,6 +225,7 @@
 		A20000000000000000000092 /* PurchaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000093 /* ProPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProPaywallSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000094 /* FlowDeskMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskMotion.swift; sourceTree = "<group>"; };
+		A20000000000000000000095 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -351,6 +353,7 @@
 				A20000000000000000000059 /* FlowDeskTypography.swift */,
 				A20000000000000000000060 /* FlowDeskInteractionStyles.swift */,
 				A20000000000000000000094 /* FlowDeskMotion.swift */,
+				A20000000000000000000095 /* DesignSystem.swift */,
 				A20000000000000000000043 /* FlowDeskTheme.swift */,
 				A2000000000000000000000D /* BoardEmptySelectionView.swift */,
 				A20000000000000000000016 /* CanvasElementChrome.swift */,
@@ -702,6 +705,7 @@
 				A10000000000000000000059 /* FlowDeskTypography.swift in Sources */,
 				A10000000000000000000060 /* FlowDeskInteractionStyles.swift in Sources */,
 				A10000000000000000000094 /* FlowDeskMotion.swift in Sources */,
+				A10000000000000000000095 /* DesignSystem.swift in Sources */,
 				A10000000000000000000043 /* FlowDeskTheme.swift in Sources */,
 				A1000000000000000000000D /* BoardEmptySelectionView.swift in Sources */,
 				A10000000000000000000016 /* CanvasElementChrome.swift in Sources */,

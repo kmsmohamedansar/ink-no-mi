@@ -26,6 +26,9 @@ struct TextBlockCanvasItemView: View {
     private var isConvertingIn: Bool {
         boardViewModel.convertingTextIDs.contains(element.id)
     }
+    private var isDragging: Bool {
+        moveDragStartCanvasOrigin != nil
+    }
 
     /// Multi-select drag: leader uses local snap translation; followers mirror shared preview.
     private var composedMoveOffset: CGSize {
@@ -49,11 +52,11 @@ struct TextBlockCanvasItemView: View {
                 .fill(tokens.canvasTextBlockFill)
                 .shadow(
                     color: Color.black.opacity(
-                        isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal
+                        isDragging ? 0.1 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
                     ),
-                    radius: isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal,
+                    radius: isDragging ? 12 : (isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal),
                     x: 0,
-                    y: isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal
+                    y: isDragging ? 6 : (isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
@@ -84,8 +87,8 @@ struct TextBlockCanvasItemView: View {
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
-            RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
                 .opacity(isHovered && !isSelected ? 1 : 0)
                 .allowsHitTesting(false)
         }
@@ -111,9 +114,11 @@ struct TextBlockCanvasItemView: View {
             }
         }
         .offset(composedMoveOffset)
+        .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
         .scaleEffect(isConvertingIn ? 0.95 : 1.0)
         .opacity(isConvertingIn ? 0.78 : 1.0)
         .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)
+        .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
         .contentShape(RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous))
         .highPriorityGesture(
             TapGesture(count: 2).onEnded {

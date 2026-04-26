@@ -28,6 +28,9 @@ struct StickyNoteCanvasItemView: View {
     private var isSelected: Bool {
         selection.isSelected(element.id)
     }
+    private var isDragging: Bool {
+        moveDragStartCanvasOrigin != nil
+    }
 
     private var composedMoveOffset: CGSize {
         if boardViewModel.optionDuplicateSourceElementID == element.id {
@@ -52,11 +55,11 @@ struct StickyNoteCanvasItemView: View {
                 .fill(payload.backgroundColor.swiftUIColor)
                 .shadow(
                     color: Color.black.opacity(
-                        isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal
+                        isDragging ? 0.1 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
                     ),
-                    radius: isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal,
+                    radius: isDragging ? 12 : (isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal),
                     x: 0,
-                    y: isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal
+                    y: isDragging ? 6 : (isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
                 )
                 .overlay {
                     cardShape
@@ -88,8 +91,8 @@ struct StickyNoteCanvasItemView: View {
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
-            cardShape
-                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
                 .opacity(isHovered && !isSelected ? 1 : 0)
                 .allowsHitTesting(false)
         }
@@ -115,7 +118,9 @@ struct StickyNoteCanvasItemView: View {
             }
         }
         .offset(composedMoveOffset)
+        .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
         .contentShape(cardShape)
+        .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
         .highPriorityGesture(
             TapGesture(count: 2).onEnded {
                 selection.selectOnly(element.id)

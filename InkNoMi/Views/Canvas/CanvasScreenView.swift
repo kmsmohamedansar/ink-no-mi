@@ -9,7 +9,10 @@ struct CanvasScreenView: View {
     @Bindable var selection: CanvasSelectionModel
 
     var body: some View {
-        ZStack(alignment: .leading) {
+        ZStack(alignment: .topLeading) {
+            DS.Color.appBackground
+                .ignoresSafeArea()
+
             CanvasBoardView(
                 boardViewModel: boardViewModel,
                 selection: selection
@@ -20,7 +23,8 @@ struct CanvasScreenView: View {
                 boardViewModel: boardViewModel,
                 selection: selection
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.leading, DS.Spacing.lg)
+            .padding(.top, DS.Spacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(document.title)

@@ -4,11 +4,11 @@ import SwiftUI
 enum FlowDeskLayout {
     // MARK: - Spacing scale (4pt rhythm)
 
-    static let spaceXS: CGFloat = 4
-    static let spaceS: CGFloat = 8
-    static let spaceM: CGFloat = 12
-    static let spaceL: CGFloat = 16
-    static let spaceXL: CGFloat = 24
+    static let spaceXS: CGFloat = DS.Spacing.xs
+    static let spaceS: CGFloat = DS.Spacing.sm
+    static let spaceM: CGFloat = DS.Spacing.md
+    static let spaceL: CGFloat = DS.Spacing.lg
+    static let spaceXL: CGFloat = DS.Spacing.xl
     static let spaceXXL: CGFloat = 32
 
     // MARK: - Home / dashboard
@@ -30,7 +30,7 @@ enum FlowDeskLayout {
     // MARK: - Cards (same family as canvas framed elements)
 
     /// Primary corner radius for home cards, text blocks, charts, and sticky notes.
-    static let cardCornerRadius: CGFloat = 12
+    static let cardCornerRadius: CGFloat = DS.Radius.medium
 
     static let cardBorderLineWidth: CGFloat = 1
     static let cardBorderLineWidthHover: CGFloat = 1.25
@@ -90,7 +90,7 @@ enum FlowDeskLayout {
     static let sidebarEmptyHorizontalPadding: CGFloat = 12
 
     /// Sidebar row pill; matches home-adjacent rounded language (continuous curve).
-    static let sidebarRowSelectionCornerRadius: CGFloat = 8
+    static let sidebarRowSelectionCornerRadius: CGFloat = DS.Radius.small
     /// Leading inset for the “BOARDS”-style section label (aligns with row content).
     static let sidebarSectionHeaderLeadingPadding: CGFloat = 18
 
@@ -107,7 +107,7 @@ enum FlowDeskLayout {
 
     // MARK: - Floating panels (palette, selection bar, tips)
 
-    static let floatingPanelCornerRadius: CGFloat = 12
+    static let floatingPanelCornerRadius: CGFloat = DS.Radius.medium
     static let floatingPanelContentPadding: CGFloat = 8
     /// Contextual toolbars anchored to the selection (compact footprint).
     static let floatingPanelToolbarPaddingH: CGFloat = 8
@@ -119,9 +119,9 @@ enum FlowDeskLayout {
     static let floatingPanelMultiSelectOuterStackSpacing: CGFloat = 7
 
     /// HUD chips, rail icon wells, template rows, placeholder element chrome (step below card radius).
-    static let chromeCompactCornerRadius: CGFloat = 8
+    static let chromeCompactCornerRadius: CGFloat = DS.Radius.small
     /// Inset rows inside context panels (shape picker, etc.); aligns with stroke selection handle chrome.
-    static let chromeInsetCornerRadius: CGFloat = 8
+    static let chromeInsetCornerRadius: CGFloat = DS.Radius.small
     /// Dashed placement preview on the board.
     static let chromePlacementPreviewCornerRadius: CGFloat = 3
     /// Bar marks inside Swift Charts.

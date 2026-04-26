@@ -89,20 +89,20 @@ struct FlowDeskAppearanceTokens: Equatable {
     }
 
     /// Product accent — slightly richer for Miro-like interaction clarity while staying calm (not system blue).
-    private static let accentStrokeLight = Color(nsColor: NSColor(red: 0.298, green: 0.553, blue: 0.941, alpha: 1))
+    private static let accentStrokeLight = DS.Color.accent
     private static let accentStrokeDark = Color(nsColor: NSColor(red: 0.55, green: 0.76, blue: 1.0, alpha: 1))
 
     // MARK: - Warm Paper
 
     private static let warmPaperLight = FlowDeskAppearanceTokens(
-        workspaceBackground: Color(nsColor: NSColor(red: 0.956, green: 0.945, blue: 0.918, alpha: 1)), // #F4F1EA
-        canvasWorkspaceBackground: Color(nsColor: NSColor(red: 0.984, green: 0.98, blue: 0.965, alpha: 1)), // #FBFAF6
+        workspaceBackground: DS.Color.appBackground,
+        canvasWorkspaceBackground: DS.Color.canvas,
         gridLineOpacity: 0.03,
         canvasGridInk: Color.black,
         canvasBottomDepthOpacity: 0.03,
         canvasTopWashOpacity: 0.02,
         canvasVignetteOpacity: 0.022,
-        canvasGrainOpacity: 0.0,
+        canvasGrainOpacity: 0.007,
         canvasGridEmphasis: 1.0,
         homeCardFill: Color(nsColor: NSColor(red: 1, green: 0.998, blue: 0.992, alpha: 1)),
         homeCardFillTop: Color(nsColor: NSColor(red: 1, green: 0.998, blue: 0.992, alpha: 1)),
@@ -124,8 +124,8 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 1, green: 0.996, blue: 0.988, alpha: 1)),
         chartCardBorderOpacity: 0.1,
         selectionStrokeColor: accentStrokeLight.opacity(0.9),
-        selectionStrokeWidth: 1.25,
-        sidebarListTint: Color(nsColor: NSColor(red: 0.965, green: 0.956, blue: 0.932, alpha: 0.86)),
+        selectionStrokeWidth: 1.5,
+        sidebarListTint: Color(nsColor: NSColor(red: 0.965, green: 0.956, blue: 0.932, alpha: 0.74)),
         sidebarFooterUseSystemBar: false,
         sidebarFooterMaterial: .thin,
         toolbarMaterial: .thin,
@@ -163,7 +163,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 0.262, green: 0.23, blue: 0.21, alpha: 1)),
         chartCardBorderOpacity: 0.24,
         selectionStrokeColor: accentStrokeDark.opacity(0.94),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor(red: 0.152, green: 0.128, blue: 0.114, alpha: 0.94)),
         sidebarFooterUseSystemBar: true,
         sidebarFooterMaterial: .none,
@@ -204,7 +204,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 0.992, green: 0.994, blue: 1, alpha: 1)),
         chartCardBorderOpacity: 0.125,
         selectionStrokeColor: accentStrokeLight.opacity(0.94),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor(red: 0.898, green: 0.905, blue: 0.922, alpha: 0.94)),
         sidebarFooterUseSystemBar: true,
         sidebarFooterMaterial: .none,
@@ -243,7 +243,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 0.218, green: 0.226, blue: 0.246, alpha: 1)),
         chartCardBorderOpacity: 0.27,
         selectionStrokeColor: accentStrokeDark.opacity(0.93),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor(red: 0.118, green: 0.126, blue: 0.148, alpha: 0.92)),
         sidebarFooterUseSystemBar: true,
         sidebarFooterMaterial: .none,
@@ -284,7 +284,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor.white.withAlphaComponent(0.9)),
         chartCardBorderOpacity: 0.15,
         selectionStrokeColor: accentStrokeLight.opacity(0.94),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor.white.withAlphaComponent(0.28)),
         sidebarFooterUseSystemBar: false,
         sidebarFooterMaterial: .thin,
@@ -323,7 +323,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor.white.withAlphaComponent(0.16)),
         chartCardBorderOpacity: 0.28,
         selectionStrokeColor: accentStrokeDark.opacity(0.94),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color.white.opacity(0.12),
         sidebarFooterUseSystemBar: false,
         sidebarFooterMaterial: .thin,
@@ -364,7 +364,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 0.994, green: 0.995, blue: 1, alpha: 1)),
         chartCardBorderOpacity: 0.135,
         selectionStrokeColor: accentStrokeLight.opacity(0.92),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor(red: 0.918, green: 0.918, blue: 0.93, alpha: 0.94)),
         sidebarFooterUseSystemBar: true,
         sidebarFooterMaterial: .none,
@@ -403,7 +403,7 @@ struct FlowDeskAppearanceTokens: Equatable {
         chartCardFill: Color(nsColor: NSColor(red: 0.224, green: 0.222, blue: 0.228, alpha: 1)),
         chartCardBorderOpacity: 0.3,
         selectionStrokeColor: accentStrokeDark.opacity(0.93),
-        selectionStrokeWidth: 1.25,
+        selectionStrokeWidth: 1.5,
         sidebarListTint: Color(nsColor: NSColor(red: 0.148, green: 0.146, blue: 0.152, alpha: 0.92)),
         sidebarFooterUseSystemBar: true,
         sidebarFooterMaterial: .none,

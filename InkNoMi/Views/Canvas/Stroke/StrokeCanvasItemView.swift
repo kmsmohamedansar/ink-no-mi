@@ -39,8 +39,8 @@ struct StrokeCanvasItemView: View {
                     .allowsHitTesting(false)
             }
             if isHovered && !isSelected {
-                RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                    .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
                     .allowsHitTesting(false)
             }
         }

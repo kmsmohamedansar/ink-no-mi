@@ -12,6 +12,7 @@ struct ChartCanvasItemView: View {
     @State private var moveDragTranslation: CGSize = .zero
     @State private var moveDragStartCanvasOrigin: CGPoint?
     @State private var resizeDragStartSize: CGSize?
+    @State private var isHovered = false
 
     private var payload: ChartPayload {
         element.resolvedChartPayload()
@@ -19,6 +20,9 @@ struct ChartCanvasItemView: View {
 
     private var isSelected: Bool {
         selection.isSelected(element.id)
+    }
+    private var isDragging: Bool {
+        moveDragStartCanvasOrigin != nil
     }
 
     private var composedMoveOffset: CGSize {
@@ -44,11 +48,11 @@ struct ChartCanvasItemView: View {
                 .fill(tokens.chartCardFill)
                 .shadow(
                     color: Color.black.opacity(
-                        isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal
+                        isDragging ? 0.1 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
                     ),
-                    radius: isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal,
+                    radius: isDragging ? 12 : (isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal),
                     x: 0,
-                    y: isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal
+                    y: isDragging ? 6 : (isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
                 )
 
             cardShape
@@ -71,6 +75,10 @@ struct ChartCanvasItemView: View {
                 .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
                 .opacity(isSelected ? 1 : 0)
                 .allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
+                .opacity(isHovered && !isSelected ? 1 : 0)
+                .allowsHitTesting(false)
         }
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .overlay(alignment: .bottomTrailing) {
@@ -82,13 +90,18 @@ struct ChartCanvasItemView: View {
             }
         }
         .offset(composedMoveOffset)
+        .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
         .contentShape(cardShape)
+        .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
         .onTapGesture {
             boardViewModel.stopAllInlineEditing()
             let extend = NSEvent.modifierFlags.contains(.shift)
             selection.handleCanvasTap(elementID: element.id, extendSelection: extend)
         }
         .simultaneousGesture(moveGesture)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             CanvasElementEditorContextMenuItems(
                 elementID: element.id,
