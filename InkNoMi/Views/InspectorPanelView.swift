@@ -23,8 +23,8 @@ struct InspectorPanelView: View {
             } footer: {
                 if !selection.hasSelection {
                     Text("Select any element to edit contextual properties.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.textTertiary)
                 }
             }
 
@@ -34,26 +34,26 @@ struct InspectorPanelView: View {
                    let element = canvasViewModel.boardState.elements.first(where: { $0.id == id }) {
                     LabeledContent("Kind") {
                         Text(elementKindLabel(element.kind))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     LabeledContent("Frame") {
                         Text("\(Int(element.x)), \(Int(element.y)) · \(Int(element.width))×\(Int(element.height))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .font(DS.Typography.caption.monospacedDigit())
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     LabeledContent("Stack") {
                         Text("\(element.zIndex)")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.textSecondary)
                             .monospacedDigit()
                     }
                 } else if selection.isMultiSelection {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(selection.selectedElementIDs.count) items selected")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.textSecondary)
                         Text("Shift-click to add or remove. Drag any selected framed item to move the group together.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .font(DS.Typography.caption)
+                            .foregroundStyle(DS.Color.textTertiary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -69,10 +69,10 @@ struct InspectorPanelView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Nothing selected")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(DS.Color.textPrimary)
                         Text("Use Select to pick an element, or choose a tool on the left to create new content.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DS.Typography.caption)
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } header: {
@@ -162,7 +162,14 @@ struct InspectorPanelView: View {
         .scrollContentBackground(.hidden)
         .background {
             ZStack {
-                tokens.inspectorChromeBackground
+                LinearGradient(
+                    colors: [
+                        tokens.inspectorChromeBackground.opacity(colorScheme == .dark ? 0.96 : 0.98),
+                        DS.Color.surfaceFloatingBottom.opacity(colorScheme == .dark ? 0.2 : 0.5)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 FlowDeskTheme.homeAtmosphereWash(colorScheme: colorScheme)
                     .opacity(colorScheme == .dark ? 0.35 : 0.22)
                     .allowsHitTesting(false)

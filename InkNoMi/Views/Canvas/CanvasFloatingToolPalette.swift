@@ -13,10 +13,15 @@ struct InkNoMiCanvasChromeColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: FlowDeskLayout.spaceM) {
-            Text("Tools")
-                .font(.caption2.weight(.semibold))
-                .tracking(0.5)
-                .foregroundStyle(DS.Color.textSecondary)
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.Color.textSecondary.opacity(0.86))
+                Text("Tools")
+                    .font(DS.Typography.label.weight(.medium))
+                    .tracking(0.5)
+                    .foregroundStyle(DS.Color.textSecondary)
+            }
 
             VStack(alignment: .leading, spacing: FlowDeskLayout.spaceXS) {
                 toolGroup("Selection", items: [.select])
@@ -30,8 +35,8 @@ struct InkNoMiCanvasChromeColumn: View {
             if boardViewModel.canvasTool == .shape {
                 VStack(alignment: .leading, spacing: FlowDeskLayout.spaceXS) {
                     Text("Shape")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(DS.Typography.label.weight(.medium))
+                        .foregroundStyle(DS.Color.textSecondary)
                     ForEach(shapeOptions, id: \.kind) { option in
                         shapeOptionButton(option)
                     }
@@ -53,16 +58,16 @@ struct InkNoMiCanvasChromeColumn: View {
             ZStack(alignment: .leading) {
                 Text(activeToolHint)
                     .id(activeToolHint)
-                    .font(.caption)
-                    .foregroundStyle(DS.Color.textSecondary.opacity(0.78))
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(DS.Color.textSecondary)
                     .transition(.opacity)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .animation(FlowDeskMotion.standardEaseOut, value: activeToolHint)
 
             Text("Shortcuts: V Select  ·  P Pen  ·  T Text  ·  S Shapes")
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(DS.Color.textSecondary.opacity(0.62))
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.textTertiary)
                 .padding(.top, 2)
         }
         .padding(.horizontal, DS.Spacing.md)
@@ -96,10 +101,10 @@ struct InkNoMiCanvasChromeColumn: View {
     private func toolGroup(_ title: String, items: [CanvasToolMode]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(DS.Color.textSecondary.opacity(0.85))
+                .font(DS.Typography.label.weight(.medium))
+                .foregroundStyle(DS.Color.textSecondary)
                 .textCase(.uppercase)
-                .tracking(0.55)
+                .tracking(0.72)
                 .padding(.leading, 8)
             ForEach(items, id: \.self) { mode in
                 if let item = toolItems.first(where: { $0.mode == mode }) {
@@ -119,9 +124,9 @@ struct InkNoMiCanvasChromeColumn: View {
             HStack(spacing: FlowDeskLayout.spaceS) {
                 Image(systemName: item.symbol)
                     .frame(width: 18)
-                    .font(.system(size: 13, weight: active ? .semibold : .regular))
+                    .font(.system(size: active ? 13.2 : 12.6, weight: active ? .bold : (hovered ? .medium : .regular)))
                 Text(item.label)
-                    .font(.subheadline.weight(active ? .semibold : .regular))
+                    .font(DS.Typography.body.weight(active ? .semibold : .regular))
                 if !item.enabled {
                     Text("Soon")
                         .font(.caption2.weight(.semibold))
@@ -137,22 +142,24 @@ struct InkNoMiCanvasChromeColumn: View {
             }
             .frame(height: rowHeight)
             .padding(.horizontal, DS.Spacing.md - 2)
-            .foregroundStyle(active ? tokens.selectionStrokeColor : DS.Color.textPrimary.opacity(0.84))
+            .foregroundStyle(active ? tokens.selectionStrokeColor : DS.Color.textPrimary.opacity(0.88))
             .scaleEffect(active ? 1.012 : (hovered ? 1.016 : 1.0))
+            .brightness(hovered ? 0.016 : 0)
             .offset(x: active ? 1 : 0)
+            .offset(y: hovered ? -0.5 : 0)
             .background {
                 RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                    .fill(active ? DS.Color.accent.opacity(0.11) : (hovered ? DS.Color.hover.opacity(0.9) : Color.clear))
+                    .fill(active ? DS.Color.accent.opacity(0.22) : (hovered ? DS.Color.hover.opacity(0.95) : Color.clear))
                     .overlay {
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.32) : DS.Color.border.opacity(1.15), lineWidth: 0.8)
+                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.56) : DS.Color.border.opacity(1.15), lineWidth: active ? 1.0 : 0.8)
                     }
             }
             .shadow(
-                color: active ? tokens.selectionStrokeColor.opacity(0.20) : Color.clear,
-                radius: active ? 9 : 0,
+                color: active ? tokens.selectionStrokeColor.opacity(0.24) : Color.clear,
+                radius: active ? 14 : 0,
                 x: 0,
-                y: active ? 2 : 0
+                y: active ? 3 : 0
             )
         }
         .buttonStyle(CanvasToolButtonStyle(isActive: active, isHovered: hovered))
@@ -178,6 +185,8 @@ struct InkNoMiCanvasChromeColumn: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(hovered ? DS.Color.hover.opacity(0.86) : .clear)
                 )
+                .brightness(hovered ? 0.015 : 0)
+                .offset(y: hovered ? -0.5 : 0)
                 .scaleEffect(hovered ? 1.015 : 1)
         }
         .buttonStyle(.plain)
@@ -210,7 +219,7 @@ struct InkNoMiCanvasChromeColumn: View {
                 Image(systemName: option.symbol)
                     .frame(width: 16)
                 Text(option.label)
-                    .font(.caption)
+                    .font(DS.Typography.caption)
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 6)

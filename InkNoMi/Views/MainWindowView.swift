@@ -99,9 +99,11 @@ struct MainWindowView: View {
                     renameSession = nil
                 }
             )
+            .flowDeskModalEntrance()
         }
         .sheet(isPresented: paywallPresentedBinding) {
             ProPaywallSheet(purchaseManager: purchaseManager)
+                .flowDeskModalEntrance()
         }
         .alert("InkNoMi Pro", isPresented: purchaseMessageBinding) {
             Button("OK", role: .cancel) {

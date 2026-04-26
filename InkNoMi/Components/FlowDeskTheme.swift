@@ -4,6 +4,12 @@ import SwiftUI
 /// Geometry and export-time constants. **Dynamic colors** come from `FlowDeskAppearanceTokens`
 /// (resolved per `ColorScheme` + user style preset) and are injected via `@Environment(\.flowDeskTokens)`.
 enum FlowDeskTheme {
+    enum DepthLevel {
+        case base
+        case elevated
+        case floating
+    }
+
     // MARK: - Core color identity
 
     /// Primary UI accent used across selection, highlights, and active controls.
@@ -17,20 +23,172 @@ enum FlowDeskTheme {
     // MARK: - Depth (Level 2 floating panels — single shadow system)
 
     /// Tight, modern lift—subtle elevation without heavy blur.
-    static let floatingPanelShadowOpacity: Double = 0.05
-    static let floatingPanelShadowRadius: CGFloat = DS.Shadow.soft.radius
-    static let floatingPanelShadowY: CGFloat = DS.Shadow.soft.y
+    static let floatingPanelShadowOpacity: Double = 0.085
+    static let floatingPanelShadowRadius: CGFloat = DS.Shadow.medium.radius
+    static let floatingPanelShadowY: CGFloat = DS.Shadow.medium.y
+
+    static func depthShadow(for level: DepthLevel) -> (color: Color, radius: CGFloat, y: CGFloat) {
+        switch level {
+        case .base:
+            return (DS.Shadow.base.color, DS.Shadow.base.radius, DS.Shadow.base.y)
+        case .elevated:
+            return (DS.Shadow.soft.color, DS.Shadow.soft.radius, DS.Shadow.soft.y)
+        case .floating:
+            return (DS.Shadow.elevated.color, DS.Shadow.elevated.radius, DS.Shadow.elevated.y)
+        }
+    }
+
+    static func surfaceGradient(for level: DepthLevel, colorScheme: ColorScheme) -> LinearGradient {
+        switch (level, colorScheme) {
+        case (.base, .light):
+            return LinearGradient(
+                colors: [DS.Color.canvasTopWash, DS.Color.canvasBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case (.elevated, .light):
+            return LinearGradient(
+                colors: [DS.Color.surfaceTop, DS.Color.surfaceBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case (.floating, .light):
+            return LinearGradient(
+                colors: [DS.Color.surfaceFloatingTop, DS.Color.surfaceFloatingBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case (.base, .dark):
+            return LinearGradient(
+                colors: [Color.white.opacity(0.06), Color.black.opacity(0.12)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case (.elevated, .dark):
+            return LinearGradient(
+                colors: [Color.white.opacity(0.11), Color.black.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case (.floating, .dark):
+            return LinearGradient(
+                colors: [Color.white.opacity(0.15), Color.black.opacity(0.24)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    static func borderColor(for level: DepthLevel, colorScheme: ColorScheme) -> Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(level == .floating ? 0.2 : 0.14)
+        }
+        return DS.Color.borderWarm.opacity(level == .floating ? 1.15 : (level == .elevated ? 1 : 0.85))
+    }
+
+    static func topInnerHighlight(for level: DepthLevel, colorScheme: ColorScheme) -> Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(level == .floating ? 0.1 : 0.07)
+        }
+        return DS.Color.topInnerHighlight.opacity(level == .floating ? 0.9 : 0.72)
+    }
 
     /// App chrome backdrop: center reads gently brighter than edges.
     static func homeAtmosphereWash(colorScheme: ColorScheme) -> RadialGradient {
         RadialGradient(
             colors: colorScheme == .dark
-                ? [Color.white.opacity(0.03), Color.clear, Color.black.opacity(0.08)]
-                : [Color.white.opacity(0.24), Color.clear, Color.black.opacity(0.045)],
+                ? [Color.white.opacity(0.035), Color.clear, Color.black.opacity(0.09)]
+                : [DS.Color.canvasTopWash.opacity(0.42), DS.Color.canvas.opacity(0.08), DS.Color.backgroundVignette.opacity(0.85)],
             center: .center,
             startRadius: 120,
             endRadius: 1600
         )
+    }
+
+    private static let backdropGrainTileNSImage: NSImage = {
+        let w = 96
+        let h = 96
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: w,
+            pixelsHigh: h,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: false,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: w * 4,
+            bitsPerPixel: 32
+        ), let data = rep.bitmapData else {
+            return NSImage(size: NSSize(width: 16, height: 16))
+        }
+        for y in 0..<h {
+            for x in 0..<w {
+                var u = UInt64(x) &* 56_628_437 ^ UInt64(y) &* 362_436_069
+                u ^= u << 7
+                u ^= u >> 9
+                let t = Double(u & 0xFFFF) / 65_535.0
+                let g = UInt8(min(255, max(0, Int((0.52 + (t - 0.5) * 0.08) * 255.0))))
+                let o = y * w * 4 + x * 4
+                data[o] = g
+                data[o + 1] = g
+                data[o + 2] = g
+                data[o + 3] = 255
+            }
+        }
+        let img = NSImage(size: NSSize(width: w, height: h))
+        img.addRepresentation(rep)
+        return img
+    }()
+
+    @ViewBuilder
+    static func premiumBackgroundBase(includeGrain: Bool = true) -> some View {
+        ZStack {
+            DS.Color.appBackground
+
+            RadialGradient(
+                colors: [
+                    DS.Color.backgroundCenterLift.opacity(0.72),
+                    DS.Color.backgroundCenterLift.opacity(0.26),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 120,
+                endRadius: 1200
+            )
+            .blendMode(.softLight)
+
+            RadialGradient(
+                colors: [
+                    Color.clear,
+                    DS.Color.backgroundEdgeShade.opacity(0.44)
+                ],
+                center: .center,
+                startRadius: 420,
+                endRadius: 1900
+            )
+            .blendMode(.multiply)
+
+            RadialGradient(
+                colors: [
+                    Color.clear,
+                    DS.Color.backgroundVignette
+                ],
+                center: .center,
+                startRadius: 560,
+                endRadius: 2200
+            )
+            .blendMode(.multiply)
+            .opacity(0.52)
+
+            if includeGrain {
+                Image(nsImage: backdropGrainTileNSImage)
+                    .resizable(resizingMode: .tile)
+                    .blendMode(.overlay)
+                    .opacity(0.016)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - Canvas readability (dense boards)
@@ -100,7 +258,7 @@ enum FlowDeskTheme {
     static var chromeHairlineBorderGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color.primary.opacity(0.085),
+                DS.Color.borderWarm.opacity(0.95),
                 Color.primary.opacity(0.03)
             ],
             startPoint: .topLeading,
@@ -120,7 +278,9 @@ enum FlowDeskTheme {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(.ultraThinMaterial)
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(tokens.homeCardFill.opacity(colorScheme == .dark ? darkOpacity : lightOpacity))
+                .fill(surfaceGradient(for: .floating, colorScheme: colorScheme).opacity(colorScheme == .dark ? darkOpacity * 1.45 : lightOpacity))
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(tokens.homeCardFill.opacity(colorScheme == .dark ? darkOpacity * 0.5 : lightOpacity * 0.78))
         }
     }
 
@@ -285,10 +445,10 @@ struct FlowDeskInspectorSectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold, design: .default))
-            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.58 : 0.45))
+            .font(DS.Typography.label.weight(.medium))
+            .foregroundStyle(DS.Color.textTertiary.opacity(colorScheme == .dark ? 0.86 : 1))
             .textCase(.uppercase)
-            .tracking(0.62)
+            .tracking(DS.Typography.labelTracking + 0.2)
             .padding(.bottom, FlowDeskLayout.inspectorSectionHeaderBottomSpacing)
     }
 }

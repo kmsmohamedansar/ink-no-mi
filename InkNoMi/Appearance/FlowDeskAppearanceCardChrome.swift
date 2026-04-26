@@ -99,8 +99,10 @@ private struct FlowDeskCardContainerModifier: ViewModifier {
                 )
                 .allowsHitTesting(false)
         }
+        .brightness(isHovered ? 0.01 : 0)
+        .offset(y: isHovered ? -1.5 : 0)
         .scaleEffect(isHovered ? scaleOnHover : 1)
-        .animation(.spring(response: 0.30, dampingFraction: 0.82), value: isHovered)
+        .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
     }
 }
 
@@ -159,9 +161,18 @@ enum FlowDeskFloatingChromeShadowStyle {
         case .toolPalette:
             return (1, 1, 1)
         case .contextualToolbar:
-            return (0.92, 0.68, 0.62)
+            return (0.9, 0.7, 0.68)
         case .compactHUD:
-            return (0.88, 0.74, 0.58)
+            return (0.82, 0.66, 0.62)
+        }
+    }
+
+    fileprivate var depthLevel: FlowDeskTheme.DepthLevel {
+        switch self {
+        case .compactHUD:
+            return .elevated
+        case .contextualToolbar, .toolPalette:
+            return .floating
         }
     }
 }
@@ -177,6 +188,7 @@ private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let f = shadowStyle.shadowFactors
+        let depthShadow = FlowDeskTheme.depthShadow(for: shadowStyle.depthLevel)
         content
             .background {
                 FlowDeskTheme.floatingPanelStackedFill(
@@ -187,18 +199,26 @@ private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
                     darkOpacity: darkOpacity
                 )
                 .shadow(
-                    color: Color.black.opacity(FlowDeskTheme.floatingPanelShadowOpacity * Double(f.opacity)),
-                    radius: FlowDeskTheme.floatingPanelShadowRadius * f.radius,
+                    color: depthShadow.color.opacity(Double(f.opacity)),
+                    radius: depthShadow.radius * f.radius,
                     x: 0,
-                    y: FlowDeskTheme.floatingPanelShadowY * f.y
+                    y: depthShadow.y * f.y
                 )
             }
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                shape
                     .strokeBorder(
-                        FlowDeskTheme.chromeHairlineBorderGradient,
+                        FlowDeskTheme.borderColor(for: shadowStyle.depthLevel, colorScheme: colorScheme),
                         lineWidth: FlowDeskLayout.chromeHairlineBorderWidth
                     )
+                    .overlay(alignment: .top) {
+                        Capsule(style: .continuous)
+                            .fill(FlowDeskTheme.topInnerHighlight(for: shadowStyle.depthLevel, colorScheme: colorScheme))
+                            .frame(height: 1.1)
+                            .padding(.horizontal, 8)
+                            .blur(radius: 0.2)
+                    }
             }
     }
 }

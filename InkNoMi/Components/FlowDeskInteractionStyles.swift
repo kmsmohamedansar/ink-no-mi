@@ -5,11 +5,18 @@ struct FlowDeskCanvasToolButtonStyle: ButtonStyle {
     var isHovered: Bool
 
     func makeBody(configuration: Configuration) -> some View {
-        let scale = configuration.isPressed ? 0.98 : (isHovered ? 1.02 : 1.0)
+        let isPressed = configuration.isPressed
+        let scale = isPressed ? 0.976 : (isHovered ? 1.012 : 1.0)
+        let yOffset: CGFloat = isPressed ? 0.8 : (isHovered ? -1.4 : 0)
+        let shadowOpacity = isPressed ? 0.08 : (isHovered ? 0.18 : 0.1)
+        let shadowRadius: CGFloat = isPressed ? 4 : (isHovered ? 10 : 6)
         return configuration.label
             .scaleEffect(scale)
-            // Single spring avoids competing animations (hover jitter).
-            .animation(FlowDeskMotion.lightSpring, value: scale)
+            .offset(y: yOffset)
+            .brightness(isHovered ? 0.012 : 0)
+            .shadow(color: Color.black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: isHovered ? 4 : 2)
+            .animation(isPressed ? FlowDeskMotion.pressCompress : FlowDeskMotion.pressRebound, value: isPressed)
+            .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
     }
 }
 
@@ -17,9 +24,12 @@ struct FlowDeskCanvasToolButtonStyle: ButtonStyle {
 struct FlowDeskPlainCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.94 : 1)
-            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.976 : 1)
+            .opacity(configuration.isPressed ? 0.96 : 1)
+            .animation(
+                configuration.isPressed ? FlowDeskMotion.pressCompress : FlowDeskMotion.pressRebound,
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -27,9 +37,12 @@ struct FlowDeskPlainCardButtonStyle: ButtonStyle {
 struct FlowDeskHomeCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.94 : 1)
-            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.974 : 1)
+            .opacity(configuration.isPressed ? 0.965 : 1)
+            .animation(
+                configuration.isPressed ? FlowDeskMotion.pressCompress : FlowDeskMotion.pressRebound,
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -37,9 +50,12 @@ struct FlowDeskHomeCardButtonStyle: ButtonStyle {
 struct FlowDeskToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.88 : 1)
-            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.978 : 1)
+            .opacity(configuration.isPressed ? 0.91 : 1)
+            .animation(
+                configuration.isPressed ? FlowDeskMotion.pressCompress : FlowDeskMotion.pressRebound,
+                value: configuration.isPressed
+            )
     }
 }
 

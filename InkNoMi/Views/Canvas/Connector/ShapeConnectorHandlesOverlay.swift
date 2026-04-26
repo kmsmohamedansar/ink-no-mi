@@ -41,18 +41,18 @@ struct ShapeConnectorHandlesOverlay: View {
         )
         let style: ConnectorLineStyle = NSEvent.modifierFlags.contains(.shift) ? .straight : .arrow
         let isHover = hoveredEdge == edge
-        let visualDiameter: CGFloat = isHover ? 8 : 6
+        let visualDiameter: CGFloat = isHover ? 8.5 : 6.3
         return ZStack {
             if isHover {
                 Circle()
-                    .strokeBorder(tokens.selectionStrokeColor.opacity(0.5), lineWidth: 1.25)
-                    .frame(width: dotSize + 12, height: dotSize + 12)
+                    .strokeBorder(tokens.selectionStrokeColor.opacity(0.45), lineWidth: 1.1)
+                    .frame(width: dotSize + 10, height: dotSize + 10)
             }
             Circle()
                 .fill(tokens.selectionStrokeColor.opacity(isHover ? 1 : 0.9))
                 .frame(width: visualDiameter, height: visualDiameter)
                 .overlay {
-                    Circle().strokeBorder(Color.white.opacity(isHover ? 0.5 : 0.34), lineWidth: 0.85)
+                    Circle().strokeBorder(Color.white.opacity(isHover ? 0.55 : 0.36), lineWidth: 0.8)
                 }
                 .shadow(
                     color: Color.black.opacity(
@@ -60,14 +60,14 @@ struct ShapeConnectorHandlesOverlay: View {
                             ? FlowDeskTheme.canvasAuxiliaryLabelShadowOpacityHover
                             : FlowDeskTheme.canvasAuxiliaryLabelShadowOpacity
                     ),
-                    radius: isHover ? FlowDeskTheme.canvasAuxiliaryLabelShadowRadiusHover : FlowDeskTheme.canvasAuxiliaryLabelShadowRadius * 0.75,
+                    radius: isHover ? FlowDeskTheme.canvasAuxiliaryLabelShadowRadiusHover : FlowDeskTheme.canvasAuxiliaryLabelShadowRadius * 0.72,
                     y: FlowDeskTheme.canvasAuxiliaryLabelShadowY
                 )
         }
-        .frame(width: 24, height: 24)
+        .frame(width: 20, height: 20)
         .contentShape(Circle())
         .position(local)
-        .animation(.easeOut(duration: 0.14), value: hoveredEdge)
+        .animation(FlowDeskMotion.standardEaseOut, value: hoveredEdge)
         .onHover { inside in
             if inside {
                 hoveredEdge = edge

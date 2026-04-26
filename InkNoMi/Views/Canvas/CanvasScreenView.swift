@@ -3,17 +3,22 @@ import SwiftUI
 /// macOS canvas screen: canvas-first tools + lightweight window toolbar (Edit / View / Export).
 struct CanvasScreenView: View {
     @Environment(PurchaseManager.self) private var purchaseManager
+    @Environment(\.colorScheme) private var colorScheme
 
     @Bindable var document: FlowDocument
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
     var onBackHome: (() -> Void)? = nil
     @State private var didEnterWorkspace = false
+    @State private var didFadeBackground = false
+    @State private var autosavePulse = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            DS.Color.appBackground
+            FlowDeskTheme.premiumBackgroundBase()
                 .ignoresSafeArea()
+                .opacity(didFadeBackground ? 1 : 0.9)
+                .animation(FlowDeskMotion.canvasEnter, value: didFadeBackground)
 
             CanvasBoardView(
                 boardViewModel: boardViewModel,
@@ -29,11 +34,12 @@ struct CanvasScreenView: View {
             .padding(.top, DS.Spacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .opacity(didEnterWorkspace ? 1 : 0.955)
-        .scaleEffect(didEnterWorkspace ? 1 : 0.988)
-        .animation(FlowDeskMotion.mellowSpring, value: didEnterWorkspace)
+        .opacity(didEnterWorkspace ? 1 : 0.93)
+        .scaleEffect(didEnterWorkspace ? 1 : 0.982)
+        .animation(FlowDeskMotion.canvasEnter, value: didEnterWorkspace)
         .onAppear {
             didEnterWorkspace = true
+            didFadeBackground = true
         }
         .navigationTitle(document.title)
         #if os(macOS)
@@ -59,9 +65,30 @@ struct CanvasScreenView: View {
                         document.markUpdated()
                     }
 
-                Text("Autosaved \(document.updatedAt.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    savedStatusBadge
+
+                    TimelineView(.periodic(from: .now, by: 30)) { _ in
+                        Text("Last edited \(relativeLastEditedText)")
+                            .font(DS.Typography.caption)
+                            .foregroundStyle(DS.Color.textTertiary)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    editorStatChip(
+                        icon: "plus.magnifyingglass",
+                        text: "\(zoomPercent)%"
+                    )
+                    editorStatChip(
+                        icon: "rectangle.dashed",
+                        text: "\(canvasSizeLabel)"
+                    )
+                    editorStatChip(
+                        icon: "square.on.square",
+                        text: "\(boardViewModel.boardState.elements.count)"
+                    )
+                }
             }
 
             ToolbarItemGroup(placement: .automatic) {
@@ -137,13 +164,17 @@ struct CanvasScreenView: View {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: 13, weight: .medium))
                         Text("Edit")
-                            .font(.subheadline.weight(.medium))
+                            .font(DS.Typography.toolLabel)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .fill(Color.primary.opacity(0.05))
+                            .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                    .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
+                            )
                     )
                 }
                 .buttonStyle(FlowDeskToolbarButtonStyle())
@@ -172,13 +203,17 @@ struct CanvasScreenView: View {
                         Image(systemName: "rectangle.split.2x1")
                             .font(.system(size: 14, weight: .medium))
                         Text("View")
-                            .font(.subheadline.weight(.medium))
+                            .font(DS.Typography.toolLabel)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .fill(Color.primary.opacity(0.05))
+                            .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                    .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
+                            )
                     )
                 }
                 .help("Grid, canvas framing, insert items in view, and charts")
@@ -207,18 +242,30 @@ struct CanvasScreenView: View {
                     .help("Save the board as a one-page PDF")
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(DS.Typography.toolLabel)
                         .labelStyle(.titleAndIcon)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                .fill(Color.primary.opacity(0.05))
+                                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                        .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
+                                )
                         )
                 }
                 .help("Save this board as PNG or PDF")
                 .buttonStyle(FlowDeskToolbarButtonStyle())
 
+            }
+        }
+        .task {
+            while !Task.isCancelled {
+                withAnimation(FlowDeskMotion.smoothEaseOut) {
+                    autosavePulse.toggle()
+                }
+                try? await Task.sleep(nanoseconds: 1_300_000_000)
             }
         }
     }
@@ -240,5 +287,76 @@ struct CanvasScreenView: View {
         }
         _ = purchaseManager.requirePro(for: .highResolutionExport)
         return PurchaseManager.freeExportScale
+    }
+
+    private var zoomPercent: Int {
+        Int((boardViewModel.boardState.viewport.scale * 100).rounded())
+    }
+
+    private var canvasSizeLabel: String {
+        let size = Int(CanvasBoardView.logicalCanvasSize.rounded())
+        return "\(size)×\(size)"
+    }
+
+    private var savedStatusBadge: some View {
+        HStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(DS.Color.accent.opacity(autosavePulse ? 0.14 : 0.06))
+                    .frame(width: autosavePulse ? 15 : 11, height: autosavePulse ? 15 : 11)
+                Circle()
+                    .fill(DS.Color.accent.opacity(0.95))
+                    .frame(width: 6, height: 6)
+            }
+            .animation(FlowDeskMotion.smoothEaseOut, value: autosavePulse)
+
+            Label("Saved", systemImage: "checkmark.circle.fill")
+                .font(DS.Typography.caption.weight(.medium))
+                .foregroundStyle(DS.Color.textSecondary)
+                .labelStyle(.titleAndIcon)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [DS.Color.active.opacity(0.75), DS.Color.surfaceFloatingBottom.opacity(colorScheme == .dark ? 0.26 : 0.72)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
+                )
+        )
+    }
+
+    private var relativeLastEditedText: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: document.updatedAt, relativeTo: .now)
+    }
+
+    private func editorStatChip(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .medium))
+            Text(text)
+                .font(DS.Typography.caption.weight(.medium))
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .foregroundStyle(DS.Color.textSecondary)
+        .background(
+            Capsule(style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.7)
+        )
     }
 }

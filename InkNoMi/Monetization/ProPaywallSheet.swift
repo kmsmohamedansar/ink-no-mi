@@ -5,45 +5,59 @@ struct ProPaywallSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Upgrade to InkNoMi Pro")
-                .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                Text("Unlock your full workspace")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(DS.Color.textPrimary)
 
-            if let feature = purchaseManager.requestedFeature {
-                Text("Unlock \(feature.displayName) and all Pro tools.")
+                Text("Create unlimited boards, access advanced templates, and build without limits.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Unlock advanced tools and unlimited boards.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.textSecondary)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
                 planButton(.monthly)
-                planButton(.yearly)
+                planButton(.yearly, highlighted: true)
             }
 
-            HStack(spacing: 14) {
-                Button("Restore Purchases") {
-                    Task { await purchaseManager.restorePurchases() }
+            VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                Label("Cancel anytime", systemImage: "checkmark.circle")
+                Label("No data loss", systemImage: "lock.shield")
+            }
+            .font(.caption)
+            .foregroundStyle(DS.Color.textSecondary)
+
+            HStack(spacing: DS.Spacing.md) {
+                Button("Continue") {
+                    Task { await purchaseManager.purchase(plan: .yearly) }
                 }
                 .disabled(purchaseManager.isProcessingPurchase)
-
-                Spacer()
+                .buttonStyle(.borderedProminent)
 
                 Button("Not now") {
                     purchaseManager.isPaywallPresented = false
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.textSecondary)
+
+                Spacer()
+
+                Button("Restore Purchases") {
+                    Task { await purchaseManager.restorePurchases() }
+                }
+                .disabled(purchaseManager.isProcessingPurchase)
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.textSecondary)
             }
         }
-        .padding(22)
-        .frame(minWidth: 420)
+        .padding(DS.Spacing.xl)
+        .frame(minWidth: 460)
     }
 
-    private func planButton(_ plan: ProPlan) -> some View {
+    private func planButton(_ plan: ProPlan, highlighted: Bool = false) -> some View {
         Button {
             Task { await purchaseManager.purchase(plan: plan) }
         } label: {
@@ -51,7 +65,19 @@ struct ProPaywallSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plan.title)
                         .font(.headline)
-                    Text(plan.displayPrice)
+                    HStack(spacing: DS.Spacing.xs) {
+                        Text(plan.displayPrice)
+                        if highlighted {
+                            Text("Best value")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, DS.Spacing.xs + 2)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(DS.Color.active)
+                                )
+                        }
+                    }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -65,10 +91,14 @@ struct ProPaywallSheet: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(12)
+            .padding(DS.Spacing.md)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
+                RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                    .fill(DS.Color.panel)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                            .stroke(highlighted ? DS.Color.accent.opacity(0.34) : DS.Color.border)
+                    )
             )
         }
         .buttonStyle(.plain)

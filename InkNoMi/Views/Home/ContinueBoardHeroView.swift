@@ -59,7 +59,7 @@ struct ContinueBoardHeroView: View {
                     }
                     .clipped()
                     .contentShape(Rectangle())
-                    .animation(.easeOut(duration: 0.16), value: isHovered)
+                    .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
             }
             .frame(maxWidth: .infinity, minHeight: FlowDeskLayout.homeContinueMinHeight, alignment: .leading)
             .cardContainer(isHovered: $isHovered, scaleOnHover: 1.03)

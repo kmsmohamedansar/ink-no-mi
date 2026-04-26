@@ -3,6 +3,8 @@ import SwiftUI
 
 /// Renders the infinite-style board: viewport transform, grid, and element layers.
 struct CanvasBoardView: View {
+    static let logicalCanvasSize: CGFloat = 4000
+
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
 
@@ -17,8 +19,9 @@ struct CanvasBoardView: View {
     @State private var showCanvasTapRipple = false
     @State private var canvasTapRippleExpanded = false
     @State private var selectionPulse = false
+    @State private var selectionGlowVisible = false
 
-    private let canvasSize: CGFloat = 4000
+    private let canvasSize: CGFloat = Self.logicalCanvasSize
 
     private var sortedElements: [CanvasElementRecord] {
         boardViewModel.boardState.elements.sorted { $0.zIndex < $1.zIndex }
@@ -65,24 +68,28 @@ struct CanvasBoardView: View {
                        selected.kind != .stroke,
                        selected.kind != .connector {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(tokens.selectionStrokeColor.opacity(selectionPulse ? 0.13 : 0.22), lineWidth: 1.25)
+                            .strokeBorder(
+                                tokens.selectionStrokeColor.opacity(selectionPulse ? 0.32 : 0.22),
+                                lineWidth: selectionPulse ? 1.62 : 1.3
+                            )
                             .frame(
-                                width: CGFloat(selected.width) + (selectionPulse ? 13 : 9),
-                                height: CGFloat(selected.height) + (selectionPulse ? 13 : 9)
+                                width: CGFloat(selected.width) + (selectionPulse ? 15 : 10),
+                                height: CGFloat(selected.height) + (selectionPulse ? 15 : 10)
                             )
                             .position(
                                 x: CGFloat(selected.x) + CGFloat(selected.width) * 0.5,
                                 y: CGFloat(selected.y) + CGFloat(selected.height) * 0.5
                             )
-                            .scaleEffect(selectionPulse ? 1.006 : 0.996)
+                            .scaleEffect(selectionPulse ? 1.012 : 0.998)
                             .shadow(
-                                color: tokens.selectionStrokeColor.opacity(selectionPulse ? 0.16 : 0.08),
-                                radius: selectionPulse ? 18 : 10,
+                                color: tokens.selectionStrokeColor.opacity(selectionGlowVisible ? (selectionPulse ? 0.24 : 0.16) : 0),
+                                radius: selectionPulse ? 22 : 12,
                                 x: 0,
                                 y: 0
                             )
-                            .opacity(selectionPulse ? 0.92 : 1)
-                            .animation(FlowDeskMotion.mellowSpring, value: selectionPulse)
+                            .opacity(selectionGlowVisible ? (selectionPulse ? 0.95 : 0.88) : 0)
+                            .animation(FlowDeskMotion.selectionPulseOut, value: selectionPulse)
+                            .animation(FlowDeskMotion.selectionGlowIn, value: selectionGlowVisible)
                             .allowsHitTesting(false)
                             .zIndex(465_000)
                     }
@@ -208,13 +215,19 @@ struct CanvasBoardView: View {
                 )
             }
             .onChange(of: selection.primarySelectedID) { _, newID in
-                guard newID != nil else { return }
-                selectionPulse = false
-                DispatchQueue.main.async {
-                    selectionPulse = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                guard newID != nil else {
+                    selectionGlowVisible = false
                     selectionPulse = false
+                    return
+                }
+                selectionGlowVisible = false
+                selectionPulse = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+                    selectionGlowVisible = true
+                    selectionPulse = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                        selectionPulse = false
+                    }
                 }
             }
         }
@@ -741,7 +754,7 @@ struct CanvasBoardView: View {
                 )
             }
         }
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: selectionToolbarMotionIdentity())
+        .animation(FlowDeskMotion.standardEaseOut, value: selectionToolbarMotionIdentity())
     }
 
     private func unionCanvasRect(of elements: [CanvasElementRecord]) -> CGRect? {
