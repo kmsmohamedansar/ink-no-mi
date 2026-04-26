@@ -41,7 +41,7 @@ struct ShapeConnectorHandlesOverlay: View {
         )
         let style: ConnectorLineStyle = NSEvent.modifierFlags.contains(.shift) ? .straight : .arrow
         let isHover = hoveredEdge == edge
-        let visualDiameter = isHover ? 8 : 6
+        let visualDiameter: CGFloat = isHover ? 8 : 6
         return ZStack {
             if isHover {
                 Circle()

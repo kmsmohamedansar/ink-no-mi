@@ -2,6 +2,11 @@ import SwiftData
 import SwiftUI
 
 struct MainWindowView: View {
+    enum AppRoute: Equatable {
+        case home
+        case editor
+    }
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(FlowDeskAppearanceStore.self) private var appearanceStore
@@ -11,6 +16,7 @@ struct MainWindowView: View {
     private var documents: [FlowDocument]
 
     @State private var selection: FlowDocument?
+    @State private var route: AppRoute = .home
     @State private var documentListViewModel = DocumentListViewModel()
     @State private var canvasBoardViewModel = CanvasBoardViewModel()
     @State private var canvasSelection = CanvasSelectionModel()
@@ -23,26 +29,39 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            DocumentSidebarView(
-                documents: documents,
-                selection: $selection,
-                onNewBoard: createBoard,
-                onDelete: deleteBoards,
-                onRenameRequest: beginRename
-            )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
-        } detail: {
-            detailContent
+        Group {
+            if route == .home {
+                HomeView(
+                    documents: documents,
+                    onOpenDocument: openDocument,
+                    onCreateTemplate: createBoard(from:),
+                    onCreateBlank: createBoard,
+                    onDuplicate: duplicateBoard,
+                    onRename: beginRename,
+                    onDelete: deleteBoard
+                )
+            } else {
+                NavigationSplitView {
+                    DocumentSidebarView(
+                        documents: documents,
+                        selection: $selection,
+                        onNewBoard: createBoard,
+                        onDelete: deleteBoards,
+                        onRenameRequest: beginRename
+                    )
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+                } detail: {
+                    detailContent
+                }
+            }
         }
+        .transition(.opacity.combined(with: .scale(scale: 0.992)))
+        .animation(FlowDeskMotion.smoothEaseOut, value: route)
         .toolbarBackground(.visible, for: .windowToolbar)
         .flowDeskToolbarChrome(appearanceTokens)
         .environment(\.flowDeskTokens, appearanceTokens)
         .onAppear {
             documentListViewModel.attach(modelContext: modelContext)
-            if selection == nil {
-                selection = documents.first ?? documentListViewModel.createUntitledBoard(isProUser: purchaseManager.isProUser)
-            }
             syncCanvasAttachment()
         }
         .onReceive(NotificationCenter.default.publisher(for: .flowDeskBoardUndo)) { _ in
@@ -54,6 +73,7 @@ struct MainWindowView: View {
         .onChange(of: selection?.persistentModelID) { _, _ in
             canvasSelection.clear()
             syncCanvasAttachment()
+            if selection == nil { route = .home }
         }
         // SwiftData refresh can replace model instances; keep the sidebar binding and canvas on the same live object.
         .onChange(of: documents) { _, newDocuments in
@@ -62,6 +82,7 @@ struct MainWindowView: View {
                 selection = nil
                 canvasSelection.clear()
                 syncCanvasAttachment()
+                route = .home
                 return
             }
             if fresh !== current {
@@ -98,7 +119,8 @@ struct MainWindowView: View {
                 CanvasScreenView(
                     document: doc,
                     boardViewModel: canvasBoardViewModel,
-                    selection: canvasSelection
+                    selection: canvasSelection,
+                    onBackHome: { route = .home }
                 )
                 .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
@@ -124,13 +146,46 @@ struct MainWindowView: View {
     }
 
     private func createBoard() {
-        guard let doc = documentListViewModel.createUntitledBoard(isProUser: purchaseManager.isProUser) else {
+        guard let doc = documentListViewModel.createBoard(from: .blankBoard, isProUser: purchaseManager.isProUser) else {
             if documentListViewModel.boardCreationRequiresPro {
                 _ = purchaseManager.requirePro(for: .unlimitedBoards)
             }
             return
         }
-        selection = doc
+        openDocument(doc)
+    }
+
+    private func createBoard(from template: WorkspaceTemplate) {
+        guard let doc = documentListViewModel.createBoard(from: template, isProUser: purchaseManager.isProUser) else {
+            if documentListViewModel.boardCreationRequiresPro {
+                _ = purchaseManager.requirePro(for: .unlimitedBoards)
+            }
+            return
+        }
+        openDocument(doc)
+    }
+
+    private func openDocument(_ document: FlowDocument) {
+        selection = document
+        route = .editor
+    }
+
+    private func duplicateBoard(_ document: FlowDocument) {
+        guard let dup = documentListViewModel.duplicate(document, isProUser: purchaseManager.isProUser) else {
+            if documentListViewModel.boardCreationRequiresPro {
+                _ = purchaseManager.requirePro(for: .unlimitedBoards)
+            }
+            return
+        }
+        openDocument(dup)
+    }
+
+    private func deleteBoard(_ document: FlowDocument) {
+        if selection?.persistentModelID == document.persistentModelID {
+            selection = nil
+            route = .home
+        }
+        documentListViewModel.delete(document)
     }
 
     private func deleteBoards(at offsets: IndexSet) {

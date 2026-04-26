@@ -52,11 +52,11 @@ struct TextBlockCanvasItemView: View {
                 .fill(tokens.canvasTextBlockFill)
                 .shadow(
                     color: Color.black.opacity(
-                        isDragging ? 0.1 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
+                        isDragging ? 0.14 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
                     ),
-                    radius: isDragging ? 12 : (isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal),
+                    radius: isDragging ? 14 : (isSelected ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal),
                     x: 0,
-                    y: isDragging ? 6 : (isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
+                    y: isDragging ? 8 : (isSelected ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
@@ -93,6 +93,7 @@ struct TextBlockCanvasItemView: View {
                 .allowsHitTesting(false)
         }
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
+        .animation(FlowDeskMotion.smoothEaseOut, value: isSelected && !selection.isMultiSelection)
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !isEditing, !selection.isMultiSelection {
                 CanvasTextBlockResizeHandle()

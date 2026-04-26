@@ -15,6 +15,10 @@ struct CanvasFreehandDraftOverlay: View {
                 color.swiftUIColor.opacity(opacity),
                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
             )
+            .transaction { tx in
+                // Keep in-flight drawing updates immediate; avoid per-point animation churn.
+                tx.animation = nil
+            }
             .allowsHitTesting(false)
     }
 }

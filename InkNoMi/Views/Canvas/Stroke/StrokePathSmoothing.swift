@@ -57,18 +57,40 @@ enum StrokePathSmoothing {
 
     /// Fast live pass for in-progress feedback while drawing.
     static func livePreviewPoints(_ raw: [CGPoint]) -> [CGPoint] {
-        let filtered = filterJitter(raw, epsilon: 0.45)
-        let decimated = decimatedCanvasPoints(filtered, minDistance: 1.2)
+        let filtered = filterJitter(raw, epsilon: 0.5)
+        let stabilized = lightweightStabilize(filtered, blend: 0.2)
+        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.15)
         return movingAverageSmooth(decimated, passes: 1, windowRadius: 1)
     }
 
     /// Slightly more refined pass after stroke commit.
     static func finalizedStrokePoints(_ raw: [CGPoint]) -> [CGPoint] {
-        let filtered = filterJitter(raw, epsilon: 0.55)
-        let decimated = decimatedCanvasPoints(filtered, minDistance: 1.6)
+        let filtered = filterJitter(raw, epsilon: 0.62)
+        let stabilized = lightweightStabilize(filtered, blend: 0.35)
+        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.55)
         let passes = decimated.count > 800 ? 1 : 2
         let smoothed = movingAverageSmooth(decimated, passes: passes, windowRadius: 2)
-        return decimatedCanvasPoints(smoothed, minDistance: 1.8)
+        return decimatedCanvasPoints(smoothed, minDistance: 1.7)
+    }
+
+    /// Lightweight point stabilization for subtle jitter resistance without added latency.
+    /// Uses only previous accepted sample so each new point remains immediate.
+    private static func lightweightStabilize(_ points: [CGPoint], blend: CGFloat) -> [CGPoint] {
+        guard points.count > 2 else { return points }
+        let t = min(max(blend, 0), 0.45)
+        var out = points
+        var previous = points[0]
+        for idx in 1..<(points.count - 1) {
+            let current = points[idx]
+            let blended = CGPoint(
+                x: current.x * (1 - t) + previous.x * t,
+                y: current.y * (1 - t) + previous.y * t
+            )
+            out[idx] = blended
+            previous = blended
+        }
+        out[points.count - 1] = points[points.count - 1]
+        return out
     }
 
     private static func filterJitter(_ raw: [CGPoint], epsilon: CGFloat) -> [CGPoint] {

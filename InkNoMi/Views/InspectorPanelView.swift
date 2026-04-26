@@ -20,6 +20,12 @@ struct InspectorPanelView: View {
                     .tint(tokens.selectionStrokeColor)
             } header: {
                 FlowDeskInspectorSectionHeader("Canvas")
+            } footer: {
+                if !selection.hasSelection {
+                    Text("Select any element to edit contextual properties.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if selection.hasSelection || selection.isMultiSelection {
@@ -58,6 +64,20 @@ struct InspectorPanelView: View {
 
             if selection.hasSelection {
                 CanvasEditorInspectorSection(canvasViewModel: canvasViewModel, selection: selection)
+            } else {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nothing selected")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Use Select to pick an element, or choose a tool on the left to create new content.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } header: {
+                    FlowDeskInspectorSectionHeader("Inspector")
+                }
             }
 
             if selectedStrokeCount > 0 {

@@ -5,4 +5,8 @@ extension FlowDocument {
     var resolvedBoardTemplate: FlowDeskBoardTemplate? {
         CanvasBoardCoding.decode(from: canvasPayload).boardTemplate
     }
+
+    var boardType: BoardType {
+        resolvedBoardTemplate?.boardType ?? .whiteboard
+    }
 }

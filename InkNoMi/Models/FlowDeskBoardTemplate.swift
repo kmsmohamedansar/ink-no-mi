@@ -33,3 +33,74 @@ enum FlowDeskBoardTemplate: String, Codable, Sendable, CaseIterable, Identifiabl
         }
     }
 }
+
+enum BoardType: String, CaseIterable, Codable, Sendable, Identifiable {
+    case whiteboard
+    case diagram
+    case notes
+    case mindMap
+    case flowchart
+    case roadmap
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .whiteboard: return "Whiteboard"
+        case .diagram: return "Diagram"
+        case .notes: return "Notes"
+        case .mindMap: return "Mind Map"
+        case .flowchart: return "Flowchart"
+        case .roadmap: return "Roadmap"
+        }
+    }
+}
+
+struct WorkspaceTemplate: Identifiable, Hashable, Sendable {
+    enum Category: String, CaseIterable, Identifiable, Sendable {
+        case brainstorming
+        case flowcharts
+        case productPlanning
+        case meetingNotes
+        case mindMaps
+        case dataCharts
+        case studyNotes
+        case roadmaps
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .brainstorming: return "Brainstorming"
+            case .flowcharts: return "Flowcharts"
+            case .productPlanning: return "Product Planning"
+            case .meetingNotes: return "Meeting Notes"
+            case .mindMaps: return "Mind Maps"
+            case .dataCharts: return "Data / Charts"
+            case .studyNotes: return "Study Notes"
+            case .roadmaps: return "Roadmaps"
+            }
+        }
+    }
+
+    let id: String
+    let title: String
+    let description: String
+    let category: Category
+    let boardType: BoardType
+    let icon: String
+    let baseTemplate: FlowDeskBoardTemplate
+}
+
+extension WorkspaceTemplate {
+    static let gallery: [WorkspaceTemplate] = [
+        .init(id: "brainstorm-board", title: "Brainstorm Board", description: "Quick note clusters for free ideation.", category: .brainstorming, boardType: .whiteboard, icon: "bolt", baseTemplate: .smartCanvas),
+        .init(id: "flowchart", title: "Flowchart", description: "Map process steps and decisions.", category: .flowcharts, boardType: .flowchart, icon: "point.3.connected.trianglepath.dotted", baseTemplate: .flowDiagram),
+        .init(id: "product-roadmap", title: "Product Roadmap", description: "Plan milestones and releases clearly.", category: .roadmaps, boardType: .roadmap, icon: "calendar", baseTemplate: .smartCanvas),
+        .init(id: "meeting-notes", title: "Meeting Notes", description: "Capture agenda, notes, and next actions.", category: .meetingNotes, boardType: .notes, icon: "note.text", baseTemplate: .document),
+        .init(id: "mind-map", title: "Mind Map", description: "Branch ideas into connected thought trees.", category: .mindMaps, boardType: .mindMap, icon: "circle.hexagongrid", baseTemplate: .smartCanvas),
+        .init(id: "kanban-board", title: "Kanban Board", description: "Track To Do, Doing, and Done lanes.", category: .productPlanning, boardType: .whiteboard, icon: "square.grid.3x1.folder.fill.badge.plus", baseTemplate: .smartCanvas),
+        .init(id: "app-wireframe", title: "App Wireframe", description: "Structure screens and interaction flow.", category: .productPlanning, boardType: .diagram, icon: "iphone.gen3", baseTemplate: .blankBoard),
+        .init(id: "swot-analysis", title: "SWOT Analysis", description: "Map strengths, weaknesses, opportunities, and threats.", category: .productPlanning, boardType: .diagram, icon: "square.grid.2x2", baseTemplate: .smartCanvas),
+    ]
+}

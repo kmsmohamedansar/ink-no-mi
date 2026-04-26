@@ -163,12 +163,12 @@ extension CanvasBoardViewModel {
         guard !selected.isEmpty else { return }
         let strokes = selected.map(absoluteStroke(from:))
         let sourceIDs = Set(selected.map(\.id))
-        Task.detached(priority: .userInitiated) { [strokes] in
-            let result = Self.recognizeText(from: strokes)
-            await MainActor.run {
-                guard let recognized = result else { return }
-                self.replaceStrokesWithText(recognized: recognized, sourceStrokeIDs: sourceIDs, selection: selection)
-            }
+        Task { [strokes] in
+            let result = await Task.detached(priority: .userInitiated) {
+                Self.recognizeText(from: strokes)
+            }.value
+            guard let recognized = result else { return }
+            self.replaceStrokesWithText(recognized: recognized, sourceStrokeIDs: sourceIDs, selection: selection)
         }
     }
 

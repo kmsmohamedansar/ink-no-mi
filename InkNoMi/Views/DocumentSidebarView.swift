@@ -64,7 +64,7 @@ struct DocumentSidebarView: View {
                 Button(action: onNewBoard) {
                     Image(systemName: "plus")
                 }
-                .help("New board")
+                .help("New canvas")
                 .buttonStyle(FlowDeskToolbarButtonStyle())
             }
         }
@@ -128,7 +128,9 @@ struct DocumentSidebarView: View {
         .listRowSeparator(.hidden)
         .contentShape(RoundedRectangle(cornerRadius: FlowDeskLayout.sidebarRowSelectionCornerRadius, style: .continuous))
         .onHover { inside in
-            hoveredDocumentID = inside ? document.id : nil
+            withAnimation(FlowDeskMotion.standardEaseOut) {
+                hoveredDocumentID = inside ? document.id : nil
+            }
             if inside {
                 NSCursor.pointingHand.set()
             } else {
@@ -185,6 +187,7 @@ struct DocumentSidebarView: View {
                 x: 0,
                 y: isSelected ? 1 : 0
             )
+            .scaleEffect(isHovered && !isSelected ? 1.012 : 1)
             .padding(.vertical, 0.5)
             .padding(.horizontal, 6)
             .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
@@ -196,7 +199,7 @@ struct DocumentSidebarView: View {
             return tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.24 : 0.12)
         }
         if isHovered {
-            return FlowDeskTheme.hoverNeutral
+            return FlowDeskTheme.hoverNeutral.opacity(0.82)
         }
         return Color.clear
     }
@@ -208,7 +211,7 @@ struct DocumentSidebarView: View {
                 .frame(height: 1)
                 .allowsHitTesting(false)
             Button(action: onNewBoard) {
-                Label("New board", systemImage: "plus.circle.fill")
+                Label("New canvas", systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -227,14 +230,14 @@ struct DocumentSidebarView: View {
                 Text("No boards yet")
                     .font(FlowDeskTypography.sidebarEmptyTitle)
                     .foregroundStyle(.primary)
-                Text("Create a board to begin. Ink no Mi saves your work as you go—nothing to configure.")
+                Text("Create your first canvas to begin. InkNoMi saves continuously, so you can stay in flow.")
                     .font(FlowDeskTypography.sidebarEmptyBody)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .padding(.horizontal, FlowDeskLayout.spaceM)
             }
-            Button("Create board", action: onNewBoard)
+            Button("Create canvas", action: onNewBoard)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             Spacer(minLength: 0)

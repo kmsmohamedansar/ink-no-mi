@@ -16,6 +16,7 @@ struct CanvasBoardView: View {
     @State private var canvasTapRipplePoint: CGPoint = .zero
     @State private var showCanvasTapRipple = false
     @State private var canvasTapRippleExpanded = false
+    @State private var selectionPulse = false
 
     private let canvasSize: CGFloat = 4000
 
@@ -59,6 +60,33 @@ struct CanvasBoardView: View {
                             .transition(FlowDeskMotion.insertTransition)
                     }
 
+                    if let selectedID = selection.primarySelectedID,
+                       let selected = boardViewModel.boardState.elements.first(where: { $0.id == selectedID }),
+                       selected.kind != .stroke,
+                       selected.kind != .connector {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(tokens.selectionStrokeColor.opacity(selectionPulse ? 0.13 : 0.22), lineWidth: 1.25)
+                            .frame(
+                                width: CGFloat(selected.width) + (selectionPulse ? 13 : 9),
+                                height: CGFloat(selected.height) + (selectionPulse ? 13 : 9)
+                            )
+                            .position(
+                                x: CGFloat(selected.x) + CGFloat(selected.width) * 0.5,
+                                y: CGFloat(selected.y) + CGFloat(selected.height) * 0.5
+                            )
+                            .scaleEffect(selectionPulse ? 1.006 : 0.996)
+                            .shadow(
+                                color: tokens.selectionStrokeColor.opacity(selectionPulse ? 0.16 : 0.08),
+                                radius: selectionPulse ? 18 : 10,
+                                x: 0,
+                                y: 0
+                            )
+                            .opacity(selectionPulse ? 0.92 : 1)
+                            .animation(FlowDeskMotion.mellowSpring, value: selectionPulse)
+                            .allowsHitTesting(false)
+                            .zIndex(465_000)
+                    }
+
                     if let activeContainerRect = boardViewModel.activeContainerRect() {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(tokens.selectionStrokeColor.opacity(0.72), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
@@ -69,9 +97,7 @@ struct CanvasBoardView: View {
                     }
 
                     if boardViewModel.boardState.elements.isEmpty {
-                        Text("Start drawing or select a tool")
-                            .font(.system(size: 14))
-                            .foregroundStyle(DS.Color.textSecondary.opacity(0.5))
+                        FlowDeskCanvasWorkspaceHint()
                             .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
                             .allowsHitTesting(false)
                             .zIndex(200_000)
@@ -145,6 +171,7 @@ struct CanvasBoardView: View {
                     x: CGFloat(viewport.offsetX) + panDragTranslation.width,
                     y: CGFloat(viewport.offsetY) + panDragTranslation.height
                 )
+                .animation(DS.Animation.smooth, value: boardViewModel.boardState.viewport.scale)
 
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -179,6 +206,16 @@ struct CanvasBoardView: View {
                         canvasLogicalSize: Double(canvasSize)
                     )
                 )
+            }
+            .onChange(of: selection.primarySelectedID) { _, newID in
+                guard newID != nil else { return }
+                selectionPulse = false
+                DispatchQueue.main.async {
+                    selectionPulse = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    selectionPulse = false
+                }
             }
         }
     }
@@ -410,7 +447,7 @@ struct CanvasBoardView: View {
                 }
                 let loc = value.location
                 if let last = draftCanvasPoints.last {
-                    if hypot(loc.x - last.x, loc.y - last.y) >= 1.5 {
+                    if hypot(loc.x - last.x, loc.y - last.y) >= 1.2 {
                         draftCanvasPoints.append(loc)
                     }
                 } else {
@@ -537,44 +574,75 @@ struct CanvasBoardView: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(0.6),
+                    Color.white.opacity(0.64),
                     Color.clear
                 ],
                 center: .center,
-                startRadius: 40,
-                endRadius: 1600
+                startRadius: 80,
+                endRadius: 1700
             )
             .blendMode(.softLight)
             .allowsHitTesting(false)
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.4),
-                    Color.clear
+                    DS.Color.canvasTopWash.opacity(0.34),
+                    DS.Color.canvasBottom.opacity(0.38)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .blendMode(.softLight)
+            .blendMode(.normal)
             .allowsHitTesting(false)
 
             RadialGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(0.045)
+                    Color.black.opacity(0.04)
                 ],
                 center: .center,
-                startRadius: 520,
+                startRadius: 560,
                 endRadius: 2400
             )
             .blendMode(.multiply)
             .allowsHitTesting(false)
 
+            // Ultra-light paper tooth for warmth without visual noise.
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.02),
+                            Color.black.opacity(0.01),
+                            Color.white.opacity(0.012)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blendMode(.overlay)
+                .allowsHitTesting(false)
+
+            if !draftCanvasPoints.isEmpty {
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.045),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 20,
+                    endRadius: 1200
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
+                .opacity(1)
+            }
+
             if showGrid {
                 CanvasGridView(
                     spacing: 32,
                     lineWidth: 0.5,
-                    lineOpacity: 0.03,
+                    lineOpacity: 0.018,
                     gridInk: .black,
                     majorLineStride: 0
                 )

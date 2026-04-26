@@ -60,10 +60,10 @@ struct ShapeCanvasItemView: View {
         }
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected || isActiveContainer)
         .shadow(
-            color: Color.black.opacity(isDragging ? 0.1 : 0.05),
-            radius: isDragging ? 12 : 8,
+            color: Color.black.opacity(isDragging ? 0.14 : 0.05),
+            radius: isDragging ? 14 : 8,
             x: 0,
-            y: isDragging ? 6 : 2
+            y: isDragging ? 8 : 2
         )
         .overlay(alignment: .bottomTrailing) {
             if isSelected, !selection.isMultiSelection {
@@ -91,6 +91,7 @@ struct ShapeCanvasItemView: View {
         .opacity(isConvertingIn ? 0.76 : 1.0)
         .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)
         .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
+        .animation(FlowDeskMotion.smoothEaseOut, value: isSelected && !selection.isMultiSelection)
         .contentShape(Rectangle())
         .onTapGesture {
             boardViewModel.stopAllInlineEditing()

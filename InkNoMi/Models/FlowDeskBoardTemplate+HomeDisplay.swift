@@ -1,6 +1,17 @@
 import Foundation
 
 extension FlowDeskBoardTemplate {
+    var boardType: BoardType {
+        switch self {
+        case .flowDiagram:
+            return .flowchart
+        case .document:
+            return .notes
+        case .whiteboard, .blankBoard, .smartCanvas:
+            return .whiteboard
+        }
+    }
+
     /// Short label for chips on continue/recent rows. Legacy templates use a neutral “Canvas” label.
     var homeChipLabel: String {
         switch self {

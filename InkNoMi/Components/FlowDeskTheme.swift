@@ -8,7 +8,7 @@ enum FlowDeskTheme {
 
     /// Primary UI accent used across selection, highlights, and active controls.
     static let accentBlue = DS.Color.accent
-    static let accentGold = DS.Color.accentWarm
+    static let accentGold = DS.Color.highlight
     static let textPrimary = DS.Color.textPrimary
     static let textSecondary = DS.Color.textSecondary
     static let borderLight = DS.Color.border
@@ -370,11 +370,11 @@ struct FlowDeskCanvasWorkspaceHint: View {
         VStack(spacing: 20) {
             FlowDeskSheetsStackMark(size: 88)
             VStack(spacing: 8) {
-                Text("What do you want to explore?")
+                Text("Your canvas is ready")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.55 : 0.42))
                     .multilineTextAlignment(.center)
-                Text("A calm canvas for solo thinking—use the tools on the left to write, sketch, or place shapes.")
+                Text("Draw freely, add notes, or start from a template.")
                     .font(.system(size: 12.5, weight: .regular, design: .rounded))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.38 : 0.32))

@@ -7,6 +7,8 @@ struct CanvasScreenView: View {
     @Bindable var document: FlowDocument
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
+    var onBackHome: (() -> Void)? = nil
+    @State private var didEnterWorkspace = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -27,6 +29,12 @@ struct CanvasScreenView: View {
             .padding(.top, DS.Spacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .opacity(didEnterWorkspace ? 1 : 0.955)
+        .scaleEffect(didEnterWorkspace ? 1 : 0.988)
+        .animation(FlowDeskMotion.mellowSpring, value: didEnterWorkspace)
+        .onAppear {
+            didEnterWorkspace = true
+        }
         .navigationTitle(document.title)
         #if os(macOS)
         .navigationSubtitle("Last edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -36,6 +44,26 @@ struct CanvasScreenView: View {
             boardViewModel.deleteSelectedElements(selection: selection)
         }
         .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                if let onBackHome {
+                    Button(action: onBackHome) {
+                        Label("Home", systemImage: "chevron.left")
+                    }
+                    .help("Back to Home dashboard")
+                }
+
+                TextField("Canvas title", text: $document.title)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 180, idealWidth: 240, maxWidth: 320)
+                    .onSubmit {
+                        document.markUpdated()
+                    }
+
+                Text("Autosaved \(document.updatedAt.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             ToolbarItemGroup(placement: .automatic) {
                 Menu {
                     Button("Undo") {
@@ -106,6 +134,8 @@ struct CanvasScreenView: View {
                     .help("Remove selected items from the board")
                 } label: {
                     HStack(spacing: 5) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 13, weight: .medium))
                         Text("Edit")
                             .font(.subheadline.weight(.medium))
                     }
@@ -188,6 +218,7 @@ struct CanvasScreenView: View {
                 }
                 .help("Save this board as PNG or PDF")
                 .buttonStyle(FlowDeskToolbarButtonStyle())
+
             }
         }
     }

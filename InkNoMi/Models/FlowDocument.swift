@@ -9,6 +9,9 @@ final class FlowDocument {
     var title: String
     var createdAt: Date
     var updatedAt: Date
+    var isFavorite: Bool
+    /// PNG/JPEG preview bytes for home cards (optional; generated lazily).
+    @Attribute(.externalStorage) var thumbnailData: Data?
     /// Encoded `CanvasBoardState` (JSON).
     @Attribute(.externalStorage) var canvasPayload: Data
 
@@ -17,12 +20,16 @@ final class FlowDocument {
         title: String,
         createdAt: Date = .now,
         updatedAt: Date = .now,
+        isFavorite: Bool = false,
+        thumbnailData: Data? = nil,
         canvasPayload: Data = CanvasBoardState.emptyEncoded()
     ) {
         self.id = id
         self.title = title
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.isFavorite = isFavorite
+        self.thumbnailData = thumbnailData
         self.canvasPayload = canvasPayload
     }
 
