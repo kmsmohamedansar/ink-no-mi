@@ -3,18 +3,18 @@ import Foundation
 /// Primary canvas interaction mode (session UI only; not persisted on `CanvasBoardState`).
 enum CanvasToolMode: String, Codable, Sendable, Hashable {
     case select
-    case draw
-    /// Click to place a text block, or drag to define its frame (stays active for repeated placement).
-    case placeText
-    /// Click to place a sticky, or drag to define its area.
-    case placeSticky
-    /// Drag on the canvas to size a shape (or click for default size) using `CanvasBoardViewModel.placeShapeKind`.
-    case placeShape
+    case pen
+    case pencil
+    case text
+    case stickyNote
+    case shape
+    case chart
+    case smartInk
 
     var isPlacementMode: Bool {
         switch self {
-        case .placeText, .placeSticky, .placeShape: return true
-        case .select, .draw: return false
+        case .text, .stickyNote, .shape, .chart: return true
+        case .select, .pen, .pencil, .smartInk: return false
         }
     }
 }

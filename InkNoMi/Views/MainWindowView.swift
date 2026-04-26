@@ -37,11 +37,11 @@ struct MainWindowView: View {
         .toolbarBackground(.visible, for: .windowToolbar)
         .flowDeskToolbarChrome(appearanceTokens)
         .environment(\.flowDeskTokens, appearanceTokens)
-        .task {
-            LibrarySeedService.seedIfNeeded(in: modelContext)
-        }
         .onAppear {
             documentListViewModel.attach(modelContext: modelContext)
+            if selection == nil {
+                selection = documents.first ?? documentListViewModel.createUntitledBoard()
+            }
             syncCanvasAttachment()
         }
         .onReceive(NotificationCenter.default.publisher(for: .flowDeskBoardUndo)) { _ in
@@ -92,12 +92,14 @@ struct MainWindowView: View {
                 .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
-                InspectorPanelView(
-                    document: doc,
-                    canvasViewModel: canvasBoardViewModel,
-                    selection: canvasSelection
-                )
-                .frame(minWidth: 176, idealWidth: 236, maxWidth: 304)
+                if shouldShowInspector {
+                    InspectorPanelView(
+                        document: doc,
+                        canvasViewModel: canvasBoardViewModel,
+                        selection: canvasSelection
+                    )
+                    .frame(minWidth: 176, idealWidth: 236, maxWidth: 304)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Fresh SwiftUI identity per document so canvas/inspector never show stale content.
@@ -106,19 +108,12 @@ struct MainWindowView: View {
                 syncCanvasAttachment()
             }
         } else {
-            HomeView(
-                documents: documents,
-                onOpenDocument: { selection = $0 },
-                onCreateFromTemplate: { template in
-                    guard let doc = documentListViewModel.createBoard(from: template) else { return }
-                    selection = doc
-                }
-            )
+            ContentUnavailableView("No Canvas Selected", systemImage: "square.dashed")
         }
     }
 
     private func createBoard() {
-        guard let doc = documentListViewModel.createBoard(from: .smartCanvas) else { return }
+        guard let doc = documentListViewModel.createUntitledBoard() else { return }
         selection = doc
     }
 
@@ -143,6 +138,10 @@ struct MainWindowView: View {
         } else {
             canvasBoardViewModel.detach()
         }
+    }
+
+    private var shouldShowInspector: Bool {
+        canvasSelection.hasSelection || canvasBoardViewModel.canvasTool == .pen || canvasBoardViewModel.canvasTool == .pencil || canvasBoardViewModel.canvasTool == .smartInk
     }
 }
 

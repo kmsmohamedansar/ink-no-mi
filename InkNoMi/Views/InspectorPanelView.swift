@@ -100,7 +100,7 @@ struct InspectorPanelView: View {
                 ShapeInspectorSection(elementID: id, canvasViewModel: canvasViewModel)
             }
 
-            if canvasViewModel.canvasTool == .draw {
+            if canvasViewModel.canvasTool == .pen || canvasViewModel.canvasTool == .pencil || canvasViewModel.canvasTool == .smartInk {
                 DrawingToolInspectorSection(canvasViewModel: canvasViewModel)
             }
 

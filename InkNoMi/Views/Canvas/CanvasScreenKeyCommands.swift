@@ -20,6 +20,10 @@ struct CanvasScreenKeyCommands: ViewModifier {
                     boardViewModel.cancelConnectorDrag()
                     return .handled
                 }
+                if boardViewModel.canvasTool != .select {
+                    boardViewModel.applyCanvasToolSelection(.select, fromKeyboard: true)
+                    return .handled
+                }
                 return .ignored
             }
             .onKeyPress(keys: ["c"]) { press in
@@ -78,27 +82,32 @@ struct CanvasScreenKeyCommands: ViewModifier {
             }
             .onKeyPress(keys: ["t"]) { press in
                 singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.placeText, fromKeyboard: true)
+                    boardViewModel.applyCanvasToolSelection(.text, fromKeyboard: true)
                 }
             }
             .onKeyPress(keys: ["n"]) { press in
                 singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.placeSticky, fromKeyboard: true)
+                    boardViewModel.applyCanvasToolSelection(.stickyNote, fromKeyboard: true)
                 }
             }
             .onKeyPress(keys: ["r"]) { press in
                 singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.placeShape, fromKeyboard: true, rectanglePlacementShape: true)
+                    boardViewModel.applyCanvasToolSelection(.shape, fromKeyboard: true, rectanglePlacementShape: true)
                 }
             }
             .onKeyPress(keys: ["s"]) { press in
                 singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.placeShape, fromKeyboard: true, rectanglePlacementShape: false)
+                    boardViewModel.applyCanvasToolSelection(.smartInk, fromKeyboard: true)
                 }
             }
             .onKeyPress(keys: ["p"]) { press in
                 singleKeyToolPress(press) {
-                    boardViewModel.applyCanvasToolSelection(.draw, fromKeyboard: true)
+                    boardViewModel.applyCanvasToolSelection(.pen, fromKeyboard: true)
+                }
+            }
+            .onKeyPress(keys: ["b"]) { press in
+                singleKeyToolPress(press) {
+                    boardViewModel.applyCanvasToolSelection(.pencil, fromKeyboard: true)
                 }
             }
             .onKeyPress(keys: ["g"]) { press in

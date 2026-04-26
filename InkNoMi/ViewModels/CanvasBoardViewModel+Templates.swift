@@ -46,7 +46,7 @@ extension CanvasBoardViewModel {
         canvasTool = .select
     }
 
-    /// Whiteboard preset: grid on, switch to draw—no new elements.
+    /// Whiteboard preset: grid on, keep clean select mode—no new elements.
     func applyWhiteboardSessionPreset(selection: CanvasSelectionModel) {
         stopAllInlineEditing()
         applyBoardMutation { state in
@@ -54,7 +54,7 @@ extension CanvasBoardViewModel {
             state.viewport.scale = min(max(state.viewport.scale, 0.25), 4)
         }
         selection.clear()
-        canvasTool = .draw
-        canvasContextPanel = .drawStroke
+        canvasTool = .select
+        canvasContextPanel = nil
     }
 }

@@ -12,7 +12,7 @@ final class DocumentListViewModel {
     }
 
     func createUntitledBoard() -> FlowDocument? {
-        createBoard(from: .smartCanvas)
+        createBoard(from: .blankBoard)
     }
 
     /// Creates a board from a home-screen template with encoded initial canvas + template metadata.
@@ -21,8 +21,10 @@ final class DocumentListViewModel {
         let descriptor = FetchDescriptor<FlowDocument>()
         let count = (try? modelContext.fetch(descriptor).count) ?? 0
         let ordinal = count + 1
-        let title = template.suggestedTitle(ordinal: ordinal)
-        let state = template.makeInitialCanvasState()
+        let title = ordinal == 1 ? "Untitled Canvas" : "Untitled Canvas \(ordinal)"
+        var state = CanvasBoardState()
+        state.boardTemplate = .blankBoard
+        state.elements = []
         let payload = CanvasBoardCoding.encode(state)
         let doc = FlowDocument(title: title, canvasPayload: payload)
         modelContext.insert(doc)

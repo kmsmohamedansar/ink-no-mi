@@ -506,10 +506,12 @@ struct RecognitionDebouncer: Sendable {
 extension CanvasBoardViewModel {
     private static let handwritingGroupingTimeWindow: TimeInterval = 1.2
     private static let handwritingGroupingDistance: CGFloat = 180
+    private static let minimumHandwritingBoundsWidth: CGFloat = 22
+    private static let minimumHandwritingBoundsHeight: CGFloat = 16
 
     /// Temporary grouped handwriting state.
     private static var fallbackBuffer = HandwritingStrokeBuffer()
-    private static var fallbackDebouncer = RecognitionDebouncer(delaySeconds: 0.95)
+    private static var fallbackDebouncer = RecognitionDebouncer(delaySeconds: 1.0)
     private static var fallbackWorkItem: DispatchWorkItem?
 
     private var handwritingBuffer: HandwritingStrokeBuffer {
@@ -538,28 +540,44 @@ extension CanvasBoardViewModel {
         }
     }
 
+    func configureStrokeStyleForActiveTool() {
+        switch canvasTool {
+        case .pencil:
+            drawingLineWidth = 1.8
+            drawingStrokeOpacity = 0.62
+        case .pen, .smartInk:
+            drawingLineWidth = max(drawingLineWidth, 2.6)
+            drawingStrokeOpacity = max(drawingStrokeOpacity, 0.95)
+        default:
+            break
+        }
+    }
+
     func commitFreehandStroke(absoluteCanvasPoints: [CGPoint], selection: CanvasSelectionModel) {
         let decimated = StrokePathSmoothing.decimatedCanvasPoints(absoluteCanvasPoints, minDistance: 2)
         guard decimated.count >= 2 else { return }
         stopAllInlineEditing()
         let stroke = FreehandStroke(points: decimated)
 
-        // Fast shape conversion still happens immediately.
-        if let shape = recognitionPipeline.recognizeImmediateShape(
-            stroke: stroke,
-            existingElements: boardState.elements
-        ) {
-            insertRecognizedShape(shape, fallbackStroke: stroke, selection: selection)
-            return
+        if canvasTool == .smartInk {
+            // In Smart Ink mode only: run immediate shape recognition, then delayed grouped handwriting OCR.
+            if let shape = recognitionPipeline.recognizeImmediateShape(
+                stroke: stroke,
+                existingElements: boardState.elements
+            ) {
+                insertRecognizedShape(shape, fallbackStroke: stroke, selection: selection)
+                return
+            }
+            let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
+            addStrokeToHandwritingBuffer(
+                persistedStrokeID: persisted.id,
+                strokeBounds: persisted.bounds,
+                selection: selection
+            )
+        } else {
+            // Pen/Pencil modes stay as raw drawing with no semantic conversion.
+            _ = insertPersistedFreehandStroke(stroke, selection: selection)
         }
-
-        // Non-shape strokes are persisted, then grouped for delayed handwriting OCR.
-        let persisted = insertPersistedFreehandStroke(stroke, selection: selection)
-        addStrokeToHandwritingBuffer(
-            persistedStrokeID: persisted.id,
-            strokeBounds: persisted.bounds,
-            selection: selection
-        )
     }
 
     func updateStrokePayload(id: UUID, _ body: (inout StrokePayload) -> Void) {
@@ -662,11 +680,22 @@ extension CanvasBoardViewModel {
         let groupedBounds = groupedStrokes.reduce(CGRect.null) { partial, stroke in
             partial.union(stroke.bounds)
         }.standardized
+        guard groupedBounds.width >= Self.minimumHandwritingBoundsWidth,
+              groupedBounds.height >= Self.minimumHandwritingBoundsHeight else {
+            handwritingBuffer.clear()
+            return
+        }
         print("[InkNoMi OCR] grouped bounds=\(groupedBounds.debugDescription)")
 
         let recognizer = VisionHandwritingRecognizer(confidenceThreshold: 0.25)
         guard let textElement = recognizer.recognize(strokes: groupedStrokes) else {
             // Keep raw strokes when confidence is low or OCR is uncertain.
+            handwritingBuffer.clear()
+            return
+        }
+        if textElement.text.count == 1, groupedStrokes.count >= 2, textElement.confidence < 0.72 {
+            // Conservative fallback for noisy one-letter guesses from multi-stroke handwriting.
+            handwritingBuffer.clear()
             return
         }
 

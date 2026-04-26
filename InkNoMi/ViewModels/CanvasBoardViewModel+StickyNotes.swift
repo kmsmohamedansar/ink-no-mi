@@ -41,7 +41,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Click-to-place while `canvasTool == .placeSticky`; does not change the active tool.
+    /// Click-to-place while `canvasTool == .stickyNote`; does not change the active tool.
     @discardableResult
     func insertStickyNoteAtCanvasPoint(
         _ point: CGPoint,
@@ -83,7 +83,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Drag-to-define area while `canvasTool == .placeSticky`.
+    /// Drag-to-define area while `canvasTool == .stickyNote`.
     @discardableResult
     func insertStickyNoteInCanvasRect(
         _ rect: CGRect,

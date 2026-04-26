@@ -6,8 +6,6 @@ struct CanvasScreenView: View {
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
 
-    @Environment(FlowDeskOnboardingStore.self) private var onboarding
-
     var body: some View {
         ZStack(alignment: .leading) {
             CanvasBoardView(
@@ -23,20 +21,6 @@ struct CanvasScreenView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Overlay keeps hit testing to the card only (no invisible full-screen blocker).
-        .overlay(alignment: .topTrailing) {
-            if !onboarding.canvasTipsDismissed {
-                FlowDeskCanvasOnboardingCallout()
-                    .padding(.top, FlowDeskLayout.canvasOnboardingCalloutTopInset)
-                    .padding(.trailing, FlowDeskLayout.canvasOnboardingCalloutTrailingInset)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            CanvasZoomHUDView(boardViewModel: boardViewModel, selection: selection)
-                .padding(.trailing, FlowDeskLayout.canvasOverlayTrailingInset)
-                .padding(.bottom, FlowDeskLayout.canvasOverlayBottomInset)
-        }
-        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: onboarding.canvasTipsDismissed)
         .navigationTitle(document.title)
         #if os(macOS)
         .navigationSubtitle("Last edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -140,26 +124,6 @@ struct CanvasScreenView: View {
                     .disabled(!selection.hasSelection)
                     .keyboardShortcut("3", modifiers: [.command, .option])
                     .help("Zoom and pan to fit the selected items (⌘⌥3)")
-                    Divider()
-                    Button("Insert text block") {
-                        boardViewModel.insertTextBlock(selection: selection, beginEditing: true)
-                    }
-                    .keyboardShortcut("t", modifiers: [.command])
-                    .help("Adds a text block centered in what you see now")
-                    Button("Insert sticky note") {
-                        boardViewModel.insertStickyNote(selection: selection, beginEditing: true)
-                    }
-                    .keyboardShortcut("n", modifiers: [.command, .shift])
-                    .help("Adds a sticky note centered in the current view")
-                    Divider()
-                    Button("Bar chart") {
-                        boardViewModel.insertChart(kind: .bar, selection: selection)
-                    }
-                    .help("Insert a sample bar chart at the center of the view")
-                    Button("Line chart") {
-                        boardViewModel.insertChart(kind: .line, selection: selection)
-                    }
-                    .help("Insert a sample line chart at the center of the view")
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "rectangle.split.2x1")

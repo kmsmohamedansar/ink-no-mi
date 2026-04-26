@@ -41,13 +41,6 @@ struct CanvasBoardView: View {
                             .zIndex(Double(element.zIndex))
                     }
 
-                    if sortedElements.isEmpty {
-                        FlowDeskCanvasWorkspaceHint()
-                            .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
-                            .allowsHitTesting(false)
-                            .zIndex(2)
-                    }
-
                     CanvasMultiSelectionBoundsOverlay(
                         elements: boardViewModel.boardState.elements,
                         selectedIDs: selection.selectedElementIDs
@@ -81,7 +74,9 @@ struct CanvasBoardView: View {
                         .allowsHitTesting(false)
                     }
 
-                    if boardViewModel.canvasTool == .draw {
+                    if boardViewModel.canvasTool == .pen
+                        || boardViewModel.canvasTool == .pencil
+                        || boardViewModel.canvasTool == .smartInk {
                         Color.clear
                             .contentShape(Rectangle())
                             .frame(width: canvasSize, height: canvasSize)
@@ -115,12 +110,6 @@ struct CanvasBoardView: View {
                     y: CGFloat(viewport.offsetY) + panDragTranslation.height
                 )
 
-                selectionToolbarOverlay(
-                    geo: geo,
-                    safeArea: geo.safeAreaInsets,
-                    viewport: viewport,
-                    scale: scale
-                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .clipped()
@@ -133,7 +122,7 @@ struct CanvasBoardView: View {
                 switch boardViewModel.canvasTool {
                 case .select:
                     NSCursor.arrow.set()
-                case .draw, .placeText, .placeSticky, .placeShape:
+                case .pen, .pencil, .text, .stickyNote, .shape, .chart, .smartInk:
                     NSCursor.crosshair.set()
                 }
             }
@@ -214,9 +203,9 @@ struct CanvasBoardView: View {
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.resetGroupMoveState()
                 }
-        case .draw:
+        case .pen, .pencil, .smartInk:
             bg
-        case .placeText, .placeSticky, .placeShape:
+        case .text, .stickyNote, .shape, .chart:
             bg
                 .gesture(placementCreateGesture(selection: selection))
         }
@@ -261,11 +250,11 @@ struct CanvasBoardView: View {
                 let end = value.location
                 let raw = placementRawRect(from: start, to: end)
                 switch boardViewModel.canvasTool {
-                case .placeText:
+                case .text:
                     if dist < Self.placementTextStickyTapThreshold {
                         boardViewModel.insertTextBlockAtCanvasPoint(start, selection: selection)
                     } else {
-                        let (minW, minH) = placementMinimumSize(.placeText)
+                        let (minW, minH) = placementMinimumSize(.text)
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
@@ -273,11 +262,11 @@ struct CanvasBoardView: View {
                         )
                         boardViewModel.insertTextBlockInCanvasRect(snapped, selection: selection)
                     }
-                case .placeSticky:
+                case .stickyNote:
                     if dist < Self.placementTextStickyTapThreshold {
                         boardViewModel.insertStickyNoteAtCanvasPoint(start, selection: selection)
                     } else {
-                        let (minW, minH) = placementMinimumSize(.placeSticky)
+                        let (minW, minH) = placementMinimumSize(.stickyNote)
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
@@ -285,7 +274,7 @@ struct CanvasBoardView: View {
                         )
                         boardViewModel.insertStickyNoteInCanvasRect(snapped, selection: selection)
                     }
-                case .placeShape:
+                case .shape:
                     if dist < Self.placementShapeTapThreshold {
                         boardViewModel.insertShapeAtCanvasPoint(
                             kind: boardViewModel.placeShapeKind,
@@ -293,7 +282,7 @@ struct CanvasBoardView: View {
                             selection: selection
                         )
                     } else {
-                        let (minW, minH) = placementMinimumSize(.placeShape)
+                        let (minW, minH) = placementMinimumSize(.shape)
                         let (snapped, _) = boardViewModel.snapPlacementDraftRect(
                             rawRect: raw,
                             minWidth: minW,
@@ -305,6 +294,8 @@ struct CanvasBoardView: View {
                             selection: selection
                         )
                     }
+                case .chart:
+                    _ = boardViewModel.insertChart(kind: .bar, selection: selection)
                 default:
                     break
                 }
@@ -325,12 +316,14 @@ struct CanvasBoardView: View {
 
     private func placementMinimumSize(_ tool: CanvasToolMode) -> (CGFloat, CGFloat) {
         switch tool {
-        case .placeText:
+        case .text:
             (CGFloat(CanvasTextBlockLayout.minWidth), CGFloat(CanvasTextBlockLayout.minHeight))
-        case .placeSticky:
+        case .stickyNote:
             (CGFloat(CanvasStickyNoteLayout.minWidth), CGFloat(CanvasStickyNoteLayout.minHeight))
-        case .placeShape:
+        case .shape:
             (CGFloat(CanvasShapeLayout.minWidth), CGFloat(CanvasShapeLayout.minHeight))
+        case .chart:
+            (CGFloat(CanvasChartLayout.minWidth), CGFloat(CanvasChartLayout.minHeight))
         default:
             (44, 44)
         }
@@ -341,6 +334,7 @@ struct CanvasBoardView: View {
             .onChanged { value in
                 if draftCanvasPoints.isEmpty {
                     boardViewModel.stopAllInlineEditing()
+                    boardViewModel.configureStrokeStyleForActiveTool()
                 }
                 let loc = value.location
                 if let last = draftCanvasPoints.last {

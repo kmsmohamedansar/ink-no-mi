@@ -18,13 +18,13 @@ final class CanvasBoardViewModel {
     /// When set, shows a one-line label field on this connector id.
     var editingConnectorLabelElementID: UUID?
 
-    /// Tool mode: pan/select vs freehand ink. Reset when opening a document.
+    /// Active canvas tool mode.
     var canvasTool: CanvasToolMode = .select
 
-    /// Progressive panel beside the left tool rail (Miro-style); `nil` when closed.
+    /// Optional context panel beside the tool rail; currently unused by default.
     var canvasContextPanel: CanvasContextPanel?
 
-    /// Shape kind used when `canvasTool == .placeShape` (click or drag on the canvas).
+    /// Shape kind used when `canvasTool == .shape` (click or drag on the canvas).
     var placeShapeKind: FlowDeskShapeKind = .rectangle
 
     /// Active drawing style for new strokes (toolbar / inspector).
@@ -109,9 +109,9 @@ final class CanvasBoardViewModel {
         connectorEndpointAdjustDraft = nil
         placeShapeKind = .rectangle
         boardState = CanvasBoardCoding.decode(from: document.canvasPayload)
-        // Initial tool is session UI state; derive from template when present so whiteboards open ready to draw.
+        // Initial tool is session UI state and always starts in select for a predictable blank-first canvas.
         canvasTool = boardState.boardTemplate?.preferredInitialCanvasTool ?? .select
-        canvasContextPanel = canvasTool == .draw ? .drawStroke : nil
+        canvasContextPanel = nil
         resetCanvasUndoHistory()
     }
 

@@ -45,7 +45,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Click-to-place while `canvasTool == .placeText`; does not change the active tool.
+    /// Click-to-place while `canvasTool == .text`; does not change the active tool.
     @discardableResult
     func insertTextBlockAtCanvasPoint(
         _ point: CGPoint,
@@ -87,7 +87,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Drag-to-define area while `canvasTool == .placeText`.
+    /// Drag-to-define area while `canvasTool == .text`.
     @discardableResult
     func insertTextBlockInCanvasRect(
         _ rect: CGRect,

@@ -36,7 +36,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Click-to-place while `canvasTool == .placeShape`; does not change the active tool.
+    /// Click-to-place while `canvasTool == .shape`; does not change the active tool.
     @discardableResult
     func insertShapeAtCanvasPoint(
         kind: FlowDeskShapeKind,
@@ -72,7 +72,7 @@ extension CanvasBoardViewModel {
         return id
     }
 
-    /// Drag-to-define frame while `canvasTool == .placeShape`.
+    /// Drag-to-define frame while `canvasTool == .shape`.
     @discardableResult
     func insertShapeInCanvasRect(
         kind: FlowDeskShapeKind,
