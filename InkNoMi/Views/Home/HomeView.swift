@@ -1879,6 +1879,10 @@ private extension HomeView {
             return "app-wireframe"
         case .whiteboard:
             return "brainstorm-board"
+        case .kanban:
+            return "kanban-board"
+        @unknown default:
+            return "brainstorm-board"
         }
     }
 

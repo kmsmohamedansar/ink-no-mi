@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class CanvasExportSheetViewModel {
+final class CanvasExportSheetViewModel: Identifiable {
     let id = UUID()
     let boardState: CanvasBoardState
     let documentTitle: String
@@ -30,10 +30,10 @@ final class CanvasExportSheetViewModel {
         self.boardState = boardState
         self.documentTitle = documentTitle
         self.fileNameBase = CanvasExportService.defaultFileName(documentTitle: documentTitle)
-        self.options = .default
-        self.options.selectedElementIDs = selectedElementIDs
-        self.options.viewportSnapshot = viewportSnapshot
-        self.options.includeGrid = boardState.viewport.showGrid
+        var initialOptions = CanvasExportService.Options.default
+        initialOptions.selectedElementIDs = selectedElementIDs
+        initialOptions.viewportSnapshot = viewportSnapshot
+        initialOptions.includeGrid = boardState.viewport.showGrid
 
         let availability = CanvasExportService.availability(
             boardState: boardState,
@@ -42,6 +42,7 @@ final class CanvasExportSheetViewModel {
         )
         selectedOnlySupported = availability.selectedOnlyEnabled
         visibleViewportSupported = availability.visibleViewportEnabled
+        self.options = initialOptions
         refreshPreview()
     }
 

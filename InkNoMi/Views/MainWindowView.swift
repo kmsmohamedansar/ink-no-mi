@@ -451,7 +451,7 @@ struct MainWindowView: View {
         #if DEBUG
         if screenshotModeLoaded { return false }
         #endif
-        canvasSelection.hasSelection || canvasBoardViewModel.canvasTool == .pen || canvasBoardViewModel.canvasTool == .pencil
+        return canvasSelection.hasSelection || canvasBoardViewModel.canvasTool == .pen || canvasBoardViewModel.canvasTool == .pencil
     }
 
     private var commandPaletteCommands: [CommandPaletteCommand] {
@@ -720,7 +720,7 @@ struct MainWindowView: View {
     }
 
     private func boardViewModelPrepareForScreenshot() {
-        canvasBoardViewModel.selectCanvasTool(.select)
+        canvasBoardViewModel.applyCanvasToolSelection(.select, fromKeyboard: false)
         canvasBoardViewModel.fitViewportToBoardContent(canvasMargin: 140)
         canvasBoardViewModel.centerViewportOnBoardContent(canvasMargin: 120)
     }

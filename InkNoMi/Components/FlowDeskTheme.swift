@@ -76,6 +76,12 @@ enum FlowDeskTheme {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+        @unknown default:
+            return LinearGradient(
+                colors: [DS.Color.surfaceTop, DS.Color.surfaceBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
     }
 

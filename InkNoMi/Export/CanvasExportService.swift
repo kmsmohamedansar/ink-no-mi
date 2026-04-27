@@ -8,11 +8,16 @@ import UniformTypeIdentifiers
 @MainActor
 private enum CanvasExportAppearance {
     static func resolvedAppearance() -> (colorScheme: ColorScheme, tokens: FlowDeskAppearanceTokens) {
-        let modeRaw = UserDefaults.standard.string(forKey: "FlowDesk.appearance.mode")
-            ?? FlowDeskAppearanceMode.system.rawValue
-        let mode = FlowDeskAppearanceMode(rawValue: modeRaw) ?? .system
+        let settings: AppAppearanceSettings = {
+            guard let data = UserDefaults.standard.data(forKey: "InkNoMi.AppearanceSettings"),
+                  let decoded = try? JSONDecoder().decode(AppAppearanceSettings.self, from: data)
+            else {
+                return .default
+            }
+            return decoded
+        }()
         let colorScheme: ColorScheme
-        switch mode {
+        switch settings.appearanceMode {
         case .light:
             colorScheme = .light
         case .dark:
@@ -22,10 +27,7 @@ private enum CanvasExportAppearance {
                 ? .dark
                 : .light
         }
-        let presetRaw = UserDefaults.standard.string(forKey: "FlowDesk.appearance.stylePreset")
-            ?? FlowDeskStylePreset.warmPaper.rawValue
-        let preset = FlowDeskStylePreset(rawValue: presetRaw) ?? .warmPaper
-        let tokens = FlowDeskAppearanceTokens.resolve(colorScheme: colorScheme, preset: preset)
+        let tokens = FlowDeskAppearanceTokens.resolve(colorScheme: colorScheme, settings: settings)
         return (colorScheme, tokens)
     }
 }
@@ -34,6 +36,9 @@ private enum CanvasExportAppearance {
 /// Does not mutate documents or live canvas UI state.
 @MainActor
 enum CanvasExportService {
+    typealias ExportFormat = Format
+    static let defaultRenderScale: CGFloat = Quality.retina.renderScale
+
     enum Format {
         case png
         case pdf
@@ -259,6 +264,38 @@ enum CanvasExportService {
             height: rect.height
         )
         return renderer.nsImage
+    }
+
+    /// Backward-compatible convenience API used by thumbnail generation and older call sites.
+    static func renderExportImage(boardState: CanvasBoardState, renderScale: CGFloat) -> NSImage? {
+        var options = Options.default
+        if renderScale >= Quality.retina.renderScale {
+            options.quality = .retina
+        } else if renderScale >= Quality.high.renderScale {
+            options.quality = .high
+        } else {
+            options.quality = .standard
+        }
+        return renderExportImage(boardState: boardState, options: options)
+    }
+
+    /// Backward-compatible export entry point used by menus and command palette actions.
+    static func presentExportPanel(
+        boardState: CanvasBoardState,
+        documentTitle: String,
+        format: ExportFormat,
+        renderScale: CGFloat = Quality.high.renderScale
+    ) {
+        var options = Options.default
+        options.format = format
+        if renderScale >= Quality.retina.renderScale {
+            options.quality = .retina
+        } else if renderScale >= Quality.high.renderScale {
+            options.quality = .high
+        } else {
+            options.quality = .standard
+        }
+        _ = exportWithSavePanel(boardState: boardState, documentTitle: documentTitle, options: options)
     }
 
     // MARK: - Writers

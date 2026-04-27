@@ -696,7 +696,7 @@ private extension CanvasBoardViewModel {
         selection.selectOnly(id)
     }
 
-    static func recognizeText(from strokes: [FreehandStroke]) -> RecognizedManualText? {
+    nonisolated static func recognizeText(from strokes: [FreehandStroke]) -> RecognizedManualText? {
         #if canImport(Vision)
         guard !strokes.isEmpty else { return nil }
         let grouped = boundsForPoints(strokes.flatMap(\.points)).standardized
@@ -727,7 +727,7 @@ private extension CanvasBoardViewModel {
         #endif
     }
 
-    static func renderStrokeImage(strokes: [FreehandStroke], bounds: CGRect) -> CGImage? {
+    nonisolated static func renderStrokeImage(strokes: [FreehandStroke], bounds: CGRect) -> CGImage? {
         let padding: CGFloat = 18
         let size = CGSize(width: bounds.width + padding * 2, height: bounds.height + padding * 2)
         guard let context = CGContext(
@@ -764,7 +764,7 @@ private extension CanvasBoardViewModel {
         return context.makeImage()
     }
 
-    static func boundsForPoints(_ points: [CGPoint]) -> CGRect {
+    nonisolated static func boundsForPoints(_ points: [CGPoint]) -> CGRect {
         guard let first = points.first else { return .null }
         return points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { partial, point in
             partial.union(CGRect(origin: point, size: .zero))

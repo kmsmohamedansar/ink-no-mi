@@ -114,6 +114,11 @@
 		A10000000000000000000093 /* ProPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* ProPaywallSheet.swift */; };
 		A10000000000000000000094 /* FlowDeskMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* FlowDeskMotion.swift */; };
 		A10000000000000000000095 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* DesignSystem.swift */; };
+		A10000000000000000000096 /* CommandPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* CommandPaletteView.swift */; };
+		A10000000000000000000097 /* NewBoardSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000097 /* NewBoardSheetView.swift */; };
+		A10000000000000000000098 /* CanvasExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000098 /* CanvasExportSheet.swift */; };
+		A10000000000000000000099 /* ScreenshotModeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* ScreenshotModeService.swift */; };
+		A100000000000000000000A0 /* KeyboardShortcutsOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A0 /* KeyboardShortcutsOverlayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -226,6 +231,11 @@
 		A20000000000000000000093 /* ProPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProPaywallSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000094 /* FlowDeskMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskMotion.swift; sourceTree = "<group>"; };
 		A20000000000000000000095 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		A20000000000000000000096 /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Views/CommandPaletteView.swift; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000097 /* NewBoardSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Views/Home/NewBoardSheetView.swift; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000098 /* CanvasExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Export/CanvasExportSheet.swift; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000099 /* ScreenshotModeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Services/ScreenshotModeService.swift; sourceTree = SOURCE_ROOT; };
+		A200000000000000000000A0 /* KeyboardShortcutsOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Views/KeyboardShortcutsOverlayView.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -706,6 +716,11 @@
 				A10000000000000000000060 /* FlowDeskInteractionStyles.swift in Sources */,
 				A10000000000000000000094 /* FlowDeskMotion.swift in Sources */,
 				A10000000000000000000095 /* DesignSystem.swift in Sources */,
+				A10000000000000000000096 /* CommandPaletteView.swift in Sources */,
+				A10000000000000000000097 /* NewBoardSheetView.swift in Sources */,
+				A10000000000000000000098 /* CanvasExportSheet.swift in Sources */,
+				A10000000000000000000099 /* ScreenshotModeService.swift in Sources */,
+				A100000000000000000000A0 /* KeyboardShortcutsOverlayView.swift in Sources */,
 				A10000000000000000000043 /* FlowDeskTheme.swift in Sources */,
 				A1000000000000000000000D /* BoardEmptySelectionView.swift in Sources */,
 				A10000000000000000000016 /* CanvasElementChrome.swift in Sources */,
