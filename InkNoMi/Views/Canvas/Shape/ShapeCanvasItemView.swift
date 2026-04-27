@@ -87,6 +87,7 @@ struct ShapeCanvasItemView: View {
         }
         .offset(composedMoveOffset)
         .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
+        .scaleEffect(isDragging ? 1.01 : 1.0)
         .scaleEffect(isConvertingIn ? 0.95 : 1.0)
         .opacity(isConvertingIn ? 0.76 : 1.0)
         .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)

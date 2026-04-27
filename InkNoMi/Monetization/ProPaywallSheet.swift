@@ -4,15 +4,16 @@ struct ProPaywallSheet: View {
     @Bindable var purchaseManager: PurchaseManager
     @Environment(\.dismiss) private var dismiss
     @State private var hoveredPlan: ProPlan?
+    @State private var selectedPlan: ProPlan = .yearly
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.lg) {
             VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                Text("Unlock your full workspace")
+                Text("Unlock InkNoMi Pro")
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(DS.Color.textPrimary)
 
-                Text("Create unlimited boards, access advanced templates, and build without limits.")
+                Text("Build unlimited workspaces, use advanced templates, and export in high quality.")
                     .font(.subheadline)
                     .foregroundStyle(DS.Color.textSecondary)
             }
@@ -25,13 +26,14 @@ struct ProPaywallSheet: View {
             VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 Label("Cancel anytime", systemImage: "checkmark.circle")
                 Label("No data loss", systemImage: "lock.shield")
+                Label("Secure checkout via Apple", systemImage: "checkmark.shield")
             }
             .font(.caption)
             .foregroundStyle(DS.Color.textSecondary)
 
             HStack(spacing: DS.Spacing.md) {
-                Button("Continue") {
-                    Task { await purchaseManager.purchase(plan: .yearly) }
+                Button(primaryCTAButtonTitle) {
+                    Task { await purchaseManager.purchase(plan: selectedPlan) }
                 }
                 .disabled(purchaseManager.isProcessingPurchase)
                 .buttonStyle(.plain)
@@ -60,23 +62,31 @@ struct ProPaywallSheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.textSecondary)
             }
+
+            Text("You can keep using existing boards on Free. Upgrade only unlocks advanced limits and exports.")
+                .font(.caption)
+                .foregroundStyle(DS.Color.textTertiary)
+            Text(planDisclosureText)
+                .font(.caption2)
+                .foregroundStyle(DS.Color.textTertiary)
         }
         .padding(24)
         .frame(minWidth: 460)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.04), lineWidth: 0.8)
                 )
-                .shadow(color: Color.black.opacity(0.18), radius: 40, x: 0, y: 20)
+                .shadow(color: Color.black.opacity(0.1), radius: 18, x: 0, y: 8)
         )
     }
 
     private func planButton(_ plan: ProPlan, highlighted: Bool = false) -> some View {
-        Button {
-            Task { await purchaseManager.purchase(plan: plan) }
+        let isSelected = selectedPlan == plan
+        return Button {
+            selectedPlan = plan
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -103,9 +113,9 @@ struct ProPaywallSheet: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Image(systemName: "chevron.right")
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isSelected ? DS.Color.accent : .secondary)
                 }
             }
             .padding(DS.Spacing.md)
@@ -114,15 +124,18 @@ struct ProPaywallSheet: View {
                     .fill(DS.Color.panel)
                     .overlay(
                         RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                            .stroke(highlighted ? DS.Color.accent.opacity(0.34) : DS.Color.border)
+                            .stroke(
+                                isSelected ? DS.Color.accent.opacity(0.48) : (highlighted ? DS.Color.accent.opacity(0.34) : DS.Color.border),
+                                lineWidth: isSelected ? 1 : 0.8
+                            )
                     )
             )
             .overlay {
                 RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                    .fill(Color.white.opacity(hoveredPlan == plan ? 0.06 : 0))
+                    .fill(Color.white.opacity(hoveredPlan == plan ? 0.035 : 0))
                     .blendMode(.overlay)
             }
-            .scaleEffect(hoveredPlan == plan ? DS.Interaction.hoverScale : 1)
+            .scaleEffect(hoveredPlan == plan ? 1.008 : 1)
             .offset(y: hoveredPlan == plan ? -1 : 0)
             .animation(.easeOut(duration: DS.Interaction.hoverDuration), value: hoveredPlan == plan)
         }
@@ -130,6 +143,19 @@ struct ProPaywallSheet: View {
         .disabled(purchaseManager.isProcessingPurchase)
         .onHover { inside in
             hoveredPlan = inside ? plan : nil
+        }
+    }
+
+    private var primaryCTAButtonTitle: String {
+        purchaseManager.isProcessingPurchase ? "Processing..." : "Start Pro - \(selectedPlan.displayPrice)"
+    }
+
+    private var planDisclosureText: String {
+        switch selectedPlan {
+        case .monthly:
+            return "Billed monthly. Manage or cancel anytime in App Store subscriptions."
+        case .yearly:
+            return "Billed yearly. Manage or cancel anytime in App Store subscriptions."
         }
     }
 }

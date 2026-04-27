@@ -9,6 +9,8 @@ struct CanvasBoardExportContentView: View {
     /// Matches the user’s light/dark + style preset for background and grid (see `CanvasExportService`).
     let tokens: FlowDeskAppearanceTokens
     let colorScheme: ColorScheme
+    let includeBackground: Bool
+    let includeGrid: Bool
 
     private var sortedElements: [CanvasElementRecord] {
         boardState.elements.sorted {
@@ -19,8 +21,10 @@ struct CanvasBoardExportContentView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            exportBackground(showGrid: boardState.viewport.showGrid)
-                .frame(width: exportRect.width, height: exportRect.height)
+            if includeBackground {
+                exportBackground(showGrid: includeGrid)
+                    .frame(width: exportRect.width, height: exportRect.height)
+            }
 
             ForEach(sortedElements) { element in
                 exportElement(element)

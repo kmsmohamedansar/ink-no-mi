@@ -5,21 +5,35 @@ import StoreKit
 #endif
 import Observation
 
-enum ProFeatureGate: String, Sendable {
-    case convertDiagram
-    case smartConvert
-    case mindMapAutoLayout
-    case highResolutionExport
+enum ProFeature: String, Sendable, CaseIterable {
     case unlimitedBoards
+    case advancedTemplates
+    case appearanceCustomization
+    case highResExport
+    case smartConvert
+}
 
-    var displayName: String {
-        switch self {
-        case .convertDiagram: return "Convert to Diagram"
-        case .smartConvert: return "Smart Ink Convert"
-        case .mindMapAutoLayout: return "Mind Map Auto Layout"
-        case .highResolutionExport: return "High Resolution Export"
-        case .unlimitedBoards: return "Unlimited Boards"
+@MainActor
+struct FeatureGate {
+    private let purchaseManager: PurchaseManager
+
+    init(purchaseManager: PurchaseManager) {
+        self.purchaseManager = purchaseManager
+    }
+
+    func canUse(_ feature: ProFeature) -> Bool {
+        if purchaseManager.isProUser { return true }
+        switch feature {
+        case .unlimitedBoards, .advancedTemplates, .appearanceCustomization, .highResExport, .smartConvert:
+            return false
         }
+    }
+
+    @discardableResult
+    func requirePro(_ feature: ProFeature, source: String) -> Bool {
+        guard !canUse(feature) else { return true }
+        purchaseManager.presentUpgrade(for: feature, source: source)
+        return false
     }
 }
 
@@ -29,8 +43,8 @@ enum ProPlan: String, CaseIterable, Sendable {
 
     var displayPrice: String {
         switch self {
-        case .monthly: return "$4.99"
-        case .yearly: return "$29.99"
+        case .monthly: return "$4.99 / month"
+        case .yearly: return "$29.99 / year"
         }
     }
 
@@ -51,7 +65,8 @@ final class PurchaseManager {
     }
 
     var isPaywallPresented = false
-    var requestedFeature: ProFeatureGate?
+    var requestedFeature: ProFeature?
+    var paywallSource: String?
     var purchaseMessage: String?
     var isProcessingPurchase = false
 
@@ -64,11 +79,10 @@ final class PurchaseManager {
         isProUser = UserDefaults.standard.bool(forKey: Self.proUserDefaultsKey)
     }
 
-    func requirePro(for feature: ProFeatureGate) -> Bool {
-        if isProUser { return true }
+    func presentUpgrade(for feature: ProFeature, source: String) {
         requestedFeature = feature
+        paywallSource = source
         isPaywallPresented = true
-        return false
     }
 
     func purchase(plan: ProPlan) async {

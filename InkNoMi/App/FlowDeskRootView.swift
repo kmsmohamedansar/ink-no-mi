@@ -2,16 +2,13 @@ import SwiftUI
 
 /// Hosts the main window with appearance preferences applied (color scheme + environment).
 struct FlowDeskRootView: View {
-    let appearanceStore: FlowDeskAppearanceStore
-    @State private var onboardingStore = FlowDeskOnboardingStore()
+    @ObservedObject var appearanceStore: AppearanceManager
     @State private var purchaseManager = PurchaseManager()
 
     var body: some View {
-        @Bindable var appearanceStore = appearanceStore
         MainWindowView()
-            .environment(appearanceStore)
-            .environment(onboardingStore)
-            .environment(purchaseManager)
-            .preferredColorScheme(appearanceStore.preferredColorScheme)
+        .environmentObject(appearanceStore)
+        .environment(purchaseManager)
+        .preferredColorScheme(appearanceStore.settings.appearanceMode.preferredColorScheme)
     }
 }

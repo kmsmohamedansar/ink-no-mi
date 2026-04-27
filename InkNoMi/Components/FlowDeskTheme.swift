@@ -200,15 +200,15 @@ enum FlowDeskTheme {
 
     /// Matches warm-paper light tokens for predictable PNG/PDF output (board mat, not home chrome).
     static func canvasWorkspaceBackground(for colorScheme: ColorScheme) -> Color {
-        FlowDeskAppearanceTokens.resolve(colorScheme: colorScheme, preset: .warmPaper).canvasWorkspaceBackground
+        DynamicTheme.resolve(colorScheme: colorScheme, settings: .default).canvasWorkspaceBackground
     }
 
     static var canvasWorkspaceBackgroundExport: Color {
-        FlowDeskAppearanceTokens.resolve(colorScheme: .light, preset: .warmPaper).canvasWorkspaceBackground
+        DynamicTheme.resolve(colorScheme: .light, settings: .default).canvasWorkspaceBackground
     }
 
     static func gridLineOpacity(for colorScheme: ColorScheme) -> Double {
-        FlowDeskAppearanceTokens.resolve(colorScheme: colorScheme, preset: .warmPaper).gridLineOpacity
+        DynamicTheme.resolve(colorScheme: colorScheme, settings: .default).gridLineOpacity
     }
 
     // MARK: - Framed canvas items (geometry; aligned with `FlowDeskLayout.cardCornerRadius`)
@@ -238,17 +238,17 @@ enum FlowDeskTheme {
     // MARK: - Shadows (export + legacy callers)
 
     static func cardShadowOpacity(selected: Bool) -> Double {
-        let t = FlowDeskAppearanceTokens.resolve(colorScheme: .light, preset: .warmPaper)
+        let t = DynamicTheme.resolve(colorScheme: .light, settings: .default)
         return selected ? t.canvasItemShadowSelected : t.canvasItemShadowNormal
     }
 
     static func cardShadowRadius(selected: Bool) -> CGFloat {
-        let t = FlowDeskAppearanceTokens.resolve(colorScheme: .light, preset: .warmPaper)
+        let t = DynamicTheme.resolve(colorScheme: .light, settings: .default)
         return selected ? t.canvasItemShadowRadiusSelected : t.canvasItemShadowRadiusNormal
     }
 
     static func cardShadowY(selected: Bool) -> CGFloat {
-        let t = FlowDeskAppearanceTokens.resolve(colorScheme: .light, preset: .warmPaper)
+        let t = DynamicTheme.resolve(colorScheme: .light, settings: .default)
         return selected ? t.canvasItemShadowYSelected : t.canvasItemShadowYNormal
     }
 

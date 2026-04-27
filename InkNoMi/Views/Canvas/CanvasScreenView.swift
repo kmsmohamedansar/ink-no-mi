@@ -2,16 +2,21 @@ import SwiftUI
 
 /// macOS canvas screen: canvas-first tools + lightweight window toolbar (Edit / View / Export).
 struct CanvasScreenView: View {
-    @Environment(PurchaseManager.self) private var purchaseManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     @Bindable var document: FlowDocument
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
+    var isFocusModeEnabled: Bool = false
+    var screenshotPolishMode: Bool = false
     var onBackHome: (() -> Void)? = nil
     @State private var didEnterWorkspace = false
     @State private var didFadeBackground = false
-    @State private var autosavePulse = false
+    @State private var showCommandPalette = false
+    @State private var showShortcutHelp = false
+    @State private var exportSheetViewModel: CanvasExportSheetViewModel?
+    @State private var titleAutosaveTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -28,10 +33,50 @@ struct CanvasScreenView: View {
 
             InkNoMiCanvasChromeColumn(
                 boardViewModel: boardViewModel,
-                selection: selection
+                selection: selection,
+                compactMode: isFocusModeEnabled,
+                screenshotPolishMode: screenshotPolishMode
             )
             .padding(.leading, DS.Spacing.lg)
             .padding(.top, DS.Spacing.lg)
+            .padding(.bottom, DS.Spacing.lg)
+            .transition(.move(edge: .leading).combined(with: .opacity))
+
+            if showCommandPalette {
+                CommandPaletteView(
+                    isPresented: $showCommandPalette,
+                    commands: commandPaletteCommands
+                )
+                .zIndex(1_000_000)
+            }
+
+            if showShortcutHelp {
+                KeyboardShortcutsOverlayView(isPresented: $showShortcutHelp)
+                    .zIndex(1_000_001)
+            }
+
+            if isFocusModeEnabled {
+                VStack {
+                    Spacer()
+                    Text("Press Esc to exit Focus Mode")
+                        .font(DS.Typography.caption.weight(.medium))
+                        .foregroundStyle(DS.Color.textTertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                                .overlay(
+                                    Capsule(style: .continuous)
+                                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
+                                )
+                        )
+                        .padding(.bottom, DS.Spacing.lg)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .opacity(didEnterWorkspace ? 1 : 0.93)
@@ -41,13 +86,50 @@ struct CanvasScreenView: View {
             didEnterWorkspace = true
             didFadeBackground = true
         }
+        .onDisappear {
+            titleAutosaveTask?.cancel()
+        }
+        .onChange(of: document.title) { _, _ in
+            scheduleTitleAutosave()
+        }
         .navigationTitle(document.title)
         #if os(macOS)
         .navigationSubtitle("Last edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
         #endif
-        .canvasScreenKeyCommands(boardViewModel: boardViewModel, selection: selection)
+        .overlay(alignment: .top) {
+            if boardViewModel.saveErrorBannerVisible {
+                saveErrorBanner
+                    .padding(.top, 10)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !isFocusModeEnabled && !screenshotPolishMode {
+                minimalStatusBar
+                    .padding(.horizontal, DS.Spacing.lg)
+                    .padding(.bottom, DS.Spacing.md)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isFocusModeEnabled)
+        .canvasScreenKeyCommands(
+            boardViewModel: boardViewModel,
+            selection: selection,
+            isFocusModeEnabled: isFocusModeEnabled
+        )
         .onDeleteCommand {
             boardViewModel.deleteSelectedElements(selection: selection)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowDeskOpenCommandPalette)) { _ in
+            showShortcutHelp = false
+            showCommandPalette = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowDeskOpenShortcutHelp)) { _ in
+            showCommandPalette = false
+            showShortcutHelp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .flowDeskExportBoard)) { _ in
+            performQuickExport()
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -62,32 +144,16 @@ struct CanvasScreenView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 180, idealWidth: 240, maxWidth: 320)
                     .onSubmit {
-                        document.markUpdated()
+                        persistTitleNow()
                     }
 
-                HStack(spacing: 10) {
-                    savedStatusBadge
-
-                    TimelineView(.periodic(from: .now, by: 30)) { _ in
-                        Text("Last edited \(relativeLastEditedText)")
-                            .font(DS.Typography.caption)
-                            .foregroundStyle(DS.Color.textTertiary)
+                if !screenshotPolishMode {
+                    HStack(spacing: 10) {
+                        saveStatusBadge
+                        saveStatusTimestampLabel
                     }
-                }
 
-                HStack(spacing: 8) {
-                    editorStatChip(
-                        icon: "plus.magnifyingglass",
-                        text: "\(zoomPercent)%"
-                    )
-                    editorStatChip(
-                        icon: "rectangle.dashed",
-                        text: "\(canvasSizeLabel)"
-                    )
-                    editorStatChip(
-                        icon: "square.on.square",
-                        text: "\(boardViewModel.boardState.elements.count)"
-                    )
+                    toolContextChip
                 }
             }
 
@@ -178,6 +244,8 @@ struct CanvasScreenView: View {
                     )
                 }
                 .buttonStyle(FlowDeskToolbarButtonStyle())
+                .frame(minHeight: 40)
+                .accessibilityLabel("Edit controls")
 
                 Menu {
                     Toggle("Show grid", isOn: gridBinding)
@@ -218,28 +286,19 @@ struct CanvasScreenView: View {
                 }
                 .help("Grid, canvas framing, insert items in view, and charts")
                 .buttonStyle(FlowDeskToolbarButtonStyle())
+                .frame(minHeight: 40)
+                .accessibilityLabel("View controls")
 
                 Menu {
-                    Button("PNG…") {
-                        let renderScale = resolvedExportScale()
-                        CanvasExportService.presentExportPanel(
+                    Button("Export board…") {
+                        exportSheetViewModel = CanvasExportSheetViewModel(
                             boardState: boardViewModel.boardState,
                             documentTitle: document.title,
-                            format: .png,
-                            renderScale: renderScale
+                            selectedElementIDs: selection.selectedElementIDs,
+                            viewportSnapshot: boardViewModel.insertionViewportSnapshot
                         )
                     }
-                    .help("Save the board as a PNG image")
-                    Button("PDF…") {
-                        let renderScale = resolvedExportScale()
-                        CanvasExportService.presentExportPanel(
-                            boardState: boardViewModel.boardState,
-                            documentTitle: document.title,
-                            format: .pdf,
-                            renderScale: renderScale
-                        )
-                    }
-                    .help("Save the board as a one-page PDF")
+                    .help("Open advanced export options")
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
                         .font(DS.Typography.toolLabel)
@@ -255,18 +314,41 @@ struct CanvasScreenView: View {
                                 )
                         )
                 }
-                .help("Save this board as PNG or PDF")
+                .help("Open export sheet")
+                .buttonStyle(FlowDeskToolbarButtonStyle())
+                .frame(minHeight: 40)
+                .accessibilityLabel("Export controls")
+
+                Menu {
+                    Button("Keyboard Shortcuts") {
+                        showCommandPalette = false
+                        showShortcutHelp = true
+                    }
+                    .keyboardShortcut("/", modifiers: [.shift])
+                } label: {
+                    Label("Help", systemImage: "questionmark.circle")
+                        .font(DS.Typography.toolLabel)
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
+                                        .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
+                                )
+                        )
+                }
+                .help("Show keyboard shortcuts")
                 .buttonStyle(FlowDeskToolbarButtonStyle())
 
             }
         }
-        .task {
-            while !Task.isCancelled {
-                withAnimation(FlowDeskMotion.smoothEaseOut) {
-                    autosavePulse.toggle()
-                }
-                try? await Task.sleep(nanoseconds: 1_300_000_000)
-            }
+        .sheet(item: $exportSheetViewModel) { viewModel in
+            CanvasExportSheet(viewModel: viewModel)
+                .presentationDetents([.height(640), .large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -281,12 +363,65 @@ struct CanvasScreenView: View {
         )
     }
 
-    private func resolvedExportScale() -> CGFloat {
-        if purchaseManager.isProUser {
-            return PurchaseManager.proExportScale
-        }
-        _ = purchaseManager.requirePro(for: .highResolutionExport)
-        return PurchaseManager.freeExportScale
+    private func performQuickExport() {
+        exportSheetViewModel = CanvasExportSheetViewModel(
+            boardState: boardViewModel.boardState,
+            documentTitle: document.title,
+            selectedElementIDs: selection.selectedElementIDs,
+            viewportSnapshot: boardViewModel.insertionViewportSnapshot
+        )
+    }
+
+    private var commandPaletteCommands: [CommandPaletteCommand] {
+        [
+            CommandPaletteCommand(id: "tool.select", title: "Select Tool", icon: "cursorarrow", shortcut: "V", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.select, fromKeyboard: true)
+            },
+            CommandPaletteCommand(id: "tool.pan", title: "Hand / Pan Tool", icon: "hand.draw", shortcut: "H", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.select, fromKeyboard: true)
+            },
+            CommandPaletteCommand(id: "tool.pen", title: "Pen Tool", icon: "pencil.tip", shortcut: "P", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.pen, fromKeyboard: true)
+            },
+            CommandPaletteCommand(id: "tool.note", title: "Note Tool", icon: "note.text", shortcut: "N", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.stickyNote, fromKeyboard: true)
+            },
+            CommandPaletteCommand(id: "tool.text", title: "Text Tool", icon: "textformat", shortcut: "T", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.text, fromKeyboard: true)
+            },
+            CommandPaletteCommand(id: "tool.rectangle", title: "Rectangle Tool", icon: "square", shortcut: "R", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.shape, fromKeyboard: true, rectanglePlacementShape: true)
+            },
+            CommandPaletteCommand(id: "tool.line", title: "Line Tool", icon: "line.diagonal", shortcut: "L", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.shape, fromKeyboard: true)
+                boardViewModel.placeShapeKind = .line
+            },
+            CommandPaletteCommand(id: "tool.arrow", title: "Arrow Tool", icon: "arrow.right", shortcut: "A", category: "Tools") {
+                boardViewModel.applyCanvasToolSelection(.shape, fromKeyboard: true)
+                boardViewModel.placeShapeKind = .arrow
+            },
+            CommandPaletteCommand(id: "edit.undo", title: "Undo", icon: "arrow.uturn.backward", shortcut: "Cmd+Z", category: "Editing") {
+                boardViewModel.undoBoard()
+            },
+            CommandPaletteCommand(id: "edit.redo", title: "Redo", icon: "arrow.uturn.forward", shortcut: "Cmd+Shift+Z", category: "Editing") {
+                boardViewModel.redoBoard()
+            },
+            CommandPaletteCommand(
+                id: "view.focus_mode",
+                title: isFocusModeEnabled ? "Exit Focus Mode" : "Enter Focus Mode",
+                icon: isFocusModeEnabled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                shortcut: "Cmd+Shift+F",
+                category: "View"
+            ) {
+                NotificationCenter.default.post(name: .flowDeskToggleFocusMode, object: nil)
+            },
+            CommandPaletteCommand(id: "app.export", title: "Export", icon: "square.and.arrow.up", shortcut: "Cmd+E", category: "Navigation") {
+                performQuickExport()
+            },
+            CommandPaletteCommand(id: "app.shortcuts", title: "Keyboard Shortcuts", icon: "keyboard", shortcut: "?", category: "Navigation") {
+                showShortcutHelp = true
+            }
+        ]
     }
 
     private var zoomPercent: Int {
@@ -298,22 +433,15 @@ struct CanvasScreenView: View {
         return "\(size)×\(size)"
     }
 
-    private var savedStatusBadge: some View {
+    private var saveStatusBadge: some View {
         HStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .fill(DS.Color.accent.opacity(autosavePulse ? 0.14 : 0.06))
-                    .frame(width: autosavePulse ? 15 : 11, height: autosavePulse ? 15 : 11)
-                Circle()
-                    .fill(DS.Color.accent.opacity(0.95))
-                    .frame(width: 6, height: 6)
-            }
-            .animation(FlowDeskMotion.smoothEaseOut, value: autosavePulse)
+            Image(systemName: saveBadgeIconName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(saveBadgeColor)
 
-            Label("Saved", systemImage: "checkmark.circle.fill")
+            Text(saveBadgeTitle)
                 .font(DS.Typography.caption.weight(.medium))
-                .foregroundStyle(DS.Color.textSecondary)
-                .labelStyle(.titleAndIcon)
+                .foregroundStyle(saveBadgeColor)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -321,22 +449,92 @@ struct CanvasScreenView: View {
             Capsule(style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [DS.Color.active.opacity(0.75), DS.Color.surfaceFloatingBottom.opacity(colorScheme == .dark ? 0.26 : 0.72)],
+                        colors: [saveBadgeColor.opacity(0.1), DS.Color.surfaceFloatingBottom.opacity(colorScheme == .dark ? 0.2 : 0.62)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
+                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme).opacity(0.7), lineWidth: 0.6)
                 )
         )
     }
 
-    private var relativeLastEditedText: String {
+    private var saveStatusTimestampLabel: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            Text(lastEditedText)
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.textTertiary)
+                .monospacedDigit()
+        }
+    }
+
+    private var saveBadgeTitle: String {
+        switch boardViewModel.saveStatus {
+        case .saving:
+            return "Saving..."
+        case .saved:
+            return "Saved"
+        case .localOnly:
+            return "Local only"
+        }
+    }
+
+    private var saveBadgeIconName: String {
+        switch boardViewModel.saveStatus {
+        case .saving:
+            return "arrow.triangle.2.circlepath"
+        case .saved:
+            return "checkmark.circle.fill"
+        case .localOnly:
+            return "externaldrive.badge.exclamationmark"
+        }
+    }
+
+    private var saveBadgeColor: Color {
+        switch boardViewModel.saveStatus {
+        case .saving:
+            return DS.Color.textSecondary
+        case .saved:
+            return DS.Color.textSecondary
+        case .localOnly:
+            return .orange
+        }
+    }
+
+    private var lastEditedText: String {
+        let editedAt = max(boardViewModel.lastSavedAt ?? .distantPast, document.updatedAt)
+        guard editedAt != .distantPast else { return "Last edited just now" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
-        return formatter.localizedString(for: document.updatedAt, relativeTo: .now)
+        return "Last edited \(formatter.localizedString(for: editedAt, relativeTo: .now))"
+    }
+
+    private var saveErrorBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text("Couldn't save changes locally. Try again.")
+                .font(DS.Typography.caption.weight(.medium))
+            Spacer(minLength: 8)
+            Button("Dismiss") {
+                boardViewModel.dismissSaveErrorBanner()
+            }
+            .buttonStyle(.plain)
+            .font(DS.Typography.caption)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: 480)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(.orange.opacity(0.25), lineWidth: 0.8)
+                )
+        )
     }
 
     private func editorStatChip(icon: String, text: String) -> some View {
@@ -356,7 +554,126 @@ struct CanvasScreenView: View {
         )
         .overlay(
             Capsule(style: .continuous)
-                .strokeBorder(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.7)
+                .strokeBorder(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme).opacity(0.65), lineWidth: 0.55)
         )
+    }
+
+    private var toolContextChip: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "cursorarrow.motionlines")
+                .font(.system(size: 11, weight: .medium))
+            Text("Tool: \(currentToolName) (\(currentToolShortcut))")
+                .font(DS.Typography.caption.weight(.medium))
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .foregroundStyle(DS.Color.textSecondary)
+        .background(
+            Capsule(style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme).opacity(0.65), lineWidth: 0.55)
+        )
+    }
+
+    private var minimalStatusBar: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 8) {
+                Text(document.title.isEmpty ? "Untitled Board" : document.title)
+                    .font(DS.Typography.caption.weight(.medium))
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .lineLimit(1)
+
+                editorStatChip(icon: "plus.magnifyingglass", text: "\(zoomPercent)%")
+                editorStatChip(icon: "rectangle.dashed", text: canvasSizeLabel)
+                editorStatChip(icon: "square.on.square", text: "\(boardViewModel.boardState.elements.count)")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 10) {
+                Button {
+                    gridBinding.wrappedValue.toggle()
+                } label: {
+                    Label(gridBinding.wrappedValue ? "Grid On" : "Grid Off", systemImage: "grid")
+                        .font(DS.Typography.caption.weight(.medium))
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.textSecondary)
+
+                Text("\(zoomPercent)%")
+                    .font(DS.Typography.caption.weight(.medium))
+                    .foregroundStyle(DS.Color.textSecondary)
+                    .monospacedDigit()
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
+                )
+        )
+    }
+
+    private var currentToolName: String {
+        switch boardViewModel.canvasTool {
+        case .select: return "Select"
+        case .connect: return "Connect"
+        case .pen: return "Pen"
+        case .pencil: return "Pencil"
+        case .text: return "Text"
+        case .stickyNote: return "Note"
+        case .shape: return shapeToolName
+        case .chart: return "Chart"
+        case .smartInk: return "Smart Ink"
+        }
+    }
+
+    private var currentToolShortcut: String {
+        switch boardViewModel.canvasTool {
+        case .select: return "V"
+        case .connect: return "K"
+        case .pen: return "P"
+        case .pencil: return "B"
+        case .text: return "T"
+        case .stickyNote: return "N"
+        case .shape: return "R/L/A"
+        case .chart: return "-"
+        case .smartInk: return "-"
+        }
+    }
+
+    private var shapeToolName: String {
+        switch boardViewModel.placeShapeKind {
+        case .rectangle: return "Rectangle"
+        case .roundedRectangle: return "Rounded Rectangle"
+        case .ellipse: return "Oval"
+        case .line: return "Line"
+        case .arrow: return "Arrow"
+        }
+    }
+
+    private func scheduleTitleAutosave() {
+        titleAutosaveTask?.cancel()
+        titleAutosaveTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 650_000_000)
+            } catch {
+                return
+            }
+            persistTitleNow()
+        }
+    }
+
+    private func persistTitleNow() {
+        titleAutosaveTask?.cancel()
+        document.markUpdated()
+        try? modelContext.save()
     }
 }

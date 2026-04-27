@@ -6,9 +6,10 @@ struct CanvasAlignmentGuidesOverlay: View {
 
     let guides: [CanvasAlignmentGuide]
     let canvasSize: CGFloat
+    var emphasized: Bool = false
 
     private var lineColor: Color {
-        tokens.selectionStrokeColor.opacity(0.34)
+        tokens.selectionStrokeColor.opacity(emphasized ? 0.68 : 0.34)
     }
 
     var body: some View {
@@ -17,7 +18,11 @@ struct CanvasAlignmentGuidesOverlay: View {
                 path(for: guide)
                     .stroke(
                         lineColor,
-                        style: StrokeStyle(lineWidth: 0.75, lineCap: .round, dash: [4, 5])
+                        style: StrokeStyle(
+                            lineWidth: emphasized ? 1.15 : 0.75,
+                            lineCap: .round,
+                            dash: emphasized ? [3.2, 3.2] : [4, 5]
+                        )
                     )
             }
         }

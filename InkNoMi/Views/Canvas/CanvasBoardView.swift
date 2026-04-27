@@ -21,6 +21,8 @@ struct CanvasBoardView: View {
     @State private var canvasTapRippleExpanded = false
     @State private var selectionPulse = false
     @State private var selectionGlowVisible = false
+    @State private var snapCueVisible = false
+    @State private var snapCueMagnetic = false
 
     private let canvasSize: CGFloat = Self.logicalCanvasSize
 
@@ -124,6 +126,19 @@ struct CanvasBoardView: View {
                     )
                     .zIndex(500_000)
 
+                    if !boardViewModel.activeAlignmentGuides.isEmpty {
+                        CanvasAlignmentGuidesOverlay(
+                            guides: boardViewModel.activeAlignmentGuides,
+                            canvasSize: canvasSize,
+                            emphasized: true
+                        )
+                        .opacity(snapCueVisible ? 1 : 0)
+                        .scaleEffect(snapCueMagnetic ? 1.002 : 1.0)
+                        .animation(FlowDeskMotion.snapCueFlash, value: snapCueVisible)
+                        .animation(FlowDeskMotion.microQuickEaseOut, value: snapCueMagnetic)
+                        .zIndex(500_100)
+                    }
+
                     if let r = placementPreviewRect {
                         RoundedRectangle(cornerRadius: FlowDeskLayout.chromePlacementPreviewCornerRadius, style: .continuous)
                             .strokeBorder(tokens.selectionStrokeColor.opacity(0.88), style: StrokeStyle(lineWidth: 1.25, dash: [7, 5]))
@@ -143,6 +158,14 @@ struct CanvasBoardView: View {
                         .frame(width: canvasSize, height: canvasSize)
                         .allowsHitTesting(false)
                     }
+
+                    Rectangle()
+                        .fill(tokens.selectionStrokeColor.opacity(0.06))
+                        .blendMode(.softLight)
+                        .opacity(draftCanvasPoints.isEmpty ? 0 : 1)
+                        .animation(FlowDeskMotion.drawingLiftFade, value: draftCanvasPoints.isEmpty)
+                        .allowsHitTesting(false)
+                        .zIndex(200_100)
 
                     if boardViewModel.canvasTool == .pen
                         || boardViewModel.canvasTool == .pencil {
@@ -229,6 +252,16 @@ struct CanvasBoardView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
                         selectionPulse = false
                     }
+                }
+            }
+            .onChange(of: boardViewModel.activeAlignmentGuides.count) { oldCount, newCount in
+                if newCount > 0, oldCount == 0 {
+                    triggerSnapCue()
+                }
+            }
+            .onChange(of: connectorSnapTargetElementID) { oldID, newID in
+                if newID != nil, oldID == nil {
+                    triggerSnapCue()
                 }
             }
         }
@@ -608,6 +641,21 @@ struct CanvasBoardView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
                 showCanvasTapRipple = false
                 canvasTapRippleExpanded = false
+            }
+        }
+    }
+
+    private func triggerSnapCue() {
+        snapCueVisible = false
+        snapCueMagnetic = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+            snapCueVisible = true
+            snapCueMagnetic = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                snapCueMagnetic = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+                snapCueVisible = false
             }
         }
     }

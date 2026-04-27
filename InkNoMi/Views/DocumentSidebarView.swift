@@ -8,6 +8,7 @@ struct DocumentSidebarView: View {
     let documents: [FlowDocument]
     @Binding var selection: FlowDocument?
     var onNewBoard: () -> Void
+    var onOpenTemplates: () -> Void
     var onDelete: (IndexSet) -> Void
     var onRenameRequest: (FlowDocument) -> Void
 
@@ -34,15 +35,9 @@ struct DocumentSidebarView: View {
                             .fill(tokens.sidebarListTint)
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(DS.Color.hover.opacity(colorScheme == .dark ? 2.0 : 0.75))
+                                    .fill(DS.Color.hover.opacity(colorScheme == .dark ? 1.2 : 0.52))
                             }
                     }
-                    .shadow(
-                        color: DS.Shadow.soft.color.opacity(colorScheme == .dark ? 1.6 : 1.05),
-                        radius: DS.Shadow.soft.radius * 0.9,
-                        x: DS.Shadow.soft.x,
-                        y: 1
-                    )
             .padding(.horizontal, DS.Spacing.sm - 2)
             .padding(.vertical, DS.Spacing.sm)
 
@@ -177,17 +172,11 @@ struct DocumentSidebarView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .strokeBorder(
-                        isSelected ? tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.5 : 0.44) : Color.clear,
+                        isSelected ? tokens.selectionStrokeColor.opacity(colorScheme == .dark ? 0.42 : 0.36) : Color.clear,
                         lineWidth: isSelected ? 1 : 0
                     )
             }
-            .shadow(
-                color: isSelected ? tokens.selectionStrokeColor.opacity(0.16) : Color.clear,
-                radius: isSelected ? 6 : 0,
-                x: 0,
-                y: isSelected ? 1 : 0
-            )
-            .scaleEffect(isHovered && !isSelected ? 1.012 : 1)
+            .scaleEffect(isHovered && !isSelected ? 1.006 : 1)
             .padding(.vertical, 0.5)
             .padding(.horizontal, 6)
             .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
@@ -227,19 +216,49 @@ struct DocumentSidebarView: View {
             Spacer(minLength: 0)
             FlowDeskSheetsStackMark(size: 84)
             VStack(spacing: FlowDeskLayout.spaceS) {
-                Text("No boards yet")
+                Text("Create your first workspace")
                     .font(FlowDeskTypography.sidebarEmptyTitle)
                     .foregroundStyle(.primary)
-                Text("Create your first canvas to begin. InkNoMi saves continuously, so you can stay in flow.")
+                Text("Capture ideas, plan work, and visualize thinking.")
                     .font(FlowDeskTypography.sidebarEmptyBody)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .padding(.horizontal, FlowDeskLayout.spaceM)
             }
-            Button("Create canvas", action: onNewBoard)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+            HStack(spacing: 8) {
+                Button("Blank canvas", action: onNewBoard)
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+
+                Button("Template picker", action: onOpenTemplates)
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DS.Color.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.88))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                    )
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

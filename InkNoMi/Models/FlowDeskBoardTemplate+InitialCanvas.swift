@@ -81,39 +81,39 @@ private enum WorkspaceTemplateSeed {
     private static func brainstormElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("Brainstorm board", x: 226, y: 122, width: 520, height: 48, size: 34, bold: true, z: z),
-            text("Use case label: rough launch-week idea sorting", x: 228, y: 174, width: 510, height: 26, size: 15, z: z + 1),
+            text("Q3 Launch Brainstorm Sprint", x: 220, y: 112, width: 620, height: 50, size: 34, bold: true, z: z),
+            text("Cross-functional workshop board for week-one launch planning", x: 222, y: 166, width: 620, height: 24, size: 15, z: z + 1),
         ]
         z += 2
 
         let clusters: [(title: String, color: StickyNoteColorPreset, x: Double, y: Double, notes: [String])] = [
-            ("Growth channels", .mint, 220, 220, [
-                "DM 5 creators we already know (not cold)",
-                "Referral challenge? maybe too early",
-                "Teaser clips -> need someone to edit",
-                "Comparison page draft is half done",
-                "Could run one onboarding live session",
+            ("Ideas", .mint, 220, 220, [
+                "Host a 30-min launch livestream with live Q&A and board demo",
+                "Bundle top 3 templates as a downloadable kickoff pack",
+                "Publish short founder videos showing real planning workflows",
+                "Offer a concierge setup call for first 20 paid teams",
+                "Add a launch countdown checklist directly in onboarding",
             ]),
-            ("User pain points", .blush, 610, 220, [
-                "Setup still feels like too many choices",
-                "People ask what 'canvas' means",
-                "Blank board = where do I start?",
-                "Recent boards can disappear in long list",
-                "Some template copy sounds polished, not human",
+            ("Problems", .blush, 620, 220, [
+                "Users still ask where to start when opening a blank board",
+                "Template copy feels generic and not tied to real workflows",
+                "Launch assets live in three folders and go out of sync",
+                "No single owner for day-of support triage coverage",
+                "Roadmap board gets stale because updates are ad-hoc",
             ]),
-            ("Retention ideas", .sky, 220, 560, [
-                "Weekly nudge with one tiny prompt",
-                "Celebrate milestones (lightweight, no confetti overload)",
-                "Starter kits by role maybe v2",
-                "handoff checklist for small teams",
-                "Monthly recap board auto-created (?)",
+            ("Opportunities", .sky, 220, 560, [
+                "Turn strong customer examples into reusable premium template packs",
+                "Add role-based starter kits for PM, founder, and design teams",
+                "Create onboarding prompts tied to each template category",
+                "Partner with two agencies for co-branded launch playbooks",
+                "Use milestone reminders to re-engage dormant trial users",
             ]),
-            ("Risks and blockers", .lemon, 610, 560, [
-                "No clear owner for launch day support",
-                "Still unsure if pricing page is understandable",
-                "Docs screenshots are two versions behind",
-                "Onboarding email draft sounds too formal",
-                "Could break if import edge cases spike",
+            ("Next experiments", .lemon, 620, 560, [
+                "Run 5 moderated sessions with new users on template gallery",
+                "A/B test concise vs narrative onboarding hints for first board",
+                "Pilot weekly digest email with one guided board prompt",
+                "Ship one 'premium-ready' template set and track activation lift",
+                "Time-box a launch war-room simulation with support and eng",
             ]),
         ]
 
@@ -136,8 +136,9 @@ private enum WorkspaceTemplateSeed {
 
     private static func flowchartElements() -> [CanvasElementRecord] {
         var out: [CanvasElementRecord] = [
-            text("Flowchart", x: 460, y: 122, width: 320, height: 48, size: 34, bold: true, z: 10, alignment: .center),
-            text("Use case label: inbound lead qualification", x: 446, y: 174, width: 370, height: 24, size: 15, z: 11, alignment: .center),
+            text("Enterprise Demo Qualification Flow", x: 400, y: 110, width: 560, height: 48, size: 34, bold: true, z: 10, alignment: .center),
+            text("Sales + solutions handoff flow with branch decisions", x: 422, y: 162, width: 520, height: 24, size: 15, z: 11, alignment: .center),
+            text("Decision branch labels are on connectors", x: 530, y: 194, width: 310, height: 20, size: 12, z: 12, alignment: .center),
         ]
 
         let startID = UUID()
@@ -201,32 +202,47 @@ private enum WorkspaceTemplateSeed {
     private static func roadmapElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("Roadmap", x: 226, y: 122, width: 300, height: 48, size: 34, bold: true, z: z),
-            text("Use case label: quarterly planning with trade-offs", x: 228, y: 174, width: 470, height: 24, size: 15, z: z + 1),
+            text("Product Roadmap - H2 2026", x: 220, y: 108, width: 560, height: 48, size: 34, bold: true, z: z),
+            text("Planning board with ownership, priorities, and timeline checkpoints", x: 222, y: 160, width: 700, height: 24, size: 15, z: z + 1),
         ]
         z += 2
 
-        let columns: [(title: String, color: StickyNoteColorPreset, x: Double, items: [String])] = [
+        out += [
+            text("Jul", x: 254, y: 194, width: 60, height: 20, size: 12, bold: true, z: z),
+            text("Aug", x: 624, y: 194, width: 60, height: 20, size: 12, bold: true, z: z + 1),
+            text("Sep", x: 994, y: 194, width: 60, height: 20, size: 12, bold: true, z: z + 2),
+            text("Oct+", x: 1364, y: 194, width: 60, height: 20, size: 12, bold: true, z: z + 3),
+        ]
+        z += 4
+
+        let columns: [(title: String, color: StickyNoteColorPreset, x: Double, items: [(work: String, owner: String, priority: String)])] = [
             ("Now", .mint, 220, [
-                "Stabilize offline sync (still flaky on large boards)",
-                "Ship new template gallery copy pass",
-                "PDF export quality: tighten spacing + fonts",
-                "Refine onboarding empty states",
-                "Fix duplicate board name edge case",
+                ("Stabilize offline sync on boards with 1K+ elements", "Owner: Ramon", "P0"),
+                ("Refresh template gallery with customer-like examples", "Owner: Elise", "P1"),
+                ("Improve PDF export spacing and text wrapping", "Owner: Jun", "P1"),
+                ("Tighten onboarding first-run hints", "Owner: Priya", "P1"),
+                ("Fix duplicate board title race condition", "Owner: Mei", "P2"),
             ]),
             ("Next", .sky, 590, [
-                "Board comments (lightweight, not full chat)",
-                "Reusable style presets v1",
-                "Milestone dashboard draft",
-                "Large-board performance pass",
-                "Smarter template recommendations",
+                ("Ship lightweight board comments for async reviews", "Owner: Omar", "P1"),
+                ("Add reusable visual style presets v1", "Owner: Elise", "P2"),
+                ("Publish milestone dashboard alpha", "Owner: Priya", "P1"),
+                ("Run large-board performance optimization pass", "Owner: Ramon", "P0"),
+                ("Improve template recommendation ranking", "Owner: Jun", "P2"),
             ]),
             ("Later", .lavender, 960, [
-                "AI assist for organizing messy boards",
-                "Cross-board linking",
-                "Shared team template packs",
-                "Usage insights (if privacy review passes)",
-                "Lightweight mobile companion",
+                ("AI assist for organizing unstructured brainstorm boards", "Owner: Mei", "P2"),
+                ("Enable cross-board linking and previews", "Owner: Omar", "P2"),
+                ("Launch team-curated template packs", "Owner: Elise", "P2"),
+                ("Roll out privacy-safe usage insights", "Owner: Priya", "P3"),
+                ("Prototype lightweight mobile companion", "Owner: Jun", "P3"),
+            ]),
+            ("Parking Lot", .lemon, 1330, [
+                ("In-app chat for board collaborators", "Owner: TBD", "P3"),
+                ("Template marketplace revenue share model", "Owner: TBD", "P3"),
+                ("White-label branding controls", "Owner: TBD", "P3"),
+                ("Advanced workflow automations", "Owner: TBD", "P3"),
+                ("Native desktop widgets experiment", "Owner: TBD", "P3"),
             ]),
         ]
 
@@ -238,11 +254,11 @@ private enum WorkspaceTemplateSeed {
             var y = 300.0
             for (index, item) in column.items.enumerated() {
                 let h = 68.0 + Double((index % 3) * 8)
-                out.append(note(item, x: column.x + 6, y: y, width: 282, height: h, color: column.color, z: z))
-                let pillColor: StickyNoteColorPreset = index == 0 ? .mint : (index == 1 || index == 2 ? .sky : .blush)
-                let priority = index == 0 ? "High" : (index < 3 ? "Med" : "Low")
+                out.append(note(item.work, x: column.x + 6, y: y, width: 282, height: h, color: column.color, z: z))
+                let pillColor: StickyNoteColorPreset = item.priority == "P0" ? .blush : (item.priority == "P1" ? .sky : .lemon)
                 out.append(shape(kind: .roundedRectangle, x: column.x + 214, y: y + 8, width: 66, height: 24, stroke: shapeStroke, fill: tint(pillColor.rgba, alpha: 0.32), z: z + 1, cornerRadius: 12))
-                out.append(text(priority, x: column.x + 224, y: y + 12, width: 46, height: 16, size: 11.5, bold: true, z: z + 2, alignment: .center))
+                out.append(text(item.priority, x: column.x + 224, y: y + 12, width: 46, height: 16, size: 11.5, bold: true, z: z + 2, alignment: .center))
+                out.append(text(item.owner, x: column.x + 18, y: y + h - 22, width: 190, height: 16, size: 11.5, z: z + 3))
                 z += 1
                 y += h + 12
             }
@@ -253,7 +269,8 @@ private enum WorkspaceTemplateSeed {
     private static func meetingNotesElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("Meeting Notes", x: 230, y: 122, width: 360, height: 48, size: 34, bold: true, z: z),
+            text("Weekly Product Sync - Meeting Notes", x: 224, y: 112, width: 610, height: 48, size: 34, bold: true, z: z),
+            text("Apr 24, 2026 - Release readiness and launch owners", x: 226, y: 164, width: 520, height: 24, size: 15, z: z + 1),
             shape(kind: .roundedRectangle, x: 220, y: 220, width: 360, height: 620, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.lemon.rgba, alpha: 0.13), z: z + 1),
             shape(kind: .roundedRectangle, x: 610, y: 220, width: 360, height: 620, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.sky.rgba, alpha: 0.12), z: z + 2),
             shape(kind: .roundedRectangle, x: 1000, y: 220, width: 360, height: 620, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.mint.rgba, alpha: 0.12), z: z + 3),
@@ -261,13 +278,13 @@ private enum WorkspaceTemplateSeed {
         z += 4
         out += [
             text("Meeting details", x: 248, y: 246, width: 320, height: 30, size: 20, bold: true, z: z),
-            text("Date: Tue 10:00", x: 250, y: 286, width: 170, height: 24, size: 13, z: z + 1),
+            text("Date: Fri 10:00 - 10:45", x: 250, y: 286, width: 220, height: 24, size: 13, z: z + 1),
             text("Host: Priya", x: 250, y: 314, width: 170, height: 24, size: 13, z: z + 2),
-            text("Attendees: Priya, Ramon, Elise, Jun", x: 250, y: 342, width: 300, height: 24, size: 13, z: z + 3),
+            text("Attendees: Priya, Ramon, Elise, Jun, Mei", x: 250, y: 342, width: 318, height: 24, size: 13, z: z + 3),
             text("Agenda", x: 248, y: 382, width: 320, height: 30, size: 20, bold: true, z: z + 4),
-            note("Release status + blockers", x: 250, y: 424, width: 292, height: 62, color: .lemon, z: z + 5),
-            note("Template quality pass", x: 252, y: 496, width: 286, height: 58, color: .lemon, z: z + 6),
-            note("Decide launch freeze date", x: 252, y: 564, width: 286, height: 58, color: .lemon, z: z + 7),
+            note("Release status and top two launch blockers", x: 250, y: 424, width: 292, height: 62, color: .lemon, z: z + 5),
+            note("Template quality pass and screenshot readiness", x: 252, y: 496, width: 286, height: 58, color: .lemon, z: z + 6),
+            note("Decide launch freeze date and owner handoff", x: 252, y: 564, width: 286, height: 58, color: .lemon, z: z + 7),
             text("Notes", x: 640, y: 246, width: 300, height: 30, size: 20, bold: true, z: z + 8),
             note("Beta users liked speed, still confused by connector handles.", x: 638, y: 288, width: 300, height: 90, color: .sky, z: z + 9),
             note("Onboarding copy sounds too polished; make it more human.", x: 636, y: 388, width: 304, height: 86, color: .sky, z: z + 10),
@@ -276,30 +293,31 @@ private enum WorkspaceTemplateSeed {
             note("Ship template refresh in this sprint, not next.", x: 638, y: 624, width: 300, height: 78, color: .sky, z: z + 13),
             note("Defer markdown export polish by one release.", x: 640, y: 710, width: 296, height: 76, color: .sky, z: z + 14),
             text("Action items", x: 1030, y: 246, width: 300, height: 30, size: 20, bold: true, z: z + 15),
-            note("Ramon: fix connector snapping by Thu", x: 1030, y: 288, width: 300, height: 72, color: .mint, z: z + 16),
-            note("Elise: rewrite 8 template notes with natural wording", x: 1030, y: 368, width: 302, height: 84, color: .mint, z: z + 17),
-            note("Jun: verify iPhone SE viewport clipping", x: 1032, y: 460, width: 296, height: 72, color: .mint, z: z + 18),
-            note("Priya: send launch checklist v3 by Friday", x: 1032, y: 540, width: 296, height: 76, color: .mint, z: z + 19),
-            note("All: add one blocker before standup tomorrow", x: 1030, y: 624, width: 302, height: 78, color: .mint, z: z + 20),
+            note("Ramon - Fix connector snapping | Due: Apr 29", x: 1030, y: 288, width: 300, height: 72, color: .mint, z: z + 16),
+            note("Elise - Rewrite 8 template notes | Due: Apr 30", x: 1030, y: 368, width: 302, height: 84, color: .mint, z: z + 17),
+            note("Jun - Verify iPhone SE clipping | Due: Apr 28", x: 1032, y: 460, width: 296, height: 72, color: .mint, z: z + 18),
+            note("Priya - Publish launch checklist v3 | Due: May 1", x: 1032, y: 540, width: 296, height: 76, color: .mint, z: z + 19),
+            note("All - Add one blocker before tomorrow's standup", x: 1030, y: 624, width: 302, height: 78, color: .mint, z: z + 20),
         ]
         return out
     }
 
     private static func mindMapElements() -> [CanvasElementRecord] {
         var out: [CanvasElementRecord] = [
-            text("Mind Map", x: 232, y: 122, width: 280, height: 48, size: 34, bold: true, z: 7),
+            text("Launch Strategy Mind Map", x: 230, y: 108, width: 440, height: 48, size: 34, bold: true, z: 7),
+            text("One-page view of key levers, bets, and risks", x: 232, y: 160, width: 430, height: 24, size: 15, z: 8),
         ]
 
         let centerID = UUID()
         out.append(shape(id: centerID, kind: .ellipse, x: 720, y: 430, width: 200, height: 94, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.lemon.rgba, alpha: 0.28), z: 19))
-        out.append(text("InkNoMi", x: 760, y: 462, width: 120, height: 24, size: 20, bold: true, z: 20, alignment: .center))
+        out.append(text("Launch Plan", x: 744, y: 462, width: 152, height: 24, size: 20, bold: true, z: 20, alignment: .center))
 
         let branches: [(title: String, x: Double, y: Double, color: StickyNoteColorPreset, subs: [String])] = [
-            ("Users", 450, 260, .mint, ["Solo creators", "Tiny startup teams", "Student builders"]),
+            ("Users", 450, 260, .mint, ["Solo creators", "Startup PM teams", "Ops-heavy agencies"]),
             ("Product", 980, 300, .sky, ["Template realism", "Fast connector editing", "Smooth onboarding"]),
-            ("Revenue", 1020, 600, .lemon, ["Pro monthly", "Team annual", "Add-on exports"]),
-            ("Marketing", 520, 650, .blush, ["Founder content", "Partner launches", "Referral loops"]),
-            ("Risks", 240, 520, .lavender, ["Stability regressions", "Slow collaboration roadmap", "Pricing confusion"]),
+            ("Revenue", 1020, 600, .lemon, ["Pro monthly plan", "Team annual contracts", "Export add-on upsell"]),
+            ("Marketing", 520, 650, .blush, ["Founder-led videos", "Partner launches", "Referral loops"]),
+            ("Risks", 240, 520, .lavender, ["Stability regressions", "Slow team features", "Pricing confusion"]),
         ]
 
         var z = 30
@@ -331,38 +349,39 @@ private enum WorkspaceTemplateSeed {
     private static func kanbanElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("Kanban", x: 230, y: 122, width: 220, height: 48, size: 34, bold: true, z: z),
+            text("Launch Operations Kanban", x: 224, y: 108, width: 450, height: 48, size: 34, bold: true, z: z),
+            text("Weekly execution board with status, tags, and priority chips", x: 226, y: 160, width: 620, height: 24, size: 15, z: z + 1),
         ]
-        z += 1
+        z += 2
 
-        let columns: [(title: String, color: StickyNoteColorPreset, x: Double, cards: [String])] = [
+        let columns: [(title: String, color: StickyNoteColorPreset, x: Double, cards: [(task: String, tag: String, priority: String)])] = [
             ("Backlog", .lemon, 220, [
-                "Finalize launch FAQ (missing 2 answers)",
-                "Review accessibility contrast tokens",
-                "Set up beta feedback board",
-                "Write release announcement draft",
-                "Check analytics event naming",
+                ("Finalize launch FAQ with last two legal answers", "Docs", "P2"),
+                ("Review accessibility contrast token usage", "Design", "P1"),
+                ("Set up beta feedback board taxonomy", "Ops", "P2"),
+                ("Write release announcement first draft", "Marketing", "P1"),
+                ("Audit analytics event naming consistency", "Data", "P2"),
             ]),
             ("In Progress", .sky, 520, [
-                "Template realism copy pass",
-                "Improve connector hit-testing",
-                "Benchmark rendering on large boards",
-                "Prep support macro snippets",
-                "Rewrite empty-state hints",
+                ("Template realism copy pass across 8 seeds", "Content", "P0"),
+                ("Improve connector hit-testing precision", "iOS", "P0"),
+                ("Benchmark rendering on 1K-element boards", "Perf", "P1"),
+                ("Prepare support macro snippets for launch week", "Support", "P1"),
+                ("Rewrite empty-state hints to reduce confusion", "UX", "P1"),
             ]),
             ("Review", .lavender, 820, [
-                "Board creation flow QA checklist",
-                "Import/export weird file samples",
-                "Flowchart seed spacing tune-up",
-                "Meeting notes wording pass",
-                "Smoke test on iPad split view",
+                ("Board creation flow QA checklist signoff", "QA", "P1"),
+                ("Import/export edge-case file verification", "QA", "P2"),
+                ("Flowchart seed spacing tune-up", "Design", "P2"),
+                ("Meeting notes seed wording pass", "Content", "P2"),
+                ("Smoke test on iPad split view", "iOS", "P1"),
             ]),
             ("Done", .mint, 1120, [
-                "Migrate board payload to format v1",
-                "Refactor canvas undo grouping",
-                "Align empty-state copy across home",
-                "Fix missing icon in sidebar",
-                "Stabilize template thumbnails",
+                ("Migrate board payload serialization to v1", "Core", "P0"),
+                ("Refactor canvas undo grouping behavior", "Core", "P1"),
+                ("Align empty-state copy across home screens", "Content", "P2"),
+                ("Fix missing icon in sidebar navigation", "UI", "P2"),
+                ("Stabilize template thumbnail generation", "Infra", "P1"),
             ]),
         ]
 
@@ -375,7 +394,11 @@ private enum WorkspaceTemplateSeed {
             for (index, card) in column.cards.enumerated() {
                 let w = 238.0 + Double((index % 2) * 8)
                 let h = 80.0 + Double((index % 3) * 12)
-                out.append(note(card, x: column.x + Double((index % 2) * 4), y: y, width: w, height: h, color: column.color, z: z))
+                out.append(note(card.task, x: column.x + Double((index % 2) * 4), y: y, width: w, height: h, color: column.color, z: z))
+                let chipColor: StickyNoteColorPreset = card.priority == "P0" ? .blush : (card.priority == "P1" ? .sky : .lemon)
+                out.append(shape(kind: .roundedRectangle, x: column.x + 182, y: y + 8, width: 54, height: 22, stroke: shapeStroke, fill: tint(chipColor.rgba, alpha: 0.3), z: z + 1, cornerRadius: 11))
+                out.append(text(card.priority, x: column.x + 194, y: y + 11, width: 30, height: 16, size: 11, bold: true, z: z + 2, alignment: .center))
+                out.append(text(card.tag, x: column.x + 16, y: y + h - 22, width: 150, height: 16, size: 11.5, bold: true, z: z + 3))
                 z += 1
                 y += h + 12
             }
@@ -386,36 +409,42 @@ private enum WorkspaceTemplateSeed {
     private static func wireframeElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("App Wireframe", x: 224, y: 122, width: 320, height: 48, size: 34, bold: true, z: z),
+            text("App Wireframe - Mobile Home", x: 220, y: 108, width: 520, height: 48, size: 34, bold: true, z: z),
+            text("High-fidelity layout sketch with implementation notes", x: 222, y: 160, width: 500, height: 24, size: 15, z: z + 1),
         ]
-        z += 1
+        z += 2
 
         out += [
             shape(kind: .roundedRectangle, x: 280, y: 220, width: 360, height: 690, stroke: shapeStroke, fill: CanvasRGBAColor(red: 0.97, green: 0.97, blue: 0.98, opacity: 1), z: z, cornerRadius: 42),
             shape(kind: .roundedRectangle, x: 306, y: 250, width: 308, height: 30, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.sky.rgba, alpha: 0.1), z: z + 1, cornerRadius: 10),
             text("Status bar", x: 420, y: 258, width: 80, height: 16, size: 11, z: z + 2, alignment: .center),
             shape(kind: .roundedRectangle, x: 306, y: 292, width: 308, height: 72, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.sky.rgba, alpha: 0.16), z: z + 3),
-            text("Header", x: 430, y: 320, width: 60, height: 20, size: 14, bold: true, z: z + 4, alignment: .center),
+            text("Header - Good morning, Maya", x: 360, y: 320, width: 200, height: 20, size: 13.5, bold: true, z: z + 4, alignment: .center),
             shape(kind: .roundedRectangle, x: 306, y: 378, width: 308, height: 160, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.lavender.rgba, alpha: 0.16), z: z + 5),
-            text("Hero placeholder", x: 400, y: 448, width: 120, height: 24, size: 13, bold: true, z: z + 6, alignment: .center),
+            text("Hero - This week's launch checklist", x: 346, y: 448, width: 228, height: 24, size: 13, bold: true, z: z + 6, alignment: .center),
             shape(kind: .roundedRectangle, x: 306, y: 552, width: 308, height: 180, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.mint.rgba, alpha: 0.14), z: z + 7),
-            text("Card list", x: 430, y: 632, width: 60, height: 20, size: 13, bold: true, z: z + 8, alignment: .center),
+            text("Content cards", x: 404, y: 632, width: 112, height: 20, size: 13, bold: true, z: z + 8, alignment: .center),
+            shape(kind: .roundedRectangle, x: 324, y: 572, width: 272, height: 42, stroke: shapeStroke, fill: CanvasRGBAColor(red: 1, green: 1, blue: 1, opacity: 0.7), z: z + 9),
+            text("Card: Sprint health at 78%", x: 340, y: 586, width: 236, height: 18, size: 12, z: z + 10),
+            shape(kind: .roundedRectangle, x: 324, y: 622, width: 272, height: 42, stroke: shapeStroke, fill: CanvasRGBAColor(red: 1, green: 1, blue: 1, opacity: 0.7), z: z + 11),
+            text("Card: 3 blockers need owner", x: 342, y: 636, width: 236, height: 18, size: 12, z: z + 12),
+            shape(kind: .roundedRectangle, x: 324, y: 672, width: 272, height: 42, stroke: shapeStroke, fill: CanvasRGBAColor(red: 1, green: 1, blue: 1, opacity: 0.7), z: z + 13),
+            text("Card: Team update due 5PM", x: 342, y: 686, width: 236, height: 18, size: 12, z: z + 14),
             shape(kind: .roundedRectangle, x: 306, y: 742, width: 308, height: 58, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.lemon.rgba, alpha: 0.2), z: z + 9),
-            text("CTA", x: 444, y: 762, width: 32, height: 20, size: 13, bold: true, z: z + 10, alignment: .center),
+            text("CTA - Start today's focus board", x: 358, y: 762, width: 206, height: 20, size: 13, bold: true, z: z + 10, alignment: .center),
             shape(kind: .roundedRectangle, x: 306, y: 810, width: 308, height: 74, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.sky.rgba, alpha: 0.12), z: z + 11),
-            text("Bottom nav", x: 418, y: 838, width: 84, height: 20, size: 13, z: z + 12, alignment: .center),
+            text("Bottom nav - Home | Boards | Search | Profile", x: 336, y: 838, width: 246, height: 20, size: 12.5, z: z + 12, alignment: .center),
         ]
 
         out += [
             shape(kind: .roundedRectangle, x: 760, y: 230, width: 560, height: 420, stroke: shapeStroke, fill: tint(StickyNoteColorPreset.blush.rgba, alpha: 0.1), z: z + 13),
-            text("Side annotations", x: 790, y: 258, width: 220, height: 24, size: 16, bold: true, z: z + 14),
-            text("phone frame", x: 792, y: 300, width: 260, height: 24, size: 13, z: z + 15),
-            text("status bar", x: 792, y: 332, width: 260, height: 24, size: 13, z: z + 16),
-            text("header", x: 792, y: 364, width: 260, height: 24, size: 13, z: z + 17),
-            text("hero placeholder", x: 792, y: 396, width: 260, height: 24, size: 13, z: z + 18),
-            text("card list", x: 792, y: 428, width: 260, height: 24, size: 13, z: z + 19),
-            text("CTA", x: 792, y: 460, width: 260, height: 24, size: 13, z: z + 20),
-            text("bottom nav", x: 792, y: 492, width: 260, height: 24, size: 13, z: z + 21),
+            text("Annotation notes", x: 790, y: 258, width: 220, height: 24, size: 16, bold: true, z: z + 14),
+            note("Phone frame uses 16pt safe side padding.", x: 792, y: 294, width: 246, height: 56, color: .blush, z: z + 15),
+            note("Header must show user context + streak icon.", x: 792, y: 360, width: 246, height: 56, color: .blush, z: z + 16),
+            note("Hero rotates between launch, risk, and review prompts.", x: 792, y: 426, width: 246, height: 66, color: .blush, z: z + 17),
+            note("Cards stay tappable with 44pt minimum touch targets.", x: 1054, y: 294, width: 246, height: 62, color: .blush, z: z + 18),
+            note("CTA appears only when no urgent blockers exist.", x: 1054, y: 366, width: 246, height: 56, color: .blush, z: z + 19),
+            note("Bottom nav keeps current tab highlighted for orientation.", x: 1054, y: 432, width: 246, height: 60, color: .blush, z: z + 20),
         ]
         return out
     }
@@ -423,31 +452,28 @@ private enum WorkspaceTemplateSeed {
     private static func swotElements() -> [CanvasElementRecord] {
         var z = 10
         var out: [CanvasElementRecord] = [
-            text("SWOT", x: 230, y: 122, width: 180, height: 48, size: 34, bold: true, z: z),
-            text("Use case label: launch-readiness reality check", x: 230, y: 174, width: 420, height: 24, size: 15, z: z + 1),
+            text("SWOT Analysis - Launch Readiness", x: 224, y: 108, width: 560, height: 48, size: 34, bold: true, z: z),
+            text("Quarterly strategy review with concrete strengths, gaps, and risks", x: 226, y: 160, width: 640, height: 24, size: 15, z: z + 1),
         ]
         z += 2
 
-        let boxes: [(title: String, x: Double, y: Double, color: StickyNoteColorPreset, bullets: String)] = [
-            ("Strengths", 220, 220, .mint, "• Fast board rendering\n• Intuitive templates\n• Lightweight onboarding\n• Clear visual hierarchy\n• Strong solo-user fit"),
-            ("Weaknesses", 760, 220, .blush, "• Limited collaboration depth\n• Export options are basic\n• Connector edits still tricky\n• Sparse integrations\n• Mobile workflow is rough"),
-            ("Opportunities", 220, 560, .sky, "• Async planning trend\n• Creator partnership channels\n• Template marketplace potential\n• Education segment pull\n• AI-assisted organization"),
-            ("Threats", 760, 560, .lavender, "• Bundled suite competition\n• Pricing pressure in SMB\n• Reliability incidents hurt trust\n• Fast-moving AI alternatives\n• Feature fatigue risk"),
+        let boxes: [(title: String, x: Double, y: Double, color: StickyNoteColorPreset, bullets: [String])] = [
+            ("Strengths", 220, 220, .mint, ["Fast board rendering on large canvases", "Template set covers common team workflows", "Low-friction onboarding for solo users", "Visual hierarchy reads clearly in screenshots", "Internal shipping cadence is reliable"]),
+            ("Weaknesses", 760, 220, .blush, ["Collaboration depth is still lightweight", "Export options lag power-user needs", "Connector edits remain error-prone", "Integration catalog is very small", "Mobile workflow feels cramped for planning"]),
+            ("Opportunities", 220, 560, .sky, ["Async planning trend keeps growing in SMB", "Partner channels can widen top-of-funnel reach", "Premium template packs can drive paid upgrades", "Education segment asks for planning workflows", "AI assist can accelerate board organization"]),
+            ("Threats", 760, 560, .lavender, ["Bundled suites undercut standalone pricing", "SMB budget pressure slows conversions", "Reliability incidents can hurt trust quickly", "AI-native competitors iterate aggressively", "Feature sprawl can weaken product clarity"]),
         ]
 
         for box in boxes {
             out.append(shape(kind: .roundedRectangle, x: box.x, y: box.y, width: 500, height: 300, stroke: shapeStroke, fill: tint(box.color.rgba, alpha: 0.16), z: z))
             out.append(text(box.title, x: box.x + 20, y: box.y + 20, width: 460, height: 30, size: 22, bold: true, z: z + 1))
-            out.append(text(box.bullets, x: box.x + 20, y: box.y + 68, width: 460, height: 206, size: 14, z: z + 2))
-            z += 3
+            var bulletY = box.y + 66
+            for bullet in box.bullets {
+                out.append(text("• \(bullet)", x: box.x + 22, y: bulletY, width: 456, height: 30, size: 13.5, z: z + 2))
+                bulletY += 44
+            }
+            z += 7
         }
-        out += [
-            text("Top question this week:", x: 1230, y: 150, width: 160, height: 22, size: 12, bold: true, z: z),
-            text("Can we launch without hurting trust?", x: 1170, y: 174, width: 220, height: 22, size: 12, z: z + 1),
-            text("Risk owner: PM + Eng", x: 1218, y: 198, width: 172, height: 20, size: 11.5, z: z + 2),
-            text("Next checkpoint: Friday", x: 1210, y: 220, width: 180, height: 20, size: 11.5, z: z + 3),
-            text("Confidence: medium-low", x: 1214, y: 242, width: 176, height: 20, size: 11.5, z: z + 4),
-        ]
         return out
     }
 

@@ -39,44 +39,74 @@ enum VisualTheme: String, CaseIterable, Codable, Sendable, Identifiable {
 
     var isProTheme: Bool {
         switch self {
-        case .auroraFocus, .founderDesk: return true
-        case .miroBright, .applePaper, .linearGraphite, .studioNeutral: return false
+        case .auroraFocus, .founderDesk:
+            return true
+        case .miroBright, .applePaper, .linearGraphite, .studioNeutral:
+            return false
         }
     }
 }
 
 enum AccentPalette: String, CaseIterable, Codable, Sendable, Identifiable {
-    case blue, violet, mint, coral, amber, rose
+    case blue
+    case violet
+    case mint
+    case coral
+    case amber
+    case rose
+
     var id: String { rawValue }
 }
 
 enum AppFontStyle: String, CaseIterable, Codable, Sendable, Identifiable {
-    case system, rounded, serif, mono
+    case system
+    case rounded
+    case serif
+    case mono
+
     var id: String { rawValue }
 }
 
 enum InterfaceDensity: String, CaseIterable, Codable, Sendable, Identifiable {
-    case compact, comfortable, spacious
+    case compact
+    case comfortable
+    case spacious
+
     var id: String { rawValue }
 }
 
 enum CornerStyle: String, CaseIterable, Codable, Sendable, Identifiable {
-    case soft, rounded, square
+    case soft
+    case rounded
+    case square
+
     var id: String { rawValue }
 }
 
 enum MotionLevel: String, CaseIterable, Codable, Sendable, Identifiable {
-    case full, reduced, none
+    case full
+    case reduced
+    case none
+
     var id: String { rawValue }
 }
 
 enum CanvasBackgroundStyle: String, CaseIterable, Codable, Sendable, Identifiable {
-    case clean, paper, grid, dots, gradient
+    case clean
+    case paper
+    case grid
+    case dots
+    case gradient
+
     var id: String { rawValue }
 }
 
 enum CanvasGridStyle: String, CaseIterable, Codable, Sendable, Identifiable {
-    case none, lines, dots, majorMinor
+    case none
+    case lines
+    case dots
+    case majorMinor
+
     var id: String { rawValue }
 }
 
@@ -109,6 +139,3 @@ struct AppAppearanceSettings: Codable, Equatable, Sendable {
         canvasColorGlowEnabled: true
     )
 }
-
-typealias FlowDeskAppearanceMode = AppearanceMode
-typealias FlowDeskStylePreset = VisualTheme

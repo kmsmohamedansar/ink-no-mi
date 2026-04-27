@@ -43,4 +43,26 @@ enum CanvasExportBounds {
 
         return clipped
     }
+
+    /// Visible viewport rectangle in canvas coordinates derived from live viewport snapshot.
+    static func viewportRect(from snapshot: CanvasInsertionViewportSnapshot?) -> CGRect? {
+        guard let snapshot,
+              snapshot.visibleWidth > 1,
+              snapshot.visibleHeight > 1
+        else { return nil }
+
+        let scale = CanvasInsertionPlacement.clampedDisplayScale(for: snapshot.viewport)
+        guard scale > 0 else { return nil }
+        let ox = snapshot.viewport.offsetX + snapshot.panDragWidth
+        let oy = snapshot.viewport.offsetY + snapshot.panDragHeight
+
+        let x = (-ox) / scale
+        let y = (-oy) / scale
+        let width = snapshot.visibleWidth / scale
+        let height = snapshot.visibleHeight / scale
+        let canvasRect = CGRect(x: 0, y: 0, width: logicalCanvasSize, height: logicalCanvasSize)
+        let clipped = CGRect(x: x, y: y, width: width, height: height).intersection(canvasRect)
+        guard !clipped.isNull, clipped.width >= 1, clipped.height >= 1 else { return nil }
+        return clipped
+    }
 }

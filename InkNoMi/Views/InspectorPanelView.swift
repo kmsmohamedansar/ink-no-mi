@@ -9,6 +9,10 @@ struct InspectorPanelView: View {
     @Bindable var canvasViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
 
+    private var featureGate: FeatureGate {
+        FeatureGate(purchaseManager: purchaseManager)
+    }
+
     var body: some View {
         Form {
             Section {
@@ -84,15 +88,15 @@ struct InspectorPanelView: View {
                 Section {
                     Menu("Convert") {
                         Button("Convert to Diagram") {
-                            guard purchaseManager.requirePro(for: .convertDiagram) else { return }
+                            guard featureGate.requirePro(.smartConvert, source: "inspector_convert_diagram") else { return }
                             canvasViewModel.convertSelectedStrokesToDiagram(selection: selection)
                         }
                         Button("Convert to Shape") {
-                            guard purchaseManager.requirePro(for: .smartConvert) else { return }
+                            guard featureGate.requirePro(.smartConvert, source: "inspector_convert_shape") else { return }
                             canvasViewModel.convertSelectedStrokesToShape(selection: selection)
                         }
                         Button("Convert to Text") {
-                            guard purchaseManager.requirePro(for: .smartConvert) else { return }
+                            guard featureGate.requirePro(.smartConvert, source: "inspector_convert_text") else { return }
                             canvasViewModel.convertSelectedStrokesToText(selection: selection)
                         }
                     }
@@ -108,11 +112,11 @@ struct InspectorPanelView: View {
                     }
                     Menu("Organize") {
                         Button("Tree Layout") {
-                            guard purchaseManager.requirePro(for: .mindMapAutoLayout) else { return }
+                            guard featureGate.requirePro(.smartConvert, source: "inspector_mindmap_tree_layout") else { return }
                             canvasViewModel.organizeSelectedStickyNotesAsTree(selection: selection)
                         }
                         Button("Radial Layout") {
-                            guard purchaseManager.requirePro(for: .mindMapAutoLayout) else { return }
+                            guard featureGate.requirePro(.smartConvert, source: "inspector_mindmap_radial_layout") else { return }
                             canvasViewModel.organizeSelectedStickyNotesRadially(selection: selection)
                         }
                     }

@@ -41,6 +41,7 @@ enum BoardType: String, CaseIterable, Codable, Sendable, Identifiable {
     case mindMap
     case flowchart
     case roadmap
+    case kanban
 
     var id: String { rawValue }
 
@@ -52,6 +53,7 @@ enum BoardType: String, CaseIterable, Codable, Sendable, Identifiable {
         case .mindMap: return "Mind Map"
         case .flowchart: return "Flowchart"
         case .roadmap: return "Roadmap"
+        case .kanban: return "Kanban"
         }
     }
 }
@@ -90,17 +92,18 @@ struct WorkspaceTemplate: Identifiable, Hashable, Sendable {
     let boardType: BoardType
     let icon: String
     let baseTemplate: FlowDeskBoardTemplate
+    let isProTemplate: Bool
 }
 
 extension WorkspaceTemplate {
     static let gallery: [WorkspaceTemplate] = [
-        .init(id: "brainstorm-board", title: "Brainstorm Board", description: "Quick note clusters for free ideation.", category: .brainstorming, boardType: .whiteboard, icon: "bolt", baseTemplate: .smartCanvas),
-        .init(id: "flowchart", title: "Flowchart", description: "Map process steps and decisions.", category: .flowcharts, boardType: .flowchart, icon: "point.3.connected.trianglepath.dotted", baseTemplate: .flowDiagram),
-        .init(id: "product-roadmap", title: "Product Roadmap", description: "Plan milestones and releases clearly.", category: .roadmaps, boardType: .roadmap, icon: "calendar", baseTemplate: .smartCanvas),
-        .init(id: "meeting-notes", title: "Meeting Notes", description: "Capture agenda, notes, and next actions.", category: .meetingNotes, boardType: .notes, icon: "note.text", baseTemplate: .document),
-        .init(id: "mind-map", title: "Mind Map", description: "Branch ideas into connected thought trees.", category: .mindMaps, boardType: .mindMap, icon: "circle.hexagongrid", baseTemplate: .smartCanvas),
-        .init(id: "kanban-board", title: "Kanban Board", description: "Track To Do, Doing, and Done lanes.", category: .productPlanning, boardType: .whiteboard, icon: "square.grid.3x1.folder.fill.badge.plus", baseTemplate: .smartCanvas),
-        .init(id: "app-wireframe", title: "App Wireframe", description: "Structure screens and interaction flow.", category: .productPlanning, boardType: .diagram, icon: "iphone.gen3", baseTemplate: .blankBoard),
-        .init(id: "swot-analysis", title: "SWOT Analysis", description: "Map strengths, weaknesses, opportunities, and threats.", category: .productPlanning, boardType: .diagram, icon: "square.grid.2x2", baseTemplate: .smartCanvas),
+        .init(id: "brainstorm-board", title: "Brainstorm Board", description: "Quick note clusters for free ideation.", category: .brainstorming, boardType: .whiteboard, icon: "bolt", baseTemplate: .smartCanvas, isProTemplate: false),
+        .init(id: "flowchart", title: "Flowchart", description: "Map process steps and decisions.", category: .flowcharts, boardType: .flowchart, icon: "point.3.connected.trianglepath.dotted", baseTemplate: .flowDiagram, isProTemplate: false),
+        .init(id: "product-roadmap", title: "Product Roadmap", description: "Plan milestones and releases clearly.", category: .roadmaps, boardType: .roadmap, icon: "calendar", baseTemplate: .smartCanvas, isProTemplate: false),
+        .init(id: "meeting-notes", title: "Meeting Notes", description: "Capture agenda, notes, and next actions.", category: .meetingNotes, boardType: .notes, icon: "note.text", baseTemplate: .document, isProTemplate: false),
+        .init(id: "mind-map", title: "Mind Map", description: "Branch ideas into connected thought trees.", category: .mindMaps, boardType: .mindMap, icon: "circle.hexagongrid", baseTemplate: .smartCanvas, isProTemplate: true),
+        .init(id: "kanban-board", title: "Kanban Board", description: "Track To Do, Doing, and Done lanes.", category: .productPlanning, boardType: .kanban, icon: "square.grid.3x1.folder.fill.badge.plus", baseTemplate: .smartCanvas, isProTemplate: true),
+        .init(id: "app-wireframe", title: "App Wireframe", description: "Structure screens and interaction flow.", category: .productPlanning, boardType: .diagram, icon: "iphone.gen3", baseTemplate: .blankBoard, isProTemplate: true),
+        .init(id: "swot-analysis", title: "SWOT Analysis", description: "Map strengths, weaknesses, opportunities, and threats.", category: .productPlanning, boardType: .diagram, icon: "square.grid.2x2", baseTemplate: .smartCanvas, isProTemplate: true),
     ]
 }

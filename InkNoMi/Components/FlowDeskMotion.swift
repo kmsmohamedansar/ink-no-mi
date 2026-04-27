@@ -4,17 +4,21 @@ import SwiftUI
 @MainActor
 enum FlowDeskMotion {
     static let quickEaseOut = Animation.easeOut(duration: 0.12)
+    static let microQuickEaseOut = Animation.easeOut(duration: 0.09)
     static let standardEaseOut = Animation.easeOut(duration: 0.2)
     static let smoothEaseOut = Animation.easeOut(duration: 0.15)
     static let lightSpring = Animation.easeOut(duration: 0.14)
     static let mellowSpring = Animation.easeOut(duration: 0.15)
     static let premiumLiftEaseOut = Animation.easeOut(duration: 0.12)
-    static let pressCompress = Animation.easeOut(duration: 0.1)
-    static let pressRebound = Animation.easeOut(duration: 0.14)
+    static let pressCompress = Animation.easeOut(duration: 0.08)
+    static let pressRebound = Animation.easeOut(duration: 0.12)
+    static let hoverGlow = Animation.easeOut(duration: 0.14)
     static let modalEnter = Animation.easeOut(duration: 0.15).delay(0.02)
     static let canvasEnter = Animation.easeOut(duration: 0.26).delay(0.05)
     static let selectionGlowIn = Animation.easeOut(duration: 0.2).delay(0.03)
     static let selectionPulseOut = Animation.easeOut(duration: 0.22)
+    static let snapCueFlash = Animation.easeOut(duration: 0.1)
+    static let drawingLiftFade = Animation.easeOut(duration: 0.12)
 
     static let insertTransition: AnyTransition = .asymmetric(
         insertion: .opacity.combined(with: .scale(scale: 0.96)),

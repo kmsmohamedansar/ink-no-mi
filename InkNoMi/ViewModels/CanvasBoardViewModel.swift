@@ -4,12 +4,33 @@ import SwiftData
 
 /// In-memory canvas state for the selected document. Persists back to `FlowDocument.canvasPayload`
 /// on meaningful changes (viewport, elements, text payloads).
+@MainActor
 @Observable
 final class CanvasBoardViewModel {
+    enum SaveStatus: Equatable {
+        case saving(lastSavedAt: Date?)
+        case saved(lastSavedAt: Date?)
+        case localOnly(lastSavedAt: Date?)
+    }
+
+    private struct RecoverySnapshot: Codable {
+        let payload: Data
+        let capturedAt: Date
+    }
+
     private weak var document: FlowDocument?
     private var modelContext: ModelContext?
+    private var autosaveTask: Task<Void, Never>?
+    private var thumbnailTask: Task<Void, Never>?
+    private var queuedThumbnailPayloadHash: Int?
+    private var hasDirtyChanges = false
+    private let autosaveDebounceNanoseconds: UInt64 = 700_000_000
+    private let thumbnailDebounceNanoseconds: UInt64 = 450_000_000
 
     private(set) var boardState: CanvasBoardState = .empty()
+    private(set) var saveStatus: SaveStatus = .saved(lastSavedAt: nil)
+    private(set) var lastSavedAt: Date?
+    private(set) var saveErrorBannerVisible = false
 
     /// When set, the canvas shows an inline editor for this text block id.
     var editingTextElementID: UUID?
@@ -90,6 +111,14 @@ final class CanvasBoardViewModel {
     func attach(document: FlowDocument, modelContext: ModelContext) {
         self.document = document
         self.modelContext = modelContext
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        thumbnailTask?.cancel()
+        thumbnailTask = nil
+        queuedThumbnailPayloadHash = nil
+        hasDirtyChanges = false
+        lastSavedAt = document.updatedAt
+        saveErrorBannerVisible = false
         editingTextElementID = nil
         editingStickyNoteElementID = nil
         editingConnectorLabelElementID = nil
@@ -111,10 +140,15 @@ final class CanvasBoardViewModel {
         connectorEndpointAdjustDraft = nil
         placeShapeKind = .rectangle
         boardState = CanvasBoardCoding.decode(from: document.canvasPayload)
+        restoreUnsavedRecoveryIfNeeded(from: document)
         // Initial tool is session UI state and always starts in select for a predictable blank-first canvas.
         canvasTool = boardState.boardTemplate?.preferredInitialCanvasTool ?? .select
         canvasContextPanel = nil
         resetCanvasUndoHistory()
+        saveStatus = hasDirtyChanges ? .saving(lastSavedAt: lastSavedAt) : .saved(lastSavedAt: lastSavedAt)
+        if document.thumbnailData == nil {
+            scheduleThumbnailRefresh(payload: document.canvasPayload, snapshot: boardState)
+        }
     }
 
     /// Closes the progressive rail panel when focus returns to the canvas (e.g. View-menu inserts).
@@ -123,6 +157,12 @@ final class CanvasBoardViewModel {
     }
 
     func detach() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        thumbnailTask?.cancel()
+        thumbnailTask = nil
+        queuedThumbnailPayloadHash = nil
+        hasDirtyChanges = false
         document = nil
         modelContext = nil
         editingTextElementID = nil
@@ -147,13 +187,129 @@ final class CanvasBoardViewModel {
         placeShapeKind = .rectangle
         boardState = .empty()
         resetCanvasUndoHistory()
+        saveStatus = .saved(lastSavedAt: nil)
+        lastSavedAt = nil
+        saveErrorBannerVisible = false
     }
 
     func persist() {
+        markBoardDirty()
+    }
+
+    func dismissSaveErrorBanner() {
+        saveErrorBannerVisible = false
+    }
+
+    private func markBoardDirty() {
+        guard document != nil, modelContext != nil else { return }
+        hasDirtyChanges = true
+        saveStatus = .saving(lastSavedAt: lastSavedAt)
+        writeRecoverySnapshot()
+        scheduleAutosave()
+    }
+
+    private func scheduleAutosave() {
+        autosaveTask?.cancel()
+        autosaveTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: autosaveDebounceNanoseconds)
+            } catch {
+                return
+            }
+            await self?.performAutosaveIfNeeded()
+        }
+    }
+
+    private func performAutosaveIfNeeded() async {
+        guard hasDirtyChanges else { return }
+        guard document != nil, modelContext != nil else { return }
+        do {
+            try persistNow()
+            hasDirtyChanges = false
+            saveErrorBannerVisible = false
+            clearRecoverySnapshot()
+            saveStatus = .saved(lastSavedAt: lastSavedAt)
+        } catch {
+            // Keep unsaved recovery payload so data can be restored on next launch.
+            saveErrorBannerVisible = true
+            saveStatus = .localOnly(lastSavedAt: lastSavedAt)
+            scheduleAutosave()
+        }
+    }
+
+    private func persistNow() throws {
         guard let document, let modelContext else { return }
-        document.canvasPayload = CanvasBoardCoding.encode(boardState)
+        let payload = CanvasBoardCoding.encode(boardState)
+        document.canvasPayload = payload
         document.markUpdated()
-        try? modelContext.save()
+        try modelContext.save()
+        lastSavedAt = document.updatedAt
+        scheduleThumbnailRefresh(payload: payload, snapshot: boardState)
+    }
+
+    private func scheduleThumbnailRefresh(payload: Data, snapshot: CanvasBoardState) {
+        let payloadHash = payload.hashValue
+        if queuedThumbnailPayloadHash == payloadHash {
+            return
+        }
+        queuedThumbnailPayloadHash = payloadHash
+        thumbnailTask?.cancel()
+        thumbnailTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: thumbnailDebounceNanoseconds)
+            } catch {
+                return
+            }
+            await self?.writeThumbnailIfNeeded(for: snapshot, payloadHash: payloadHash)
+        }
+    }
+
+    private func writeThumbnailIfNeeded(for snapshot: CanvasBoardState, payloadHash: Int) async {
+        guard let document, let modelContext else { return }
+        guard queuedThumbnailPayloadHash == payloadHash else { return }
+        guard let rendered = CanvasExportService.renderExportImage(boardState: snapshot, renderScale: 1),
+              let pngData = CanvasExportService.pngData(from: rendered)
+        else {
+            queuedThumbnailPayloadHash = nil
+            return
+        }
+        if document.thumbnailData != pngData {
+            document.thumbnailData = pngData
+            try? modelContext.save()
+        }
+        queuedThumbnailPayloadHash = nil
+    }
+
+    private var recoverySnapshotKey: String? {
+        guard let document else { return nil }
+        return "inknomi.canvas.recovery.\(document.id.uuidString)"
+    }
+
+    private func writeRecoverySnapshot() {
+        guard let key = recoverySnapshotKey else { return }
+        let snapshot = RecoverySnapshot(payload: CanvasBoardCoding.encode(boardState), capturedAt: .now)
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    private func clearRecoverySnapshot() {
+        guard let key = recoverySnapshotKey else { return }
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    private func restoreUnsavedRecoveryIfNeeded(from document: FlowDocument) {
+        guard let key = recoverySnapshotKey else { return }
+        guard let data = UserDefaults.standard.data(forKey: key) else { return }
+        guard let snapshot = try? JSONDecoder().decode(RecoverySnapshot.self, from: data) else { return }
+        guard snapshot.payload != document.canvasPayload else {
+            UserDefaults.standard.removeObject(forKey: key)
+            return
+        }
+
+        boardState = CanvasBoardCoding.decode(from: snapshot.payload)
+        hasDirtyChanges = true
+        saveStatus = .saving(lastSavedAt: lastSavedAt)
+        scheduleAutosave()
     }
 
     // MARK: - Undo helpers (mutation entry points for `CanvasBoardViewModel+Undo`)

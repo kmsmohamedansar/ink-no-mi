@@ -1,26 +1,40 @@
 import SwiftUI
+import AppKit
+import Foundation
 
 struct HomeView: View {
     @Environment(PurchaseManager.self) private var purchaseManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var appearanceManager: AppearanceManager
+    @Environment(\.flowDeskTokens) private var tokens
     @AppStorage("InkNoMi.ProHintDismissed") private var proHintDismissed = false
 
     var documents: [FlowDocument]
     var onOpenDocument: (FlowDocument) -> Void
     var onCreateTemplate: (WorkspaceTemplate) -> Void
-    var onCreateBlank: () -> Void
+    var onCreateTemplateWithTitle: (WorkspaceTemplate, String) -> Void
+    var onCreateBlankBoardWithTitle: (String) -> Void
+    var onNewWorkspace: () -> Void
     var onDuplicate: (FlowDocument) -> Void
     var onRename: (FlowDocument) -> Void
     var onDelete: (FlowDocument) -> Void
+    var onToggleFavorite: (FlowDocument) -> Void
+    var onExport: (FlowDocument) -> Void
+    #if DEBUG
+    var onLoadScreenshotDemoData: (() -> Void)?
+    var onSelectScreenshotScene: ((ScreenshotModeService.Scene) -> Void)?
+    var selectedScreenshotScene: ScreenshotModeService.Scene = .homeTemplates
+    var showScreenshotControls = true
+    var showExampleWorkflows = false
+    var suppressMonetizationUpsell = false
+    #endif
 
     enum SidebarSection: String, CaseIterable, Identifiable {
         case home
         case recent
         case templates
         case allBoards
-        case favorites
-        case trash
-        case settings
 
         var id: String { rawValue }
 
@@ -30,9 +44,6 @@ struct HomeView: View {
             case .recent: return "Recent"
             case .templates: return "Templates"
             case .allBoards: return "All Boards"
-            case .favorites: return "Favorites"
-            case .trash: return "Trash"
-            case .settings: return "Settings"
             }
         }
 
@@ -42,9 +53,6 @@ struct HomeView: View {
             case .recent: return "clock"
             case .templates: return "square.grid.2x2"
             case .allBoards: return "square.stack.3d.up"
-            case .favorites: return "star"
-            case .trash: return "trash"
-            case .settings: return "gearshape"
             }
         }
     }
@@ -57,6 +65,18 @@ struct HomeView: View {
     enum BoardSort: String, CaseIterable, Identifiable {
         case updated = "Last Edited"
         case title = "Name"
+        case type = "Type"
+        case created = "Created Date"
+        var id: String { rawValue }
+    }
+    enum BoardTypeFilter: String, CaseIterable, Identifiable {
+        case whiteboard = "Whiteboard"
+        case flowchart = "Flowchart"
+        case notes = "Notes"
+        case mindMap = "Mind Map"
+        case roadmap = "Roadmap"
+        case kanban = "Kanban"
+
         var id: String { rawValue }
     }
 
@@ -64,9 +84,12 @@ struct HomeView: View {
     @State private var searchQuery = ""
     @State private var boardSort: BoardSort = .updated
     @State private var gridMode = true
+    @State private var favoriteOnly = false
+    @State private var selectedBoardTypeFilters = Set<BoardTypeFilter>()
     @State private var hoveredQuickAction: String?
     @State private var hoveredSidebarSection: SidebarSection?
     @State private var hoveredBoardID: UUID?
+    @State private var selectedBoardID: UUID?
     @State private var hoveredTemplateID: String?
     @State private var hoveredIntentChip: String?
     @State private var hoveredCommandIcon: String?
@@ -76,21 +99,57 @@ struct HomeView: View {
     @State private var selectedFilter: HomeFilter = .whiteboards
     @State private var hoveredFilter: HomeFilter?
     @State private var creationPromptText = ""
+    @State private var selectedSuggestionIndex = 0
     @State private var heroHasAppeared = false
+    @State private var hasShownBoardContent = false
 
-    private var filteredDocuments: [FlowDocument] {
+    private var featureGate: FeatureGate {
+        FeatureGate(purchaseManager: purchaseManager)
+    }
+
+    private var shouldReduceMotion: Bool {
+        reduceMotion || appearanceManager.settings.motionLevel != .full
+    }
+
+    private var smartStartSuggestions: [SmartStartSuggestion] {
+        SmartStartIntentMatcher.suggestions(for: creationPromptText)
+    }
+
+    private var shouldShowSmartStartSuggestions: Bool {
+        isCreationPromptFocused && !smartStartSuggestions.isEmpty
+    }
+
+    private var isFirstBoardJourney: Bool {
+        documents.isEmpty
+    }
+
+    private var boardLibraryDocuments: [FlowDocument] {
         let base = documents.filter {
             searchQuery.isEmpty
             || $0.title.localizedCaseInsensitiveContains(searchQuery)
             || $0.boardType.displayName.localizedCaseInsensitiveContains(searchQuery)
+            || (documentTypeLabel($0).localizedCaseInsensitiveContains(searchQuery))
         }
+        let typeFiltered = base.filter { matchesTypeFilters($0) }
+        let favoritesFiltered = typeFiltered.filter { !favoriteOnly || $0.isFavorite }
         switch boardSort {
-        case .updated: return base.sorted { $0.updatedAt > $1.updatedAt }
-        case .title: return base.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .updated: return favoritesFiltered.sorted { $0.updatedAt > $1.updatedAt }
+        case .title: return favoritesFiltered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .type:
+            return favoritesFiltered.sorted {
+                let lhsType = documentTypeLabel($0)
+                let rhsType = documentTypeLabel($1)
+                if lhsType == rhsType {
+                    return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+                }
+                return lhsType.localizedCaseInsensitiveCompare(rhsType) == .orderedAscending
+            }
+        case .created:
+            return favoritesFiltered.sorted { $0.createdAt > $1.createdAt }
         }
     }
     private var recentDocuments: [FlowDocument] {
-        Array(filteredDocuments.prefix(6))
+        Array(boardLibraryDocuments.prefix(6))
     }
 
     private var selectedTemplates: [WorkspaceTemplate] {
@@ -117,13 +176,16 @@ struct HomeView: View {
                         topFilterChips
                         creationPromptCard
                         quickActions
+                        #if DEBUG
+                        if showExampleWorkflows { workflowsSection }
+                        #endif
                         if selectedSection == .home || selectedSection == .recent || selectedFilter == .recents { recentSection }
-                        if selectedSection == .home || selectedSection == .allBoards || selectedSection == .favorites || selectedFilter == .whiteboards {
+                        if selectedSection == .home || selectedSection == .allBoards || selectedFilter == .whiteboards {
                             boardsSection
                         }
-                        if !selectedTemplates.isEmpty { templatesSection }
-                        if selectedSection == .trash { trashSection }
-                        if selectedSection == .settings { settingsPlaceholder }
+                        if selectedSection == .home || selectedSection == .templates || selectedFilter == .templates {
+                            templatesSection
+                        }
                     }
                     .frame(maxWidth: 1100, alignment: .leading)
                     .padding(.top, 44)
@@ -136,10 +198,16 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("Ink no Mi")
+        .navigationTitle("InkNoMi")
         .onAppear {
             if !heroHasAppeared {
                 heroHasAppeared = true
+            }
+            hasShownBoardContent = !documents.isEmpty
+        }
+        .onChange(of: documents.isEmpty) { _, isEmpty in
+            if !isEmpty {
+                hasShownBoardContent = true
             }
         }
     }
@@ -316,15 +384,15 @@ private struct TemplatePreviewView: View {
 
 private extension HomeView {
     var premiumCardFill: Color {
-        Color.white
+        tokens.homeCardFill
     }
 
     var premiumCardBorder: Color {
-        Color.black.opacity(0.06)
+        Color.black.opacity(0.045)
     }
 
     var premiumCardRadius: CGFloat {
-        18
+        max(10, tokens.corners.card - 2)
     }
 
     var premiumCardHoverLift: CGFloat {
@@ -332,17 +400,25 @@ private extension HomeView {
     }
 
     var premiumCardHoverScale: CGFloat {
-        1.015
+        1.008
+    }
+
+    var shouldShowUpgradeCTA: Bool {
+        #if DEBUG
+        !purchaseManager.isProUser && !suppressMonetizationUpsell
+        #else
+        !purchaseManager.isProUser
+        #endif
     }
 
     func premiumCardShadow(hovered: Bool) -> some View {
         RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
             .fill(Color.clear)
             .shadow(
-                color: .black.opacity(hovered ? 0.12 : 0.06),
-                radius: hovered ? 20 : 12,
+                color: .black.opacity(hovered ? 0.08 : 0.04),
+                radius: hovered ? 14 : 8,
                 x: 0,
-                y: hovered ? 10 : 4
+                y: hovered ? 6 : 2
             )
     }
 
@@ -354,23 +430,25 @@ private extension HomeView {
 
     var creationBackground: some View {
         ZStack {
-            DS.Color.homeMainBackground
+            tokens.workspaceBackground
             RadialGradient(
-                colors: [Color.white.opacity(0.96), Color.clear],
+                colors: [Color.white.opacity(0.82), Color.clear],
                 center: UnitPoint(x: 0.5, y: 0.04),
                 startRadius: 20,
                 endRadius: 520
             )
             Circle()
-                .fill(DS.Color.homeGlowBlue)
+                .fill(tokens.accentSoft)
                 .blur(radius: 120)
                 .frame(width: 380, height: 380)
                 .offset(x: -250, y: -160)
+                .opacity(0.45)
             Circle()
-                .fill(DS.Color.homeGlowPurple)
+                .fill(tokens.accentGradientEnd.opacity(0.15))
                 .blur(radius: 160)
                 .frame(width: 420, height: 420)
                 .offset(x: 340, y: -120)
+                .opacity(0.45)
             creationGridOverlay
         }
         .ignoresSafeArea()
@@ -393,7 +471,7 @@ private extension HomeView {
                     y += step
                 }
             }
-            .stroke(DS.Color.homeMainGrid, lineWidth: 0.5)
+            .stroke(tokens.canvasGridInk.opacity(0.08), lineWidth: 0.5)
         }
         .opacity(1)
         .allowsHitTesting(false)
@@ -415,6 +493,7 @@ private extension HomeView {
                     Image(systemName: "scribble.variable")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(DS.Color.accent)
+                        .foregroundStyle(tokens.accent)
                 }
                 Text("InkNoMi")
                     .font(.system(size: 16, weight: .semibold))
@@ -428,14 +507,13 @@ private extension HomeView {
 
             Spacer()
 
-            if !purchaseManager.isProUser {
+            if shouldShowUpgradeCTA {
                 Rectangle()
                     .fill(DS.Color.homeSidebarBorder.opacity(0.9))
                     .frame(height: 1)
                     .padding(.bottom, DS.Spacing.sm)
                 Button {
-                    purchaseManager.requestedFeature = nil
-                    purchaseManager.isPaywallPresented = true
+                    _ = featureGate.requirePro(.advancedTemplates, source: "home_sidebar_upgrade")
                 } label: {
                     HStack(spacing: DS.Spacing.sm) {
                         Image(systemName: "sparkles")
@@ -463,7 +541,57 @@ private extension HomeView {
                 }
                 .buttonStyle(FlowDeskHomeCardButtonStyle())
                 .foregroundStyle(DS.Color.accent)
+                .foregroundStyle(tokens.accent)
             }
+
+            #if DEBUG
+            if showScreenshotControls, let onLoadScreenshotDemoData {
+                Rectangle()
+                    .fill(DS.Color.homeSidebarBorder.opacity(0.9))
+                    .frame(height: 1)
+                    .padding(.top, DS.Spacing.sm)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Screenshot Scene")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                    ForEach(ScreenshotModeService.Scene.allCases) { scene in
+                        Button {
+                            onSelectScreenshotScene?(scene)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: scene == selectedScreenshotScene ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(scene.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                Spacer()
+                            }
+                            .foregroundStyle(scene == selectedScreenshotScene ? DS.Color.accent : DS.Color.textSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(scene == selectedScreenshotScene ? DS.Color.homeChipActive : .clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Button("Load Screenshot Demo Data", action: onLoadScreenshotDemoData)
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DS.Color.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.88))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                    )
+            }
+            #endif
         }
         .padding(.horizontal, DS.Spacing.md)
         .padding(.vertical, DS.Spacing.lg)
@@ -517,13 +645,13 @@ private extension HomeView {
     var creationPromptCard: some View {
         VStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Start creating")
+                Text(isFirstBoardJourney ? "Create your first board" : "Start creating")
                     .font(.system(size: 36, weight: .bold))
                     .tracking(-0.2)
                     .lineSpacing(1.05)
                     .foregroundStyle(Color(hex: "#111827"))
                     .frame(maxWidth: .infinity, alignment: .center)
-                Text("Capture an idea, pick a template, then jump straight into your board.")
+                Text(isFirstBoardJourney ? "Pick a starter board or template and be creating in seconds." : "Capture an idea, pick a template, then jump straight into your board.")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Color(hex: "#4B5563"))
                     .multilineTextAlignment(.center)
@@ -545,9 +673,21 @@ private extension HomeView {
                         .textFieldStyle(.plain)
                         .font(.system(size: 15, weight: .medium))
                         .focused($isCreationPromptFocused)
+                        .onSubmit {
+                            applyPrimarySmartStartSuggestion()
+                        }
+                        .onChange(of: creationPromptText) { _, _ in
+                            selectedSuggestionIndex = 0
+                        }
+                        .onMoveCommand { direction in
+                            handleSuggestionMove(direction)
+                        }
+                        .onExitCommand {
+                            dismissSmartStartSuggestions()
+                        }
 
                         Button {
-                            onCreateBlank()
+                            applyPrimarySmartStartSuggestion()
                         } label: {
                             Image(systemName: "arrow.right")
                                 .font(.system(size: 13, weight: .bold))
@@ -583,8 +723,8 @@ private extension HomeView {
                     .padding(.horizontal, 4)
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .frame(height: 76)
+                .padding(.top, 10)
+                .padding(.bottom, shouldShowSmartStartSuggestions ? 14 : 10)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.white.opacity(0.995))
@@ -604,6 +744,12 @@ private extension HomeView {
                 )
                 .animation(FlowDeskMotion.premiumLiftEaseOut, value: isCreationPromptFocused)
 
+                if shouldShowSmartStartSuggestions {
+                    smartStartSuggestionPanel
+                        .padding(.top, 2)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 HStack(spacing: 8) {
                     intentChip("Brainstorm", templateID: "brainstorm-board")
                     intentChip("Flowchart", templateID: "flowchart")
@@ -612,8 +758,12 @@ private extension HomeView {
                 }
 
                 HStack(spacing: 8) {
-                    Button("Start blank canvas") {
-                        onCreateBlank()
+                    Button(isFirstBoardJourney ? "Start now" : "New Board") {
+                        if isFirstBoardJourney {
+                            createTemplateFromID("brainstorm-board")
+                        } else {
+                            onNewWorkspace()
+                        }
                     }
                     .buttonStyle(FlowDeskHomeCardButtonStyle())
                     .font(.system(size: 14, weight: .medium))
@@ -648,6 +798,13 @@ private extension HomeView {
                             )
                     )
                 }
+
+                if isFirstBoardJourney {
+                    Text("Recommended: Brainstorm Board (free) opens with a polished starter layout.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color(hex: "#6B7280"))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 22)
@@ -672,7 +829,105 @@ private extension HomeView {
         .frame(maxWidth: .infinity, alignment: .center)
         .opacity(heroHasAppeared ? 1 : 0)
         .offset(y: heroHasAppeared ? 0 : 8)
-        .animation(.easeOut(duration: 0.25), value: heroHasAppeared)
+        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.25), value: heroHasAppeared)
+    }
+
+    var smartStartSuggestionPanel: some View {
+        VStack(spacing: 8) {
+            ForEach(Array(smartStartSuggestions.enumerated()), id: \.element.id) { index, suggestion in
+                let isSelected = index == selectedSuggestionIndex
+                Button {
+                    applySmartStartSuggestion(suggestion)
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: suggestion.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(DS.Color.accent)
+                            .frame(width: 20, height: 20)
+                            .padding(.top, 1)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.title)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color(hex: "#111827"))
+                            Text(suggestion.description)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color(hex: "#5E6878"))
+                            if let structureHint = suggestion.structureHint {
+                                Text("Hint: \(structureHint)")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(DS.Color.accent.opacity(0.9))
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(isSelected ? Color(hex: "#EEF4FF") : Color.white.opacity(0.84))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(isSelected ? DS.Color.accent.opacity(0.34) : Color.black.opacity(0.06), lineWidth: 1)
+                            )
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(FlowDeskHomeCardButtonStyle())
+                .accessibilityLabel(suggestion.title)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme))
+                )
+                .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 8)
+        )
+        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.16), value: selectedSuggestionIndex)
+    }
+
+    func applyPrimarySmartStartSuggestion() {
+        guard !smartStartSuggestions.isEmpty else {
+            onNewWorkspace()
+            return
+        }
+        let safeIndex = max(0, min(selectedSuggestionIndex, smartStartSuggestions.count - 1))
+        applySmartStartSuggestion(smartStartSuggestions[safeIndex])
+    }
+
+    func applySmartStartSuggestion(_ suggestion: SmartStartSuggestion) {
+        switch suggestion.action {
+        case .template(let template):
+            if let title = suggestion.resolvedTitle {
+                onCreateTemplateWithTitle(template, title)
+            } else {
+                onCreateTemplate(template)
+            }
+        case .blankWithTitle(let title):
+            onCreateBlankBoardWithTitle(title)
+        }
+        creationPromptText = ""
+        selectedSuggestionIndex = 0
+        isCreationPromptFocused = false
+    }
+
+    func handleSuggestionMove(_ direction: MoveCommandDirection) {
+        guard shouldShowSmartStartSuggestions else { return }
+        switch direction {
+        case .down:
+            selectedSuggestionIndex = min(selectedSuggestionIndex + 1, smartStartSuggestions.count - 1)
+        case .up:
+            selectedSuggestionIndex = max(selectedSuggestionIndex - 1, 0)
+        default:
+            break
+        }
+    }
+
+    func dismissSmartStartSuggestions() {
+        selectedSuggestionIndex = 0
     }
 
     func intentChip(_ title: String, templateID: String) -> some View {
@@ -696,7 +951,8 @@ private extension HomeView {
                 .scaleEffect(hovered ? 1.02 : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
-        .animation(.easeOut(duration: 0.18), value: hovered)
+        .accessibilityLabel("\(title) template")
+        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.18), value: hovered)
         .onHover { inside in
             hoveredIntentChip = inside ? templateID : nil
         }
@@ -719,30 +975,38 @@ private extension HomeView {
         HStack(spacing: DS.Spacing.grid) {
             quickActionCard(
                 id: "new",
-                title: "Start a new workspace",
-                subtitle: "Open a fresh board and shape your ideas your way.",
-                icon: "square",
-                action: onCreateBlank
+                title: isFirstBoardJourney ? "Start from Starter Board" : "New Board",
+                subtitle: isFirstBoardJourney ? "Create instantly with a polished layout so the board looks great from the first second." : "Open a fresh board and shape your ideas your way.",
+                icon: isFirstBoardJourney ? "sparkles.rectangle.stack.fill" : "square",
+                action: {
+                    if isFirstBoardJourney {
+                        createTemplateFromID("brainstorm-board")
+                    } else {
+                        onNewWorkspace()
+                    }
+                }
             )
             quickActionCard(
                 id: "template",
                 title: "Start from Template",
-                subtitle: "Launch with ready-made layouts for real work. Advanced templates (Pro).",
+                subtitle: isFirstBoardJourney ? "Free templates are ready to use. Pro templates are clearly labeled." : "Launch with ready-made layouts for real work. Advanced templates (Pro).",
                 icon: "square.grid.2x2",
                 action: { selectedSection = .templates }
             )
-            quickActionCard(
-                id: "open",
-                title: "Open Recent",
-                subtitle: recentDocuments.isEmpty ? "Create your first board to start building momentum." : "Continue where you left off.",
-                icon: "clock.arrow.circlepath",
-                enabled: !recentDocuments.isEmpty,
-                action: {
-                    if let first = recentDocuments.first {
-                        onOpenDocument(first)
+            if !isFirstBoardJourney {
+                quickActionCard(
+                    id: "open",
+                    title: "Open Recent",
+                    subtitle: recentDocuments.isEmpty ? "Create your first board to start building momentum." : "Continue where you left off.",
+                    icon: "clock.arrow.circlepath",
+                    enabled: !recentDocuments.isEmpty,
+                    action: {
+                        if let first = recentDocuments.first {
+                            onOpenDocument(first)
+                        }
                     }
-                }
-            )
+                )
+            }
         }
         .padding(.top, -4)
     }
@@ -766,10 +1030,10 @@ private extension HomeView {
                     if isPrimary {
                         Text("Recommended")
                             .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(DS.Color.accent)
+                                    .foregroundStyle(Color(hex: "#4B5563"))
                             .padding(.horizontal, DS.Spacing.sm)
                             .padding(.vertical, 3)
-                            .background(Capsule(style: .continuous).fill(Color(hex: "#EEF4FF")))
+                                    .background(Capsule(style: .continuous).fill(Color.white.opacity(0.82)))
                     }
                 }
                 Text(title)
@@ -799,6 +1063,10 @@ private extension HomeView {
                         RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
                             .stroke(premiumCardBorder, lineWidth: 1)
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
+                            .stroke(DS.Color.accent.opacity(hovered ? 0.1 : 0), lineWidth: 1)
+                    )
                     .background(premiumCardShadow(hovered: hovered))
             )
             .offset(y: hovered ? premiumCardHoverLift : 0)
@@ -807,12 +1075,12 @@ private extension HomeView {
                     ? (hovered ? premiumCardHoverScale : 1.0)
                     : 0.986
             )
-            .opacity(enabled ? 1 : 0.58)
+            .opacity(enabled ? 1 : 0.74)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .disabled(!enabled)
         .onHover { inside in
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(FlowDeskMotion.hoverGlow) {
                 hoveredQuickAction = inside && enabled ? id : nil
             }
         }
@@ -820,11 +1088,13 @@ private extension HomeView {
 
     var recentSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-            sectionHeader("Recent", subtitle: purchaseManager.isProUser ? "Jump back in quickly." : "Jump back in quickly. Unlimited boards (Pro).")
+            sectionHeader("Recent", subtitle: shouldShowUpgradeCopy ? "Jump back in quickly. Unlimited boards (Pro)." : "Jump back in quickly.")
             if recentDocuments.isEmpty {
-                compactEmptyState(
-                    title: "No recent boards yet.",
-                    detail: "Start blank or use a template to create your first board."
+                intelligentEmptyState(
+                    icon: "clock.arrow.circlepath",
+                    title: "Nothing here yet",
+                    detail: "Your recent boards will appear here once you start creating.",
+                    actions: recentEmptyStateActions
                 )
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Spacing.md)], spacing: DS.Spacing.md) {
@@ -834,6 +1104,21 @@ private extension HomeView {
                 }
             }
         }
+    }
+
+    var recentEmptyStateActions: [EmptyStateAction] {
+        var actions: [EmptyStateAction] = [
+            .init(title: "Start a new board", icon: "plus", action: onNewWorkspace),
+            .init(title: "Use a template", icon: "square.grid.2x2", action: { selectedSection = .templates })
+        ]
+        #if DEBUG
+        if onLoadScreenshotDemoData != nil {
+            actions.append(
+                .init(title: "Load demo board", icon: "wand.and.stars", action: { onLoadScreenshotDemoData?() })
+            )
+        }
+        #endif
+        return actions
     }
 
     var starterWorkspacesSection: some View {
@@ -939,8 +1224,7 @@ private extension HomeView {
             }
             Spacer()
             Button("Upgrade") {
-                purchaseManager.requestedFeature = nil
-                purchaseManager.isPaywallPresented = true
+                _ = featureGate.requirePro(.advancedTemplates, source: "home_banner_upgrade")
             }
             .buttonStyle(FlowDeskHomeCardButtonStyle())
             .font(.system(size: 14, weight: .medium))
@@ -962,9 +1246,10 @@ private extension HomeView {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(DS.Color.textSecondary)
-                    .frame(width: 18, height: 18)
+                    .frame(width: 32, height: 32)
             }
             .buttonStyle(FlowDeskHomeCardButtonStyle())
+            .accessibilityLabel("Dismiss Pro hint")
         }
         .padding(DS.Spacing.md)
         .background(
@@ -1019,115 +1304,153 @@ private extension HomeView {
     var boardsSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             HStack {
-                sectionHeader(
-                    selectedSection == .favorites ? "Favorites" : "All Boards",
-                    subtitle: "Search, sort, and reopen your work."
-                )
+                sectionHeader("All Boards", subtitle: "Search, sort, and reopen your work.")
                 Spacer()
-                Picker("Sort", selection: $boardSort) {
-                    ForEach(BoardSort.allCases) {
-                        Text($0.rawValue).tag($0)
-                    }
-                }
-                .pickerStyle(.menu)
-                Button {
-                    withAnimation(FlowDeskMotion.quickEaseOut) {
-                        gridMode.toggle()
-                    }
-                } label: {
-                    Image(systemName: gridMode ? "list.bullet" : "square.grid.2x2")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.Color.accent)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(Color.white.opacity(0.9))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                )
-                        )
-                }
-                .buttonStyle(FlowDeskToolbarButtonStyle())
             }
+            boardLibraryToolbar
+            boardTypeFilters
 
-            let source = selectedSection == .favorites ? filteredDocuments.filter(\.isFavorite) : filteredDocuments
+            let source = boardLibraryDocuments
             if source.isEmpty {
-                emptyState(
-                    title: "No boards in this view",
-                    detail: "Try another filter or create a new board."
-                )
+                if documents.isEmpty {
+                    intelligentEmptyState(
+                        icon: "square.stack.3d.up",
+                        title: "Create your first workspace",
+                        detail: "Capture ideas, plan work, and visualize thinking.",
+                        actions: [
+                            .init(title: "Blank canvas", icon: "plus.square", action: onNewWorkspace),
+                            .init(title: "Template picker", icon: "square.grid.2x2", action: { selectedSection = .templates })
+                        ]
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.985)))
+                } else if favoriteOnly {
+                    intelligentEmptyState(
+                        icon: "star.slash",
+                        title: "No favorites yet",
+                        detail: "Mark boards as favorites to keep your key workspaces handy.",
+                        actions: [
+                            .init(title: "Show all boards", icon: "line.3.horizontal.decrease.circle", action: { favoriteOnly = false }),
+                            .init(title: "Template picker", icon: "square.grid.2x2", action: { selectedSection = .templates }),
+                            .init(title: "Blank canvas", icon: "plus.square", action: onNewWorkspace)
+                        ]
+                    )
+                    .transition(.opacity)
+                } else {
+                    intelligentEmptyState(
+                        icon: "magnifyingglass",
+                        title: "No boards match yet",
+                        detail: "Try a broader search, clear filters, or start a new board.",
+                        actions: [
+                            .init(title: "Clear search", icon: "xmark.circle", action: { searchQuery = "" }),
+                            .init(title: "Reset filters", icon: "line.3.horizontal.decrease.circle", action: {
+                                favoriteOnly = false
+                                selectedBoardTypeFilters.removeAll()
+                            }),
+                            .init(title: "Blank canvas", icon: "plus.square", action: onNewWorkspace)
+                        ]
+                    )
+                    .transition(.opacity)
+                }
             } else if gridMode {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Spacing.md)], spacing: DS.Spacing.md) {
                     ForEach(source, id: \.persistentModelID) {
                         boardCard($0)
                     }
                 }
+                .transition(
+                    hasShownBoardContent
+                        ? .opacity
+                        : .opacity.combined(with: .scale(scale: 0.988))
+                )
             } else {
                 VStack(spacing: DS.Spacing.xs + 2) {
                     ForEach(source, id: \.persistentModelID) {
                         boardListRow($0)
                     }
                 }
+                .transition(.opacity)
             }
         }
+        .animation(FlowDeskMotion.standardEaseOut, value: boardLibraryDocuments.isEmpty)
     }
 
     var templatesSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             sectionHeader("Template Library", subtitle: "Pick a structured starting point and customize fast.")
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(minimum: 220), spacing: 22), count: 4),
-                spacing: 22
-            ) {
-                ForEach(selectedTemplates) { template in
-                    let hovered = hoveredTemplateID == template.id
-                    Button {
-                        onCreateTemplate(template)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            homeTemplatePreview(templateID: template.id, hovered: hovered)
-                                .frame(height: 108)
-                                .brightness(hovered ? 0.04 : 0)
-                                .scaleEffect(hovered ? 1.01 : 1)
-                                .animation(FlowDeskMotion.premiumLiftEaseOut, value: hovered)
+            if selectedTemplates.isEmpty {
+                intelligentEmptyState(
+                    icon: "square.grid.2x2",
+                    title: "Start with structure",
+                    detail: "Templates help you move faster.",
+                    actions: [
+                        .init(title: "Brainstorm ideas", icon: "bolt.fill", action: { createTemplateFromID("brainstorm-board") }),
+                        .init(title: "Plan a roadmap", icon: "calendar", action: { createTemplateFromID("product-roadmap") }),
+                        .init(title: "Map a flow", icon: "point.3.connected.trianglepath.dotted", action: { createTemplateFromID("flowchart") })
+                    ]
+                )
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(minimum: 220), spacing: 22), count: 4),
+                    spacing: 22
+                ) {
+                    ForEach(selectedTemplates) { template in
+                        let hovered = hoveredTemplateID == template.id
+                        Button {
+                            onCreateTemplate(template)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                homeTemplatePreview(templateID: template.id, hovered: hovered)
+                                    .frame(height: 108)
+                                .brightness(hovered ? 0.028 : 0)
+                                    .scaleEffect(hovered ? 1.01 : 1)
+                                .animation(FlowDeskMotion.hoverGlow, value: hovered)
 
-                            HStack {
-                                Image(systemName: template.icon)
+                                HStack {
+                                    Image(systemName: template.icon)
+                                        .foregroundStyle(DS.Color.accent)
+                                    Text(template.category.displayName.uppercased())
+                                        .font(.system(size: 11, weight: .medium))
+                                        .tracking(0.6)
+                                        .foregroundStyle(Color(hex: "#9CA3AF"))
+                                    Spacer()
+                                    if template.isProTemplate && !purchaseManager.isProUser && !isScreenshotPolishMode {
+                                        proBadge
+                                    }
+                                }
+                                Text(template.title)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Color(hex: "#111827"))
+                                Text(template.description)
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundStyle(Color(hex: "#6B7280"))
+                                    .lineLimit(2)
+                                Text(template.isProTemplate && !purchaseManager.isProUser && !isScreenshotPolishMode ? "Use this template (Pro)" : "Use this template")
+                                    .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(DS.Color.accent)
-                                Text(template.category.displayName.uppercased())
-                                    .font(.system(size: 11, weight: .medium))
-                                    .tracking(0.6)
-                                    .foregroundStyle(Color(hex: "#9CA3AF"))
                             }
-                            Text(template.title)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color(hex: "#111827"))
-                            Text(template.description)
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(Color(hex: "#6B7280"))
-                                .lineLimit(2)
-                            Text("Use this template")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(DS.Color.accent)
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 16)
-                        .frame(maxWidth: .infinity, minHeight: 250, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(premiumCardFill)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity, minHeight: 250, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(premiumCardFill)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .stroke(premiumCardBorder, lineWidth: 1)
+                                    )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(premiumCardBorder, lineWidth: 1)
+                                        .stroke(DS.Color.accent.opacity(hovered ? 0.12 : 0), lineWidth: 1)
                                 )
-                                .background(premiumCardShadow(hovered: hovered))
-                        )
-                    }
-                    .buttonStyle(FlowDeskHomeCardButtonStyle())
-                    .onHover { inside in
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            hoveredTemplateID = inside ? template.id : nil
+                                    .background(premiumCardShadow(hovered: hovered))
+                            )
+                        }
+                        .buttonStyle(FlowDeskHomeCardButtonStyle())
+                        .accessibilityLabel("Template \(template.title)")
+                        .onHover { inside in
+            withAnimation(FlowDeskMotion.hoverGlow) {
+                                hoveredTemplateID = inside ? template.id : nil
+                            }
                         }
                     }
                 }
@@ -1172,7 +1495,7 @@ private extension HomeView {
         VStack(alignment: .leading, spacing: DS.Spacing.md) {
             sectionHeader("Workspace Settings", subtitle: "Appearance and workspace behavior")
             VStack(alignment: .leading, spacing: 8) {
-                Text("Open app settings to adjust appearance and your working environment.")
+                    Text("Open app settings to adjust appearance and board behavior.")
                     .font(.system(size: 13, weight: .regular))
                     .lineSpacing(DS.Typography.bodyLineSpacing - 1.5)
                     .foregroundStyle(Color(hex: "#6B7280"))
@@ -1181,7 +1504,20 @@ private extension HomeView {
                     Text("Open Settings")
                         .font(.system(size: 14, weight: .medium))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(FlowDeskHomeCardButtonStyle())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
                 #endif
             }
             .padding(.horizontal, 18)
@@ -1201,45 +1537,7 @@ private extension HomeView {
 
     @ViewBuilder
     func homeTemplatePreview(templateID: String, hovered: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                HStack(spacing: 8) {
-                    ForEach(0..<4, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(DS.Color.accent.opacity(hovered ? 0.22 : 0.16 - (Double(index) * 0.02)))
-                            .frame(width: 22, height: 14)
-                    }
-                }
-                .overlay(alignment: .center) {
-                    Image(systemName: templatePreviewIcon(for: templateID))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(DS.Color.accent.opacity(hovered ? 0.95 : 0.8))
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-            )
-    }
-
-    func templatePreviewIcon(for templateID: String) -> String {
-        switch templateID {
-        case "brainstorm-board": return "bolt.fill"
-        case "flowchart": return "point.3.connected.trianglepath.dotted"
-        case "product-roadmap": return "calendar"
-        case "meeting-notes": return "note.text"
-        case "mind-map": return "circle.hexagongrid"
-        case "kanban-board": return "rectangle.3.group"
-        case "app-wireframe": return "iphone.gen3"
-        default: return "square.grid.2x2"
-        }
+        TemplatePreviewView(templateID: templateID, isHovered: hovered)
     }
 
     var trashSection: some View {
@@ -1254,50 +1552,44 @@ private extension HomeView {
 
     func boardCard(_ document: FlowDocument) -> some View {
         let hovered = hoveredBoardID == document.id
+        let selected = selectedBoardID == document.id
         return Button {
+            selectedBoardID = document.id
             onOpenDocument(document)
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                boardPreview(for: document)
                     .frame(height: 96)
-                    .overlay {
-                        Image(systemName: "scribble.variable")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(DS.Color.accent.opacity(0.85))
-                    }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.black.opacity(0.06))
-                    )
-
                 HStack {
                     Text(document.title)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color(hex: "#111827"))
                         .lineLimit(1)
                     Spacer()
-                    if document.isFavorite {
-                        Image(systemName: "star.fill")
-                            .foregroundStyle(DS.Color.accent)
-                    }
+                    favoriteButton(for: document)
                 }
-                Text(document.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 13, weight: .regular))
+                HStack(spacing: 6) {
+                    boardTypeChip(document)
+                    Spacer()
+                    Menu {
+                        boardContextMenu(for: document)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#6B7280"))
+                            .frame(width: 24, height: 24)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.9))
+                                    .overlay(Circle().stroke(Color.black.opacity(0.08)))
+                            )
+                    }
+                    .menuStyle(.borderlessButton)
+                    .buttonStyle(.plain)
+                }
+                Text("Edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(Color(hex: "#6B7280"))
-                Text(document.boardType.displayName)
-                    .font(.system(size: 11, weight: .medium))
-                    .tracking(0.6)
-                    .foregroundStyle(Color(hex: "#9CA3AF"))
-                    .padding(.horizontal, DS.Spacing.sm)
-                    .padding(.vertical, DS.Spacing.xs - 1)
-                    .background(Capsule().fill(DS.Color.hover))
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 13)
@@ -1306,21 +1598,22 @@ private extension HomeView {
                     .fill(premiumCardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(premiumCardBorder, lineWidth: 1)
+                            .stroke(selected ? DS.Color.accent.opacity(0.42) : premiumCardBorder, lineWidth: selected ? 1.35 : 1)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(DS.Color.accent.opacity(hovered ? 0.09 : 0), lineWidth: 1)
                     )
                     .background(premiumCardShadow(hovered: hovered))
             )
             .offset(y: hovered ? premiumCardHoverLift : 0)
-            .scaleEffect(hovered ? premiumCardHoverScale : 1)
+            .scaleEffect(shouldReduceMotion ? 1 : (hovered ? premiumCardHoverScale : 1))
+            .brightness(selected ? 0.012 : 0)
         }
-        .contextMenu {
-            Button("Open") { onOpenDocument(document) }
-            Button("Duplicate") { onDuplicate(document) }
-            Button("Rename…") { onRename(document) }
-            Divider()
-            Button("Delete", role: .destructive) { onDelete(document) }
-        }
+        .contextMenu { boardContextMenu(for: document) }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
+        .accessibilityLabel("Board \(document.title)")
+        .focusable()
         .onHover { inside in
             withAnimation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02)) {
                 hoveredBoardID = inside ? document.id : nil
@@ -1330,23 +1623,33 @@ private extension HomeView {
 
     func boardListRow(_ document: FlowDocument) -> some View {
         let hovered = hoveredBoardID == document.id
+        let selected = selectedBoardID == document.id
         return Button {
+            selectedBoardID = document.id
             onOpenDocument(document)
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "rectangle.stack.fill")
-                    .foregroundStyle(DS.Color.accent.opacity(0.85))
+                boardPreview(for: document)
+                    .frame(width: 80, height: 52)
                 Text(document.title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color(hex: "#111827"))
+                    .lineLimit(1)
                 Spacer()
-                Text(document.boardType.displayName)
-                    .font(.system(size: 11, weight: .medium))
-                    .tracking(0.6)
-                    .foregroundStyle(Color(hex: "#9CA3AF"))
-                Text(document.updatedAt.formatted(date: .abbreviated, time: .omitted))
+                boardTypeChip(document)
+                Text(document.updatedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(Color(hex: "#6B7280"))
+                favoriteButton(for: document)
+                Menu {
+                    boardContextMenu(for: document)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#6B7280"))
+                }
+                .menuStyle(.borderlessButton)
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
@@ -1355,26 +1658,238 @@ private extension HomeView {
                     .fill(premiumCardFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(premiumCardBorder, lineWidth: 1)
+                            .stroke(selected ? DS.Color.accent.opacity(0.42) : premiumCardBorder, lineWidth: selected ? 1.35 : 1)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(DS.Color.accent.opacity(hovered ? 0.09 : 0), lineWidth: 1)
                     )
                     .background(premiumCardShadow(hovered: hovered))
             )
             .offset(y: hovered ? premiumCardHoverLift : 0)
-            .scaleEffect(hovered ? premiumCardHoverScale : 1)
+            .scaleEffect(shouldReduceMotion ? 1 : (hovered ? premiumCardHoverScale : 1))
+            .brightness(selected ? 0.012 : 0)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
-        .contextMenu {
-            Button("Open") { onOpenDocument(document) }
-            Button("Duplicate") { onDuplicate(document) }
-            Button("Rename…") { onRename(document) }
-            Divider()
-            Button("Delete", role: .destructive) { onDelete(document) }
-        }
+        .accessibilityLabel("Board row \(document.title)")
+        .contextMenu { boardContextMenu(for: document) }
+        .focusable()
         .onHover { inside in
             withAnimation(.easeOut(duration: 0.18)) {
                 hoveredBoardID = inside ? document.id : nil
             }
         }
+    }
+
+    var boardLibraryToolbar: some View {
+        HStack(spacing: DS.Spacing.sm) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Color(hex: "#6B7280"))
+                TextField("Search boards", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: 320, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.9))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
+
+            Picker("Sort", selection: $boardSort) {
+                ForEach(BoardSort.allCases) {
+                    Text($0.rawValue).tag($0)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Toggle(isOn: $favoriteOnly) {
+                Label("Favorites", systemImage: favoriteOnly ? "star.fill" : "star")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .toggleStyle(.button)
+            .tint(DS.Color.accent)
+            .animation(FlowDeskMotion.standardEaseOut, value: favoriteOnly)
+
+            Spacer()
+
+            Button {
+                withAnimation(FlowDeskMotion.quickEaseOut) {
+                    gridMode.toggle()
+                }
+            } label: {
+                Image(systemName: gridMode ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.Color.accent)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(Color.white.opacity(0.9))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(FlowDeskToolbarButtonStyle())
+        }
+    }
+
+    var boardTypeFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DS.Spacing.xs + 2) {
+                ForEach(BoardTypeFilter.allCases) { filter in
+                    let active = selectedBoardTypeFilters.contains(filter)
+                    Button {
+                        withAnimation(FlowDeskMotion.quickEaseOut) {
+                            if active {
+                                selectedBoardTypeFilters.remove(filter)
+                            } else {
+                                selectedBoardTypeFilters.insert(filter)
+                            }
+                        }
+                    } label: {
+                        Text(filter.rawValue)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(active ? DS.Color.accent : Color(hex: "#6B7280"))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(active ? DS.Color.homeChipActive : Color.white.opacity(0.86))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(active ? DS.Color.accent.opacity(0.34) : Color.black.opacity(0.06), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    func boardPreview(for document: FlowDocument) -> some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                if let image = previewImage(for: document) {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                } else {
+                    TemplatePreviewView(templateID: documentTemplateID(for: document), isHovered: false)
+                        .padding(6)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .clipped()
+    }
+
+    func boardTypeChip(_ document: FlowDocument) -> some View {
+        Text(documentTypeLabel(document))
+            .font(.system(size: 11, weight: .medium))
+            .tracking(0.6)
+            .foregroundStyle(Color(hex: "#9CA3AF"))
+            .padding(.horizontal, DS.Spacing.sm)
+            .padding(.vertical, DS.Spacing.xs - 1)
+            .background(Capsule().fill(DS.Color.hover))
+    }
+
+    func favoriteButton(for document: FlowDocument) -> some View {
+        Button {
+            onToggleFavorite(document)
+        } label: {
+            Image(systemName: document.isFavorite ? "star.fill" : "star")
+                .foregroundStyle(document.isFavorite ? DS.Color.accent : Color(hex: "#9CA3AF"))
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Color.white.opacity(0.86)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    func boardContextMenu(for document: FlowDocument) -> some View {
+        Button("Rename") { onRename(document) }
+        Button("Duplicate") { onDuplicate(document) }
+        Button(document.isFavorite ? "Unfavorite" : "Favorite") { onToggleFavorite(document) }
+        Button("Export") { onExport(document) }
+        Divider()
+        Button("Delete", role: .destructive) { onDelete(document) }
+    }
+
+    func documentTypeLabel(_ document: FlowDocument) -> String {
+        if document.title.localizedCaseInsensitiveContains("kanban") {
+            return BoardTypeFilter.kanban.rawValue
+        }
+        return document.boardType.displayName
+    }
+
+    func matchesTypeFilters(_ document: FlowDocument) -> Bool {
+        guard !selectedBoardTypeFilters.isEmpty else { return true }
+        let boardLabel = documentTypeLabel(document)
+        return selectedBoardTypeFilters.contains(where: { $0.rawValue == boardLabel })
+    }
+
+    func elementCount(for document: FlowDocument) -> Int {
+        CanvasBoardCoding.decode(from: document.canvasPayload).elements.count
+    }
+
+    func documentTemplateID(for document: FlowDocument) -> String {
+        if let template = document.resolvedBoardTemplate {
+            switch template {
+            case .flowDiagram:
+                return "flowchart"
+            case .document:
+                return "meeting-notes"
+            case .whiteboard:
+                return "brainstorm-board"
+            case .smartCanvas, .blankBoard:
+                break
+            }
+        }
+        switch document.boardType {
+        case .flowchart:
+            return "flowchart"
+        case .notes:
+            return "meeting-notes"
+        case .mindMap:
+            return "mind-map"
+        case .roadmap:
+            return "product-roadmap"
+        case .diagram:
+            return "app-wireframe"
+        case .whiteboard:
+            return "brainstorm-board"
+        }
+    }
+
+    func previewImage(for document: FlowDocument) -> Image? {
+        guard let data = document.thumbnailData, let image = NSImage(data: data) else { return nil }
+        return Image(nsImage: image)
+    }
+
+    func createTemplateFromID(_ templateID: String) {
+        guard let template = WorkspaceTemplate.gallery.first(where: { $0.id == templateID }) else { return }
+        onCreateTemplate(template)
     }
 
     func sectionHeader(_ text: String, subtitle: String) -> some View {
@@ -1390,8 +1905,20 @@ private extension HomeView {
         .padding(.top, DS.Typography.sectionTopSpacing)
     }
 
-    func emptyState(title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
+    struct EmptyStateAction: Identifiable {
+        let id = UUID()
+        let title: String
+        let icon: String
+        let action: () -> Void
+    }
+
+    func intelligentEmptyState(
+        icon: String,
+        title: String,
+        detail: String,
+        actions: [EmptyStateAction]
+    ) -> some View {
+        VStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(
@@ -1402,7 +1929,7 @@ private extension HomeView {
                         )
                     )
                     .frame(width: 50, height: 50)
-                Image(systemName: "sparkles")
+                Image(systemName: icon)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(DS.Color.accent.opacity(0.9))
             }
@@ -1415,9 +1942,32 @@ private extension HomeView {
                 .foregroundStyle(Color(hex: "#6B7280"))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
+            HStack(spacing: 8) {
+                ForEach(actions.prefix(3)) { action in
+                    Button {
+                        action.action()
+                    } label: {
+                        Label(action.title, systemImage: action.icon)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.white.opacity(0.88))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .foregroundStyle(DS.Color.accent)
+                }
+            }
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1430,50 +1980,27 @@ private extension HomeView {
         )
     }
 
+    func emptyState(title: String, detail: String) -> some View {
+        intelligentEmptyState(
+            icon: "sparkles",
+            title: title,
+            detail: detail,
+            actions: [
+                .init(title: "Blank canvas", icon: "plus.square", action: onNewWorkspace),
+                .init(title: "Use a template", icon: "square.grid.2x2", action: { selectedSection = .templates })
+            ]
+        )
+    }
+
     func compactEmptyState(title: String, detail: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "square.stack.3d.up.slash")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(DS.Color.textSecondary)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.white.opacity(0.65)))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(hex: "#111827"))
-                Text(detail)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(hex: "#6B7280"))
-            }
-            Spacer()
-            Button("Start blank") {
-                onCreateBlank()
-            }
-            .buttonStyle(FlowDeskHomeCardButtonStyle())
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(DS.Color.accent)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.88))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                    )
-            )
-        }
-        .frame(minHeight: 110)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(premiumCardFill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(premiumCardBorder, lineWidth: 1)
-                )
-                .background(premiumCardShadow(hovered: false))
+        intelligentEmptyState(
+            icon: "square.stack.3d.up.slash",
+            title: title,
+            detail: detail,
+            actions: [
+                .init(title: "Blank canvas", icon: "plus.square", action: onNewWorkspace),
+                .init(title: "Use a template", icon: "square.grid.2x2", action: { selectedSection = .templates })
+            ]
         )
     }
 
@@ -1515,5 +2042,115 @@ private extension HomeView {
                 hoveredSidebarSection = inside ? section : nil
             }
         }
+    }
+}
+
+private enum SmartStartSuggestionAction {
+    case template(WorkspaceTemplate)
+    case blankWithTitle(String)
+}
+
+private struct SmartStartSuggestion: Identifiable {
+    let id: String
+    let icon: String
+    let title: String
+    let description: String
+    let structureHint: String?
+    let action: SmartStartSuggestionAction
+    let resolvedTitle: String?
+}
+
+private enum SmartStartIntentMatcher {
+    static func suggestions(for input: String) -> [SmartStartSuggestion] {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var suggestions: [SmartStartSuggestion] = []
+        if let templateSuggestion = mappedTemplateSuggestion(from: trimmed) {
+            suggestions.append(templateSuggestion)
+        }
+        suggestions.append(
+            SmartStartSuggestion(
+                id: "blank-\(trimmed.lowercased())",
+                icon: "square",
+                title: "Create blank board with this title",
+                description: "\"\(trimmed)\"",
+                structureHint: nil,
+                action: .blankWithTitle(trimmed),
+                resolvedTitle: trimmed
+            )
+        )
+        return suggestions
+    }
+
+    private static func mappedTemplateSuggestion(from prompt: String) -> SmartStartSuggestion? {
+        let tokens = prompt
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+
+        let keywordMap: [(keyword: String, templateID: String, label: String, hint: String, icon: String)] = [
+            ("plan", "product-roadmap", "Suggested template: Roadmap", "Milestones, owners, and timeline lanes.", "calendar"),
+            ("brainstorm", "brainstorm-board", "Suggested template: Brainstorm board", "Use clusters and color tags for idea grouping.", "bolt.fill"),
+            ("flow", "flowchart", "Suggested template: Flowchart", "Start with a decision node, then branch outcomes.", "point.3.connected.trianglepath.dotted"),
+            ("notes", "meeting-notes", "Suggested template: Meeting notes", "Agenda, highlights, and action items sections.", "note.text"),
+            ("kanban", "kanban-board", "Suggested template: Kanban board", "Track work with To Do, Doing, Done columns.", "rectangle.3.group")
+        ]
+
+        guard let match = keywordMap.first(where: { tokens.contains($0.keyword) }) else {
+            return nil
+        }
+        guard let template = WorkspaceTemplate.gallery.first(where: { $0.id == match.templateID }) else {
+            return nil
+        }
+
+        let cleanedTitle = cleanedPromptTitle(prompt, removing: match.keyword)
+        return SmartStartSuggestion(
+            id: "template-\(template.id)-\(prompt.lowercased())",
+            icon: match.icon,
+            title: match.label,
+            description: "Create \"\(template.title)\" from your input",
+            structureHint: match.hint,
+            action: .template(template),
+            resolvedTitle: cleanedTitle
+        )
+    }
+
+    private static func cleanedPromptTitle(_ prompt: String, removing keyword: String) -> String? {
+        let pattern = "\\b\(NSRegularExpression.escapedPattern(for: keyword))\\b"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return prompt
+        }
+        let range = NSRange(prompt.startIndex..<prompt.endIndex, in: prompt)
+        let stripped = regex.stringByReplacingMatches(in: prompt, options: [], range: range, withTemplate: "")
+        let normalized = stripped.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? prompt : normalized
+    }
+}
+
+private extension HomeView {
+    var isScreenshotPolishMode: Bool {
+        #if DEBUG
+        suppressMonetizationUpsell
+        #else
+        false
+        #endif
+    }
+
+    var shouldShowUpgradeCopy: Bool {
+        !purchaseManager.isProUser && !isScreenshotPolishMode
+    }
+
+    var proBadge: some View {
+        Text("PRO")
+            .font(.system(size: 10, weight: .bold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(DS.Color.accent.opacity(0.16))
+            )
+            .foregroundStyle(DS.Color.accent)
     }
 }

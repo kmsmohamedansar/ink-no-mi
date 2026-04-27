@@ -1,72 +1,66 @@
-import Observation
 import SwiftUI
 
-/// App-wide appearance preferences (UserDefaults-backed).
-/// `EnvironmentKey.defaultValue` requires `Sendable`; store is main-actor–consumed in practice.
-@Observable
-final class FlowDeskAppearanceStore: @unchecked Sendable {
-    private enum Key: String {
-        case mode = "FlowDesk.appearance.mode"
-        case preset = "FlowDesk.appearance.stylePreset"
+final class AppearanceManager: ObservableObject {
+    @Published var settings: AppAppearanceSettings {
+        didSet {
+            saveSettings()
+            applyTheme()
+        }
     }
 
     private let defaults: UserDefaults
-
-    var mode: FlowDeskAppearanceMode {
-        didSet { persistMode() }
-    }
-
-    var stylePreset: FlowDeskStylePreset {
-        didSet { persistPreset() }
-    }
-
-    var preferredColorScheme: ColorScheme? {
-        mode.preferredColorScheme
-    }
+    private let storageKey = "InkNoMi.AppearanceSettings"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        if let raw = defaults.string(forKey: Key.mode.rawValue),
-           let parsed = FlowDeskAppearanceMode(rawValue: raw) {
-            self.mode = parsed
-        } else {
-            self.mode = .system
-        }
-        if let raw = defaults.string(forKey: Key.preset.rawValue),
-           let parsed = FlowDeskStylePreset(rawValue: raw) {
-            self.stylePreset = parsed
-        } else {
-            self.stylePreset = .warmPaper
-        }
+        self.settings = .default
+        loadSettings()
+        applyTheme()
     }
 
-    private func persistMode() {
-        defaults.set(mode.rawValue, forKey: Key.mode.rawValue)
+    func applyTheme() {
+        objectWillChange.send()
     }
 
-    private func persistPreset() {
-        defaults.set(stylePreset.rawValue, forKey: Key.preset.rawValue)
+    func resetToDefaults() {
+        settings = .default
+    }
+
+    func saveSettings() {
+        guard let data = try? JSONEncoder().encode(settings) else { return }
+        defaults.set(data, forKey: storageKey)
+    }
+
+    func loadSettings() {
+        guard let data = defaults.data(forKey: storageKey),
+              let decoded = try? JSONDecoder().decode(AppAppearanceSettings.self, from: data)
+        else {
+            settings = .default
+            return
+        }
+        settings = decoded
     }
 }
+
+typealias FlowDeskAppearanceStore = AppearanceManager
 
 // MARK: - Environment
 
 private enum FlowDeskAppearanceStoreKey: EnvironmentKey {
-    static let defaultValue = FlowDeskAppearanceStore()
+    static let defaultValue = AppearanceManager()
 }
 
 private enum FlowDeskAppearanceTokensKey: EnvironmentKey {
-    static let defaultValue = FlowDeskAppearanceTokens.fallback
+    static let defaultValue = DynamicTheme.fallback
 }
 
 extension EnvironmentValues {
-    var flowDeskAppearanceStore: FlowDeskAppearanceStore {
+    var flowDeskAppearanceStore: AppearanceManager {
         get { self[FlowDeskAppearanceStoreKey.self] }
         set { self[FlowDeskAppearanceStoreKey.self] = newValue }
     }
 
-    /// Resolved palette for the current `colorScheme` + user style preset. Injected by `MainWindowView`.
-    var flowDeskTokens: FlowDeskAppearanceTokens {
+    var flowDeskTokens: DynamicTheme {
         get { self[FlowDeskAppearanceTokensKey.self] }
         set { self[FlowDeskAppearanceTokensKey.self] = newValue }
     }

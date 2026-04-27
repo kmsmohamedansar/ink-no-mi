@@ -120,6 +120,7 @@ struct StickyNoteCanvasItemView: View {
         }
         .offset(composedMoveOffset)
         .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
+        .scaleEffect(isDragging ? 1.01 : 1.0)
         .contentShape(cardShape)
         .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
         .highPriorityGesture(

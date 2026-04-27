@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct InkNoMiApp: App {
     private let modelContainer = ModelContainerFactory.makeDefault()
-    @State private var appearanceStore = FlowDeskAppearanceStore()
+    @StateObject private var appearanceStore = AppearanceManager()
 
     var body: some Scene {
         // Native window chrome: minimize / zoom / full screen (no custom window styles).
@@ -26,11 +26,45 @@ struct InkNoMiApp: App {
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
             }
+
+            CommandGroup(after: .appInfo) {
+                Button("Command Palette…") {
+                    NotificationCenter.default.post(name: .flowDeskOpenCommandPalette, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: [.command])
+
+                Button("Export…") {
+                    NotificationCenter.default.post(name: .flowDeskExportBoard, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+
+                #if os(macOS)
+                SettingsLink {
+                    Text("Settings…")
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+                #endif
+            }
+
+            CommandMenu("View") {
+                Button("Toggle Focus Mode") {
+                    NotificationCenter.default.post(name: .flowDeskToggleFocusMode, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
+
+            CommandMenu("Help") {
+                Button("Keyboard Shortcuts") {
+                    NotificationCenter.default.post(name: .flowDeskOpenShortcutHelp, object: nil)
+                }
+                .keyboardShortcut("/", modifiers: [.shift])
+            }
         }
 
         #if os(macOS)
         Settings {
-            FlowDeskAppearanceSettingsView(store: appearanceStore)
+            FlowDeskAppearanceSettingsView()
+                .environmentObject(appearanceStore)
         }
         #endif
     }
