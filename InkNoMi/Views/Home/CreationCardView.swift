@@ -43,7 +43,7 @@ struct CreationCardView: View {
     }
 
     private var hoverScale: CGFloat {
-        prominence == .hero ? 1.034 : 1.026
+        DS.Interaction.hoverScale
     }
 
     var body: some View {
@@ -80,8 +80,8 @@ struct CreationCardView: View {
                         .font(.system(size: iconPointSize, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.primary)
-                        .scaleEffect(isHovered ? 1.07 : 1)
-                        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isHovered)
+                        .scaleEffect(isHovered ? DS.Interaction.hoverScale : 1)
+                        .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
                 }
                 .frame(width: iconWellSide, height: iconWellSide)
                 .clipped()

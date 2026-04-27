@@ -69,11 +69,14 @@ struct HomeView: View {
     @State private var hoveredBoardID: UUID?
     @State private var hoveredTemplateID: String?
     @State private var hoveredIntentChip: String?
+    @State private var hoveredCommandIcon: String?
     @State private var hoveredStarterTemplateID: String?
     @State private var hoveredWorkflowID: String?
+    @FocusState private var isCreationPromptFocused: Bool
     @State private var selectedFilter: HomeFilter = .whiteboards
     @State private var hoveredFilter: HomeFilter?
     @State private var creationPromptText = ""
+    @State private var heroHasAppeared = false
 
     private var filteredDocuments: [FlowDocument] {
         let base = documents.filter {
@@ -107,10 +110,10 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             creationBackground
-            HStack(spacing: DS.Spacing.grid) {
+            HStack(spacing: 0) {
                 sidebar
                 ScrollView {
-                    VStack(alignment: .leading, spacing: DS.Spacing.section) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.section + 2) {
                         topFilterChips
                         creationPromptCard
                         quickActions
@@ -122,56 +125,252 @@ struct HomeView: View {
                         if selectedSection == .trash { trashSection }
                         if selectedSection == .settings { settingsPlaceholder }
                     }
-                    .padding(.horizontal, DS.Spacing.xl)
-                    .padding(.vertical, DS.Spacing.section)
-                    .frame(maxWidth: 1220, alignment: .leading)
+                    .frame(maxWidth: 1100, alignment: .leading)
+                    .padding(.top, 44)
+                    .padding(.horizontal, 40)
+                    .padding(.trailing, 18)
+                    .padding(.bottom, 80)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
+                .scrollIndicators(.hidden)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Ink no Mi")
+        .onAppear {
+            if !heroHasAppeared {
+                heroHasAppeared = true
+            }
+        }
+    }
+}
+
+private struct TemplatePreviewView: View {
+    let templateID: String
+    let isHovered: Bool
+
+    private var visualOpacity: Double { isHovered ? 1.0 : 0.88 }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            content.padding(14)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.black.opacity(0.06)))
+    }
+
+    @ViewBuilder private var content: some View {
+        switch templateID {
+        case "brainstorm-board": brainstormPreview
+        case "flowchart": flowchartPreview
+        case "product-roadmap": roadmapPreview
+        case "meeting-notes": meetingNotesPreview
+        case "mind-map": mindMapPreview
+        case "kanban-board": kanbanPreview
+        case "app-wireframe": wireframePreview
+        case "swot-analysis": swotPreview
+        default: flowchartPreview
+        }
+    }
+
+    private var brainstormPreview: some View {
+        ZStack {
+            sticky("#FFE58A", -34, -18); sticky("#B7DCFF", -8, -22); sticky("#CFEFBC", 21, -14); sticky("#FFC8A7", -23, -2)
+            sticky("#D8CCFF", 2, 6); sticky("#BEEAD9", 30, 9); sticky("#B3D5FF", -6, 18); sticky("#C9BCFF", 21, 18)
+        }
+    }
+    private func sticky(_ hex: String, _ x: CGFloat, _ y: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(Color(hex: hex).opacity(visualOpacity))
+            .frame(width: 24, height: 14)
+            .shadow(color: .black.opacity(0.08), radius: 2.5, x: 0, y: 1.5)
+            .offset(x: x, y: y)
+    }
+
+    private var flowchartPreview: some View {
+        GeometryReader { g in
+            let y = g.size.height * 0.44
+            ZStack {
+                Path { p in
+                    p.move(to: CGPoint(x: g.size.width * 0.20, y: y)); p.addLine(to: CGPoint(x: g.size.width * 0.83, y: y))
+                    p.move(to: CGPoint(x: g.size.width * 0.68, y: y)); p.addLine(to: CGPoint(x: g.size.width * 0.68, y: g.size.height * 0.72))
+                }.stroke(Color(hex: "#57627B").opacity(visualOpacity), lineWidth: 1.25)
+                node("#8CC5FF", 0.14, 0.44, g); node("#B7A2FF", 0.30, 0.44, g); diamond("#FFD58E", 0.52, 0.44, g)
+                node("#A6D6FF", 0.68, 0.44, g); node("#BFE7C5", 0.68, 0.72, g)
+            }
+        }
+    }
+    private func node(_ hex: String, _ x: CGFloat, _ y: CGFloat, _ g: GeometryProxy) -> some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(Color(hex: hex).opacity(visualOpacity))
+            .frame(width: 18, height: 12)
+            .position(x: g.size.width * x, y: g.size.height * y)
+    }
+    private func diamond(_ hex: String, _ x: CGFloat, _ y: CGFloat, _ g: GeometryProxy) -> some View {
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(Color(hex: hex).opacity(visualOpacity))
+            .frame(width: 12, height: 12)
+            .rotationEffect(.degrees(45))
+            .position(x: g.size.width * x, y: g.size.height * y)
+    }
+
+    private var roadmapPreview: some View {
+        HStack(spacing: 7) { roadmapColumn("Now", "#96C8FF"); roadmapColumn("Next", "#C3B4FF"); roadmapColumn("Later", "#BFE5C7") }
+    }
+    private func roadmapColumn(_ title: String, _ hex: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 6.5, weight: .semibold)).foregroundStyle(Color(hex: "#4A556D").opacity(visualOpacity))
+            RoundedRectangle(cornerRadius: 3).fill(Color(hex: hex).opacity(visualOpacity)).frame(height: 8)
+            RoundedRectangle(cornerRadius: 3).fill(Color(hex: hex).opacity(max(0.85, visualOpacity - 0.05))).frame(height: 8)
+            RoundedRectangle(cornerRadius: 3).fill(Color(hex: hex).opacity(max(0.85, visualOpacity - 0.10))).frame(height: 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var meetingNotesPreview: some View {
+        VStack(alignment: .leading, spacing: 3.5) {
+            RoundedRectangle(cornerRadius: 4).fill(Color(hex: "#2E3A59").opacity(visualOpacity)).frame(width: 82, height: 6)
+            ForEach(0..<5, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#5D6A84").opacity(max(0.85, visualOpacity - (Double(i) * 0.02)))).frame(width: CGFloat(92 - (i * 8)), height: 4)
+            }
+            HStack(spacing: 5) { bullet("#8CBFFF", 20); bullet("#B9ACFF", 18); bullet("#9FDDB0", 16) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    private func bullet(_ hex: String, _ width: CGFloat) -> some View {
+        HStack(spacing: 3) {
+            Circle().fill(Color(hex: hex).opacity(visualOpacity)).frame(width: 3.5, height: 3.5)
+            RoundedRectangle(cornerRadius: 2.5).fill(Color(hex: "#4F5C76").opacity(visualOpacity)).frame(width: width, height: 3.5)
+        }
+    }
+
+    private var mindMapPreview: some View {
+        GeometryReader { g in
+            let c = CGPoint(x: g.size.width * 0.5, y: g.size.height * 0.5)
+            let pts: [CGPoint] = [CGPoint(x: g.size.width * 0.50, y: g.size.height * 0.16), CGPoint(x: g.size.width * 0.78, y: g.size.height * 0.32), CGPoint(x: g.size.width * 0.78, y: g.size.height * 0.70), CGPoint(x: g.size.width * 0.50, y: g.size.height * 0.84), CGPoint(x: g.size.width * 0.24, y: g.size.height * 0.53)]
+            ZStack {
+                Path { p in for pt in pts { p.move(to: c); p.addLine(to: pt) } }.stroke(Color(hex: "#637191").opacity(visualOpacity), lineWidth: 1.2)
+                Circle().fill(Color(hex: "#88BEFF").opacity(visualOpacity)).frame(width: 16, height: 16).position(c)
+                ForEach(Array(pts.enumerated()), id: \.offset) { i, pt in Circle().fill(mindColor(i).opacity(visualOpacity)).frame(width: 10, height: 10).position(pt) }
+            }
+        }
+    }
+    private func mindColor(_ index: Int) -> Color {
+        [Color(hex: "#C4B6FF"), Color(hex: "#A0D4FF"), Color(hex: "#AEE5BC"), Color(hex: "#F7D59D"), Color(hex: "#D8B9FF")][index % 5]
+    }
+
+    private var kanbanPreview: some View {
+        HStack(spacing: 6) { kanbanColumn("#97C8FF"); kanbanColumn("#C6B8FF"); kanbanColumn("#BFE5C7") }
+    }
+    private func kanbanColumn(_ hex: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            RoundedRectangle(cornerRadius: 2.5).fill(Color(hex: "#4E5A75").opacity(visualOpacity)).frame(width: 18, height: 4)
+            RoundedRectangle(cornerRadius: 3).fill(Color(hex: hex).opacity(visualOpacity)).frame(width: 20, height: 11)
+            RoundedRectangle(cornerRadius: 3).fill(Color(hex: hex).opacity(max(0.85, visualOpacity - 0.06))).frame(width: 20, height: 11)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var wireframePreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color(hex: "#6EA8FF").opacity(visualOpacity), lineWidth: 1.8).frame(width: 46, height: 74)
+            VStack(spacing: 4) {
+                RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#A9CCFF").opacity(visualOpacity)).frame(width: 30, height: 7)
+                RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#C1DBFF").opacity(visualOpacity)).frame(width: 30, height: 10)
+                RoundedRectangle(cornerRadius: 3).fill(Color(hex: "#D5E6FF").opacity(visualOpacity)).frame(width: 30, height: 10)
+                RoundedRectangle(cornerRadius: 4).fill(Color(hex: "#7FB3FF").opacity(visualOpacity)).frame(width: 18, height: 8)
+                HStack(spacing: 4) {
+                    Circle().fill(Color(hex: "#7EAFFF").opacity(visualOpacity)).frame(width: 4, height: 4)
+                    Circle().fill(Color(hex: "#B0CCF8").opacity(visualOpacity)).frame(width: 4, height: 4)
+                    Circle().fill(Color(hex: "#D3E3FA").opacity(visualOpacity)).frame(width: 4, height: 4)
+                }
+            }
+        }
+    }
+
+    private var swotPreview: some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 5) { swotQuadrant("#DDEBFF"); swotQuadrant("#DDF5E5") }
+            HStack(spacing: 5) { swotQuadrant("#FFF3D8"); swotQuadrant("#FFE4EE") }
+        }
+    }
+    private func swotQuadrant(_ hex: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            RoundedRectangle(cornerRadius: 2.5).fill(Color(hex: "#5A667E").opacity(visualOpacity)).frame(width: 15, height: 3.5)
+            RoundedRectangle(cornerRadius: 2.5).fill(Color(hex: "#73819D").opacity(visualOpacity)).frame(width: 18, height: 3)
+            RoundedRectangle(cornerRadius: 2.5).fill(Color(hex: "#8794AD").opacity(max(0.85, visualOpacity - 0.04))).frame(width: 14, height: 3)
+        }
+        .padding(4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color(hex: hex).opacity(visualOpacity)))
     }
 }
 
 private extension HomeView {
+    var premiumCardFill: Color {
+        Color.white
+    }
+
+    var premiumCardBorder: Color {
+        Color.black.opacity(0.06)
+    }
+
+    var premiumCardRadius: CGFloat {
+        18
+    }
+
+    var premiumCardHoverLift: CGFloat {
+        -1
+    }
+
+    var premiumCardHoverScale: CGFloat {
+        1.015
+    }
+
+    func premiumCardShadow(hovered: Bool) -> some View {
+        RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
+            .fill(Color.clear)
+            .shadow(
+                color: .black.opacity(hovered ? 0.12 : 0.06),
+                radius: hovered ? 20 : 12,
+                x: 0,
+                y: hovered ? 10 : 4
+            )
+    }
+
+    func floatingShadow() -> some View {
+        RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
+            .fill(Color.clear)
+            .shadow(color: .black.opacity(0.12), radius: 20, x: 0, y: 10)
+    }
+
     var creationBackground: some View {
         ZStack {
             DS.Color.homeMainBackground
             RadialGradient(
-                colors: [
-                    Color.white.opacity(0.92),
-                    DS.Color.homeMainBackground.opacity(0.98),
-                    DS.Color.homeMainBackgroundEdge.opacity(0.92)
-                ],
-                center: .center,
-                startRadius: 0,
-                endRadius: 940
+                colors: [Color.white.opacity(0.96), Color.clear],
+                center: UnitPoint(x: 0.5, y: 0.04),
+                startRadius: 20,
+                endRadius: 520
             )
             Circle()
                 .fill(DS.Color.homeGlowBlue)
-                .blur(radius: 70)
+                .blur(radius: 120)
                 .frame(width: 380, height: 380)
                 .offset(x: -250, y: -160)
             Circle()
                 .fill(DS.Color.homeGlowPurple)
-                .blur(radius: 80)
+                .blur(radius: 160)
                 .frame(width: 420, height: 420)
                 .offset(x: 340, y: -120)
-            RadialGradient(
-                colors: [DS.Color.accent.opacity(0.10), Color.clear],
-                center: UnitPoint(x: 0.52, y: 0.43),
-                startRadius: 0,
-                endRadius: 360
-            )
-            RadialGradient(
-                colors: [
-                    Color.clear,
-                    DS.Color.backgroundVignette.opacity(0.55)
-                ],
-                center: .center,
-                startRadius: 380,
-                endRadius: 980
-            )
             creationGridOverlay
         }
         .ignoresSafeArea()
@@ -180,7 +379,7 @@ private extension HomeView {
     var creationGridOverlay: some View {
         GeometryReader { geometry in
             Path { path in
-                let step: CGFloat = 34
+                let step: CGFloat = 32
                 var x: CGFloat = 0
                 while x <= geometry.size.width {
                     path.move(to: CGPoint(x: x, y: 0))
@@ -194,23 +393,34 @@ private extension HomeView {
                     y += step
                 }
             }
-            .stroke(DS.Color.homeMainGrid, lineWidth: 0.72)
+            .stroke(DS.Color.homeMainGrid, lineWidth: 0.5)
         }
-        .opacity(0.30)
+        .opacity(1)
         .allowsHitTesting(false)
     }
 
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+        VStack(alignment: .leading, spacing: DS.Spacing.md) {
             HStack(spacing: DS.Spacing.sm) {
-                Image(systemName: "scribble.variable")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(DS.Color.accent)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#EEF4FF"), Color(hex: "#DDE8FF")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "scribble.variable")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(DS.Color.accent)
+                }
                 Text("InkNoMi")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#111827"))
             }
-            .padding(.bottom, DS.Spacing.sm)
+            .padding(.bottom, DS.Spacing.xs)
 
             ForEach(SidebarSection.allCases) { section in
                 sidebarRow(section)
@@ -219,23 +429,39 @@ private extension HomeView {
             Spacer()
 
             if !purchaseManager.isProUser {
+                Rectangle()
+                    .fill(DS.Color.homeSidebarBorder.opacity(0.9))
+                    .frame(height: 1)
+                    .padding(.bottom, DS.Spacing.sm)
                 Button {
                     purchaseManager.requestedFeature = nil
                     purchaseManager.isPaywallPresented = true
                 } label: {
                     HStack(spacing: DS.Spacing.sm) {
                         Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
                         Text("Upgrade")
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, DS.Spacing.sm)
+                    .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                            .fill(DS.Color.active)
+                        RoundedRectangle(cornerRadius: DS.Radius.medium + 1, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#EEF4FF"), Color(hex: "#DFEAFF")],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DS.Radius.medium + 1, style: .continuous)
+                                    .stroke(DS.Color.accent.opacity(0.26), lineWidth: 1)
+                            )
+                            .background(premiumCardShadow(hovered: false))
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FlowDeskHomeCardButtonStyle())
                 .foregroundStyle(DS.Color.accent)
             }
         }
@@ -250,7 +476,6 @@ private extension HomeView {
                         .fill(DS.Color.homeSidebarBorder)
                         .frame(width: 1)
                 }
-                .shadow(color: Color.black.opacity(0.04), radius: 10, x: 0, y: 3)
         )
     }
 
@@ -265,121 +490,189 @@ private extension HomeView {
                     }
                 } label: {
                     Text(filter.rawValue)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(active ? DS.Color.accent : DS.Color.textSecondary)
                         .padding(.horizontal, DS.Spacing.md)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                         .background(
                             Capsule(style: .continuous)
                                 .fill(active ? DS.Color.homeChipActive : (hovered ? DS.Color.homeChipHover : DS.Color.homeChipFill))
                                 .overlay(
                                     Capsule(style: .continuous)
-                                        .stroke(active ? DS.Color.accent.opacity(0.32) : DS.Color.borderSubtle.opacity(0.35))
+                                        .stroke(active ? DS.Color.accent.opacity(0.36) : DS.Color.borderSubtle.opacity(0.45))
                                 )
                         )
-                        .scaleEffect(hovered ? 1.02 : 1)
+                        .scaleEffect(hovered ? 1.016 : 1)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FlowDeskHomeCardButtonStyle())
                 .onHover { inside in
-                    hoveredFilter = inside ? filter : nil
+                    withAnimation(FlowDeskMotion.premiumLiftEaseOut) {
+                        hoveredFilter = inside ? filter : nil
+                    }
                 }
             }
         }
     }
 
     var creationPromptCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
-            Text("Start creating")
-                .font(.system(size: 42, weight: .bold, design: .rounded))
-                .tracking(-0.6)
-                .foregroundStyle(DS.Color.textPrimary)
-            Text("Capture an idea, pick a template, then jump straight into your board.")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(DS.Color.textSecondary)
+        VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Start creating")
+                    .font(.system(size: 36, weight: .bold))
+                    .tracking(-0.2)
+                    .lineSpacing(1.05)
+                    .foregroundStyle(Color(hex: "#111827"))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Text("Capture an idea, pick a template, then jump straight into your board.")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(Color(hex: "#4B5563"))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 520, alignment: .center)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-            HStack(spacing: DS.Spacing.sm) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(DS.Color.accent)
-                TextField("What do you want to map out?", text: $creationPromptText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .medium))
-                Button {
-                    onCreateBlank()
-                } label: {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? DS.Color.textTertiary : .white)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? DS.Color.homeChipHover : DS.Color.accent)
+                VStack(spacing: 8) {
+                    HStack(spacing: DS.Spacing.md) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(DS.Color.accent)
+                            .opacity(0.72)
+                        TextField(
+                            "",
+                            text: $creationPromptText,
+                            prompt: Text("I want to create...")
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(Color(hex: "#9CA3AF"))
                         )
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15, weight: .medium))
+                        .focused($isCreationPromptFocused)
+
+                        Button {
+                            onCreateBlank()
+                        } label: {
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [DS.Color.accent, DS.Color.accent.opacity(0.9)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .opacity(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
+                                )
+                        }
+                        .buttonStyle(FlowDeskHomeCardButtonStyle())
+                        .disabled(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    HStack {
+                        commandInputIcon(symbol: "bolt.fill", id: "brainstorm")
+                        Spacer()
+                        commandInputIcon(symbol: "point.3.connected.trianglepath.dotted", id: "flowchart")
+                        Spacer()
+                        commandInputIcon(symbol: "note.text", id: "notes")
+                        Spacer()
+                        commandInputIcon(symbol: "rectangle.3.group", id: "wireframe")
+                        Spacer()
+                        commandInputIcon(symbol: "tablecells", id: "table")
+                    }
+                    .padding(.horizontal, 4)
                 }
-                .buttonStyle(.plain)
-                .disabled(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 56)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(DS.Color.homePromptInputFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(DS.Color.accent.opacity(0.24), lineWidth: 1.1)
-                    )
-                        .shadow(color: DS.Color.accent.opacity(0.10), radius: 14, x: 0, y: 5)
-            )
-
-            HStack(spacing: DS.Spacing.md) {
-                Label("Whiteboard", systemImage: "square.on.square")
-                Label("Flow", systemImage: "point.3.connected.trianglepath.dotted")
-                Label("Notes", systemImage: "note.text")
-                Label("Wireframe", systemImage: "rectangle.3.group")
-            }
-            .font(.system(size: 12.5, weight: .semibold))
-            .foregroundStyle(DS.Color.textSecondary)
-
-            HStack(spacing: DS.Spacing.sm) {
-                intentChip("Brainstorm", templateID: "brainstorm-board")
-                intentChip("Flowchart", templateID: "flowchart")
-                intentChip("Planning", templateID: "product-roadmap")
-                intentChip("Meeting notes", templateID: "meeting-notes")
-            }
-
-            HStack(spacing: DS.Spacing.sm) {
-                Button("Start blank canvas") {
-                    onCreateBlank()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 13.5, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, DS.Spacing.md)
+                .padding(.horizontal, 20)
                 .padding(.vertical, 10)
+                .frame(height: 76)
                 .background(
-                    Capsule(style: .continuous)
-                        .fill(DS.Color.accent)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(0.995))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(
+                                    isCreationPromptFocused ? DS.Color.accent.opacity(0.52) : Color.black.opacity(0.12),
+                                    lineWidth: isCreationPromptFocused ? 1.1 : 1
+                                )
+                        )
+                        .shadow(
+                            color: .black.opacity(isCreationPromptFocused ? 0.14 : 0.08),
+                            radius: isCreationPromptFocused ? 22 : 12,
+                            x: 0,
+                            y: isCreationPromptFocused ? 12 : 5
+                        )
                 )
-                .shadow(color: DS.Color.accent.opacity(0.33), radius: 10, x: 0, y: 4)
+                .animation(FlowDeskMotion.premiumLiftEaseOut, value: isCreationPromptFocused)
 
-                Button("Use template") {
-                    selectedSection = .templates
+                HStack(spacing: 8) {
+                    intentChip("Brainstorm", templateID: "brainstorm-board")
+                    intentChip("Flowchart", templateID: "flowchart")
+                    intentChip("Planning", templateID: "product-roadmap")
+                    intentChip("Meeting notes", templateID: "meeting-notes")
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 13.5, weight: .semibold))
-                .foregroundStyle(DS.Color.accent)
+
+                HStack(spacing: 8) {
+                    Button("Start blank canvas") {
+                        onCreateBlank()
+                    }
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, DS.Spacing.md)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    )
+
+                    Button("Use template") {
+                        selectedSection = .templates
+                    }
+                    .buttonStyle(FlowDeskHomeCardButtonStyle())
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(DS.Color.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.82))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                    )
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 22)
+            .frame(maxWidth: 700, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
+                    .overlay(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.7), Color.white.opacity(0)],
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
+                    )
+                    .background(premiumCardShadow(hovered: false))
+            )
         }
-        .padding(32)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.xxLarge, style: .continuous)
-                .fill(DS.Color.homePromptFill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.xxLarge, style: .continuous)
-                        .stroke(DS.Color.accent.opacity(0.16))
-                )
-                .shadow(color: Color.black.opacity(0.10), radius: 24, x: 0, y: 11)
-        )
+        .frame(maxWidth: .infinity, alignment: .center)
+        .opacity(heroHasAppeared ? 1 : 0)
+        .offset(y: heroHasAppeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.25), value: heroHasAppeared)
     }
 
     func intentChip(_ title: String, templateID: String) -> some View {
@@ -390,15 +683,15 @@ private extension HomeView {
             }
         } label: {
             Text(title)
-                .font(.system(size: 13.5, weight: .semibold))
-                .foregroundStyle(DS.Color.textPrimary.opacity(0.85))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(hex: "#111827"))
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
                 .background(
                     Capsule(style: .continuous)
                         .fill(Color.white.opacity(0.92))
                         .overlay(Capsule(style: .continuous).stroke(Color.black.opacity(0.08), lineWidth: 1))
-                        .shadow(color: Color.black.opacity(hovered ? 0.10 : 0.06), radius: hovered ? 10 : 6, x: 0, y: hovered ? 4 : 2)
+                        .background(premiumCardShadow(hovered: hovered))
                 )
                 .scaleEffect(hovered ? 1.02 : 1)
         }
@@ -407,6 +700,19 @@ private extension HomeView {
         .onHover { inside in
             hoveredIntentChip = inside ? templateID : nil
         }
+    }
+
+    func commandInputIcon(symbol: String, id: String) -> some View {
+        let isHovered = hoveredCommandIcon == id
+        return Image(systemName: symbol)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Color(hex: "#6B7280"))
+            .opacity(isHovered ? 1 : 0.6)
+            .onHover { inside in
+                withAnimation(.easeOut(duration: 0.15)) {
+                    hoveredCommandIcon = inside ? id : nil
+                }
+            }
     }
 
     var quickActions: some View {
@@ -450,74 +756,58 @@ private extension HomeView {
         action: @escaping () -> Void
     ) -> some View {
         let hovered = hoveredQuickAction == id
+        let isPrimary = id == "new"
         return Button(action: action) {
-            VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: icon)
                         .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(id == "new" ? Color.white.opacity(0.95) : DS.Color.accent)
-                    if id == "new" {
+                        .foregroundStyle(DS.Color.accent)
+                    if isPrimary {
                         Text("Recommended")
                             .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.92))
+                            .foregroundStyle(DS.Color.accent)
                             .padding(.horizontal, DS.Spacing.sm)
                             .padding(.vertical, 3)
-                            .background(Capsule(style: .continuous).fill(Color.white.opacity(0.18)))
+                            .background(Capsule(style: .continuous).fill(Color(hex: "#EEF4FF")))
                     }
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(id == "new" ? Color.white : DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "#111827"))
                 Text(subtitle)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(id == "new" ? Color.white.opacity(0.85) : DS.Color.textSecondary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#4B5563"))
                     .lineLimit(2)
-                if id == "new" {
+                if isPrimary {
                     HStack(spacing: 6) {
                         Text("Start now")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .medium))
                         Image(systemName: "arrow.right")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundStyle(Color.white.opacity(0.95))
+                    .foregroundStyle(DS.Color.accent)
                 }
             }
-            .padding(DS.Spacing.cardPadding + 1)
-            .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, minHeight: 142, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large)
-                    .fill(
-                        id == "new"
-                            ? LinearGradient(
-                                colors: [Color(red: 0.30, green: 0.58, blue: 1.0), Color(red: 0.18, green: 0.42, blue: 0.98)],
-                                startPoint: .topLeading,
-                                endPoint: .bottom
-                            )
-                            : LinearGradient(
-                                colors: [Color.white.opacity(0.92), Color.white.opacity(0.80)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                    )
+                RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
+                    .fill(premiumCardFill)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.large)
-                            .stroke(id == "new" ? DS.Color.accent.opacity(0.52) : DS.Color.borderSubtle.opacity(0.24))
+                        RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.large)
-                            .fill(hovered ? DS.Color.hover.opacity(0.16) : Color.clear)
-                    )
-                    .shadow(
-                        color: Color.black.opacity(id == "new" ? (hovered ? 0.27 : 0.22) : (hovered ? 0.14 : 0.10)),
-                        radius: id == "new" ? (hovered ? 40 : 33) : (hovered ? 19 : 13),
-                        x: 0,
-                        y: id == "new" ? (hovered ? 19 : 15) : (hovered ? 7 : 4)
-                    )
+                    .background(premiumCardShadow(hovered: hovered))
             )
-            .brightness(hovered ? 0.016 : 0)
-            .offset(y: hovered ? -2.2 : 0)
-            .scaleEffect(enabled && hovered ? (id == "new" ? 1.028 : 1.02) : 1.0)
-            .opacity(enabled ? 1 : 0.64)
+            .offset(y: hovered ? premiumCardHoverLift : 0)
+            .scaleEffect(
+                enabled
+                    ? (hovered ? premiumCardHoverScale : 1.0)
+                    : 0.986
+            )
+            .opacity(enabled ? 1 : 0.58)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .disabled(!enabled)
@@ -529,7 +819,7 @@ private extension HomeView {
     }
 
     var recentSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+        VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             sectionHeader("Recent", subtitle: purchaseManager.isProUser ? "Jump back in quickly." : "Jump back in quickly. Unlimited boards (Pro).")
             if recentDocuments.isEmpty {
                 compactEmptyState(
@@ -537,7 +827,7 @@ private extension HomeView {
                     detail: "Start blank or use a template to create your first board."
                 )
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: DS.Spacing.grid)], spacing: DS.Spacing.grid) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Spacing.md)], spacing: DS.Spacing.md) {
                     ForEach(recentDocuments, id: \.persistentModelID) {
                         boardCard($0)
                     }
@@ -570,9 +860,9 @@ private extension HomeView {
                 )
             }
             Text("Create your first board to unlock more templates.")
-                .font(DS.Typography.label)
-                .tracking(DS.Typography.labelTracking)
-                .foregroundStyle(DS.Color.textTertiary)
+                .font(.system(size: 11, weight: .medium))
+                .tracking(0.6)
+                .foregroundStyle(Color(hex: "#9CA3AF"))
                 .padding(.top, DS.Spacing.xs)
         }
     }
@@ -583,41 +873,38 @@ private extension HomeView {
                 onCreateTemplate(template)
             }
         } label: {
-            VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: DS.Spacing.sm) {
                     Image(systemName: icon)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(DS.Color.accent)
                     Text(title)
-                        .font(.system(size: 15.5, weight: .semibold))
-                        .foregroundStyle(DS.Color.textPrimary)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color(hex: "#111827"))
                 }
                 Text(subtitle)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#6B7280"))
                     .lineLimit(2)
                 Spacer(minLength: 0)
                 Text("Open template")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(DS.Color.accent)
             }
-            .padding(DS.Spacing.cardPadding)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 150, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large)
-                    .fill(
-                        LinearGradient(
-                            colors: [DS.Color.creationCardSurface, DS.Color.creationCardSurface.opacity(0.86)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
                     )
-                    .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).stroke(DS.Color.creationCardBorder.opacity(0.22)))
-                    .shadow(color: Color.black.opacity(0.09), radius: 12, x: 0, y: 5)
+                    .background(premiumCardShadow(hovered: hoveredStarterTemplateID == templateID))
             )
-            .brightness((hoveredStarterTemplateID == templateID) ? 0.012 : 0)
-            .offset(y: (hoveredStarterTemplateID == templateID) ? -2 : 0)
-            .scaleEffect((hoveredStarterTemplateID == templateID) ? 1.02 : 1)
+            .offset(y: (hoveredStarterTemplateID == templateID) ? premiumCardHoverLift : 0)
+            .scaleEffect((hoveredStarterTemplateID == templateID) ? premiumCardHoverScale : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .animation(.easeOut(duration: 0.18), value: hoveredStarterTemplateID == templateID)
@@ -644,30 +931,40 @@ private extension HomeView {
         HStack(alignment: .center, spacing: DS.Spacing.md) {
             VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 Text("Go further with InkNoMi Pro")
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "#111827"))
                 Text("Unlimited boards and advanced templates when you need them.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#6B7280"))
             }
             Spacer()
             Button("Upgrade") {
                 purchaseManager.requestedFeature = nil
                 purchaseManager.isPaywallPresented = true
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 12.5, weight: .semibold))
+            .buttonStyle(FlowDeskHomeCardButtonStyle())
+            .font(.system(size: 14, weight: .medium))
             .foregroundStyle(DS.Color.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.84))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
 
             Button {
-                proHintDismissed = true
+                UserDefaults.standard.set(true, forKey: "InkNoMi.ProHintDismissed")
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(DS.Color.textSecondary)
                     .frame(width: 18, height: 18)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskHomeCardButtonStyle())
         }
         .padding(DS.Spacing.md)
         .background(
@@ -677,6 +974,7 @@ private extension HomeView {
                     RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                         .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme))
                 )
+                .background(premiumCardShadow(hovered: false))
         )
     }
 
@@ -690,29 +988,26 @@ private extension HomeView {
                 Image(systemName: icon)
                     .foregroundStyle(DS.Color.accent)
                 Text(title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "#111827"))
                 Spacer()
                 Image(systemName: "arrow.up.forward")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.Color.textSecondary)
             }
-            .padding(DS.Spacing.cardPadding)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [DS.Color.creationCardSurface, DS.Color.creationCardSurface.opacity(0.86)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
                     )
-                    .overlay(RoundedRectangle(cornerRadius: DS.Radius.medium).stroke(DS.Color.creationCardBorder.opacity(0.2)))
-                    .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
+                    .background(premiumCardShadow(hovered: hoveredWorkflowID == templateID))
             )
-            .brightness(hoveredWorkflowID == templateID ? 0.01 : 0)
-            .offset(y: hoveredWorkflowID == templateID ? -1.6 : 0)
-            .scaleEffect(hoveredWorkflowID == templateID ? 1.02 : 1)
+            .offset(y: hoveredWorkflowID == templateID ? premiumCardHoverLift : 0)
+            .scaleEffect(hoveredWorkflowID == templateID ? premiumCardHoverScale : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .animation(.easeOut(duration: 0.18), value: hoveredWorkflowID == templateID)
@@ -722,7 +1017,7 @@ private extension HomeView {
     }
 
     var boardsSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+        VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             HStack {
                 sectionHeader(
                     selectedSection == .favorites ? "Favorites" : "All Boards",
@@ -741,8 +1036,19 @@ private extension HomeView {
                     }
                 } label: {
                     Image(systemName: gridMode ? "list.bullet" : "square.grid.2x2")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DS.Color.accent)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(Color.white.opacity(0.9))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                )
+                        )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FlowDeskToolbarButtonStyle())
             }
 
             let source = selectedSection == .favorites ? filteredDocuments.filter(\.isFavorite) : filteredDocuments
@@ -752,13 +1058,13 @@ private extension HomeView {
                     detail: "Try another filter or create a new board."
                 )
             } else if gridMode {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: DS.Spacing.grid)], spacing: DS.Spacing.grid) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: DS.Spacing.md)], spacing: DS.Spacing.md) {
                     ForEach(source, id: \.persistentModelID) {
                         boardCard($0)
                     }
                 }
             } else {
-                VStack(spacing: DS.Spacing.sm) {
+                VStack(spacing: DS.Spacing.xs + 2) {
                     ForEach(source, id: \.persistentModelID) {
                         boardListRow($0)
                     }
@@ -768,73 +1074,55 @@ private extension HomeView {
     }
 
     var templatesSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+        VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             sectionHeader("Template Library", subtitle: "Pick a structured starting point and customize fast.")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: DS.Spacing.grid)], spacing: DS.Spacing.grid) {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(minimum: 220), spacing: 22), count: 4),
+                spacing: 22
+            ) {
                 ForEach(selectedTemplates) { template in
                     let hovered = hoveredTemplateID == template.id
                     Button {
                         onCreateTemplate(template)
                     } label: {
-                        VStack(alignment: .leading, spacing: DS.Spacing.md) {
-                            RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color(red: 0.91, green: 0.95, blue: 1.0), Color(red: 0.96, green: 0.98, blue: 1.0)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(height: 90)
-                                .overlay {
-                                    templatePreview(for: template)
-                                }
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                                        .stroke(DS.Color.accent.opacity(0.12))
-                                )
+                        VStack(alignment: .leading, spacing: 8) {
+                            homeTemplatePreview(templateID: template.id, hovered: hovered)
+                                .frame(height: 108)
+                                .brightness(hovered ? 0.04 : 0)
+                                .scaleEffect(hovered ? 1.01 : 1)
+                                .animation(FlowDeskMotion.premiumLiftEaseOut, value: hovered)
 
                             HStack {
                                 Image(systemName: template.icon)
                                     .foregroundStyle(DS.Color.accent)
                                 Text(template.category.displayName.uppercased())
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .tracking(0.7)
-                                    .foregroundStyle(DS.Color.textSecondary)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .tracking(0.6)
+                                    .foregroundStyle(Color(hex: "#9CA3AF"))
                             }
                             Text(template.title)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(DS.Color.textPrimary)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color(hex: "#111827"))
                             Text(template.description)
-                                .font(.system(size: 12.5))
-                                .foregroundStyle(DS.Color.textSecondary)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(Color(hex: "#6B7280"))
                                 .lineLimit(2)
                             Text("Use this template")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(DS.Color.accent)
                         }
-                        .padding(DS.Spacing.cardPadding + 1)
-                        .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity, minHeight: 250, alignment: .leading)
                         .background(
-                            RoundedRectangle(cornerRadius: DS.Radius.large)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [DS.Color.creationCardSurface, DS.Color.creationCardSurface.opacity(0.94)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(premiumCardFill)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: DS.Radius.large)
-                                        .fill(hovered ? DS.Color.hover.opacity(0.2) : Color.clear)
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(premiumCardBorder, lineWidth: 1)
                                 )
-                                .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).stroke(DS.Color.creationCardBorder.opacity(hovered ? 0.30 : 0.24)))
-                                .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).stroke(DS.Color.accent.opacity(hovered ? 0.14 : 0.07)))
-                                .shadow(color: Color.black.opacity(hovered ? 0.13 : 0.10), radius: hovered ? 17 : 13, x: 0, y: hovered ? 7 : 5)
+                                .background(premiumCardShadow(hovered: hovered))
                         )
-                        .brightness(hovered ? 0.016 : 0)
-                        .offset(y: hovered ? -2 : 0)
-                        .scaleEffect(hovered ? 1.022 : 1)
                     }
                     .buttonStyle(FlowDeskHomeCardButtonStyle())
                     .onHover { inside in
@@ -848,67 +1136,109 @@ private extension HomeView {
     }
 
     @ViewBuilder
-    func templatePreview(for template: WorkspaceTemplate) -> some View {
-        switch template.boardType {
-        case .flowchart, .diagram:
+    func templatePreview(for template: WorkspaceTemplate, hovered: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#F3F7FF"), Color(hex: "#E3EBFF")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
             HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 6).fill(DS.Color.accent.opacity(0.30)).frame(width: 30, height: 17)
-                Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold)).foregroundStyle(DS.Color.textSecondary.opacity(0.72))
-                RoundedRectangle(cornerRadius: 6).fill(DS.Color.secondaryAccent.opacity(0.28)).frame(width: 30, height: 17)
-                Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold)).foregroundStyle(DS.Color.textSecondary.opacity(0.72))
-                RoundedRectangle(cornerRadius: 6).fill(DS.Color.accent.opacity(0.16)).frame(width: 24, height: 17)
-            }
-        case .notes:
-            VStack(alignment: .leading, spacing: 5) {
-                RoundedRectangle(cornerRadius: 4).fill(DS.Color.accent.opacity(0.24)).frame(width: 90, height: 6)
-                RoundedRectangle(cornerRadius: 4).fill(DS.Color.textSecondary.opacity(0.20)).frame(width: 76, height: 6)
-                RoundedRectangle(cornerRadius: 4).fill(DS.Color.textSecondary.opacity(0.15)).frame(width: 62, height: 6)
-                RoundedRectangle(cornerRadius: 4).fill(DS.Color.textSecondary.opacity(0.11)).frame(width: 48, height: 6)
-            }
-        case .mindMap:
-            HStack(spacing: 6) {
-                Circle().fill(DS.Color.accent.opacity(0.30)).frame(width: 17, height: 17)
-                RoundedRectangle(cornerRadius: 1).fill(DS.Color.textSecondary.opacity(0.45)).frame(width: 12, height: 1)
-                Circle().fill(DS.Color.secondaryAccent.opacity(0.22)).frame(width: 12, height: 12)
-                Circle().fill(DS.Color.accent.opacity(0.17)).frame(width: 12, height: 12)
-                Circle().fill(DS.Color.accent.opacity(0.12)).frame(width: 12, height: 12)
-            }
-        default:
-            HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 5).fill(DS.Color.accent.opacity(0.26)).frame(width: 22, height: 14)
-                RoundedRectangle(cornerRadius: 5).fill(DS.Color.secondaryAccent.opacity(0.21)).frame(width: 22, height: 14)
-                RoundedRectangle(cornerRadius: 5).fill(DS.Color.accent.opacity(0.15)).frame(width: 22, height: 14)
-                RoundedRectangle(cornerRadius: 5).fill(DS.Color.accent.opacity(0.11)).frame(width: 22, height: 14)
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(DS.Color.accent.opacity(hovered ? 0.46 : 0.36))
+                    .frame(width: 24, height: 14)
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(DS.Color.secondaryAccent.opacity(hovered ? 0.36 : 0.28))
+                    .frame(width: 24, height: 14)
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(DS.Color.accent.opacity(hovered ? 0.28 : 0.2))
+                    .frame(width: 24, height: 14)
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(DS.Color.accent.opacity(hovered ? 0.22 : 0.14))
+                    .frame(width: 24, height: 14)
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.black.opacity(0.06))
+        )
     }
 
     var settingsPlaceholder: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.md) {
             sectionHeader("Workspace Settings", subtitle: "Appearance and workspace behavior")
-            VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Open app settings to adjust appearance and your working environment.")
-                    .font(DS.Typography.body)
+                    .font(.system(size: 13, weight: .regular))
                     .lineSpacing(DS.Typography.bodyLineSpacing - 1.5)
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .foregroundStyle(Color(hex: "#6B7280"))
                 #if os(macOS)
                 SettingsLink {
                     Text("Open Settings")
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .buttonStyle(.borderedProminent)
                 #endif
             }
-            .padding(DS.Spacing.lg)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large)
-                    .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.large)
-                            .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme))
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
                     )
+                    .background(premiumCardShadow(hovered: false))
             )
+        }
+    }
+
+    @ViewBuilder
+    func homeTemplatePreview(templateID: String, hovered: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                HStack(spacing: 8) {
+                    ForEach(0..<4, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(DS.Color.accent.opacity(hovered ? 0.22 : 0.16 - (Double(index) * 0.02)))
+                            .frame(width: 22, height: 14)
+                    }
+                }
+                .overlay(alignment: .center) {
+                    Image(systemName: templatePreviewIcon(for: templateID))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.Color.accent.opacity(hovered ? 0.95 : 0.8))
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+    }
+
+    func templatePreviewIcon(for templateID: String) -> String {
+        switch templateID {
+        case "brainstorm-board": return "bolt.fill"
+        case "flowchart": return "point.3.connected.trianglepath.dotted"
+        case "product-roadmap": return "calendar"
+        case "meeting-notes": return "note.text"
+        case "mind-map": return "circle.hexagongrid"
+        case "kanban-board": return "rectangle.3.group"
+        case "app-wireframe": return "iphone.gen3"
+        default: return "square.grid.2x2"
         }
     }
 
@@ -927,26 +1257,30 @@ private extension HomeView {
         return Button {
             onOpenDocument(document)
         } label: {
-            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                RoundedRectangle(cornerRadius: DS.Radius.medium)
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [DS.Color.accent.opacity(0.14), DS.Color.panel],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
-                    .frame(height: 106)
+                    .frame(height: 96)
                     .overlay {
                         Image(systemName: "scribble.variable")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(DS.Color.accent.opacity(0.85))
                     }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.black.opacity(0.06))
+                    )
 
                 HStack {
                     Text(document.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.Color.textPrimary)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color(hex: "#111827"))
                         .lineLimit(1)
                     Spacer()
                     if document.isFavorite {
@@ -955,30 +1289,29 @@ private extension HomeView {
                     }
                 }
                 Text(document.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#6B7280"))
                 Text(document.boardType.displayName)
-                        .font(DS.Typography.label.weight(.medium))
-                    .tracking(0.45)
-                        .foregroundStyle(DS.Color.textTertiary)
+                    .font(.system(size: 11, weight: .medium))
+                    .tracking(0.6)
+                    .foregroundStyle(Color(hex: "#9CA3AF"))
                     .padding(.horizontal, DS.Spacing.sm)
                     .padding(.vertical, DS.Spacing.xs - 1)
                     .background(Capsule().fill(DS.Color.hover))
             }
-            .padding(DS.Spacing.cardPadding)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 13)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large)
-                    .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.large)
-                            .fill(hovered ? DS.Color.hover.opacity(0.22) : Color.clear)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
                     )
-                    .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme).opacity(1.08)))
-                    .shadow(color: Color.black.opacity(hovered ? 0.12 : 0.09), radius: hovered ? 14 : 10, x: 0, y: hovered ? 6 : 4)
+                    .background(premiumCardShadow(hovered: hovered))
             )
-            .brightness(hovered ? 0.014 : 0)
-            .offset(y: hovered ? -2 : 0)
-            .scaleEffect(hovered ? 1.016 : 1)
+            .offset(y: hovered ? premiumCardHoverLift : 0)
+            .scaleEffect(hovered ? premiumCardHoverScale : 1)
         }
         .contextMenu {
             Button("Open") { onOpenDocument(document) }
@@ -996,33 +1329,40 @@ private extension HomeView {
     }
 
     func boardListRow(_ document: FlowDocument) -> some View {
-        Button {
+        let hovered = hoveredBoardID == document.id
+        return Button {
             onOpenDocument(document)
         } label: {
-            HStack(spacing: DS.Spacing.md) {
+            HStack(spacing: 8) {
                 Image(systemName: "rectangle.stack.fill")
                     .foregroundStyle(DS.Color.accent.opacity(0.85))
                 Text(document.title)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "#111827"))
                 Spacer()
                 Text(document.boardType.displayName)
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.textTertiary)
+                    .font(.system(size: 11, weight: .medium))
+                    .tracking(0.6)
+                    .foregroundStyle(Color(hex: "#9CA3AF"))
                 Text(document.updatedAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.textTertiary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#6B7280"))
             }
-            .padding(.horizontal, DS.Spacing.md)
-            .padding(.vertical, DS.Spacing.sm + 2)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: DS.Radius.medium)
-                    .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
-                    .overlay(RoundedRectangle(cornerRadius: DS.Radius.medium).stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme).opacity(1.08)))
-                    .shadow(color: Color.black.opacity(0.07), radius: 8, x: 0, y: 3)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(premiumCardFill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(premiumCardBorder, lineWidth: 1)
+                    )
+                    .background(premiumCardShadow(hovered: hovered))
             )
+            .offset(y: hovered ? premiumCardHoverLift : 0)
+            .scaleEffect(hovered ? premiumCardHoverScale : 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FlowDeskHomeCardButtonStyle())
         .contextMenu {
             Button("Open") { onOpenDocument(document) }
             Button("Duplicate") { onDuplicate(document) }
@@ -1030,24 +1370,28 @@ private extension HomeView {
             Divider()
             Button("Delete", role: .destructive) { onDelete(document) }
         }
+        .onHover { inside in
+            withAnimation(.easeOut(duration: 0.18)) {
+                hoveredBoardID = inside ? document.id : nil
+            }
+        }
     }
 
     func sectionHeader(_ text: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.xs) {
             Text(text)
-                .font(DS.Typography.sectionTitle)
-                .tracking(DS.Typography.sectionTracking)
-                .foregroundStyle(DS.Color.textPrimary)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color(hex: "#111827"))
             Text(subtitle)
-                .font(DS.Typography.body)
+                .font(.system(size: 13, weight: .regular))
                 .lineSpacing(DS.Typography.bodyLineSpacing - 1.5)
-                .foregroundStyle(DS.Color.textSecondary.opacity(0.68))
+                .foregroundStyle(Color(hex: "#6B7280"))
         }
         .padding(.top, DS.Typography.sectionTopSpacing)
     }
 
     func emptyState(title: String, detail: String) -> some View {
-        VStack(spacing: DS.Spacing.md) {
+        VStack(spacing: 8) {
             ZStack {
                 Circle()
                     .fill(
@@ -1063,33 +1407,31 @@ private extension HomeView {
                     .foregroundStyle(DS.Color.accent.opacity(0.9))
             }
             Text(title)
-                .font(.system(size: 14.5, weight: .semibold))
-                .foregroundStyle(DS.Color.textPrimary)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color(hex: "#111827"))
             Text(detail)
-                .font(DS.Typography.body)
+                .font(.system(size: 13, weight: .regular))
                 .lineSpacing(DS.Typography.bodyLineSpacing - 1)
-                .foregroundStyle(DS.Color.textSecondary)
+                .foregroundStyle(Color(hex: "#6B7280"))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
         }
-        .padding(DS.Spacing.section)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: DS.Radius.large)
-                .fill(
-                    LinearGradient(
-                        colors: [DS.Color.creationCardSurface, DS.Color.creationCardSurface.opacity(0.86)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(premiumCardFill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(premiumCardBorder, lineWidth: 1)
                 )
-                .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).stroke(DS.Color.creationCardBorder.opacity(0.16)))
-                .shadow(color: Color.black.opacity(0.05), radius: 9, x: 0, y: 4)
+                .background(premiumCardShadow(hovered: false))
         )
     }
 
     func compactEmptyState(title: String, detail: String) -> some View {
-        HStack(spacing: DS.Spacing.md) {
+        HStack(spacing: 8) {
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(DS.Color.textSecondary)
@@ -1097,28 +1439,41 @@ private extension HomeView {
                 .background(Circle().fill(Color.white.opacity(0.65)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(DS.Color.textPrimary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "#111827"))
                 Text(detail)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(DS.Color.textSecondary)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color(hex: "#6B7280"))
             }
             Spacer()
             Button("Start blank") {
                 onCreateBlank()
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 12.5, weight: .semibold))
+            .buttonStyle(FlowDeskHomeCardButtonStyle())
+            .font(.system(size: 14, weight: .medium))
             .foregroundStyle(DS.Color.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.88))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
         }
-        .padding(DS.Spacing.md)
+        .frame(minHeight: 110)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                .fill(Color.white.opacity(0.84))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(premiumCardFill)
                 .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                        .stroke(DS.Color.borderSubtle.opacity(0.16))
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(premiumCardBorder, lineWidth: 1)
                 )
+                .background(premiumCardShadow(hovered: false))
         )
     }
 
@@ -1131,29 +1486,32 @@ private extension HomeView {
             }
         } label: {
             HStack(spacing: DS.Spacing.sm) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(DS.Color.accent.opacity(active ? 0.95 : 0))
+                    .frame(width: 3, height: 16)
                 Image(systemName: section.symbol)
                     .frame(width: 16)
                 Text(section.title)
                     .font(.system(size: 13, weight: .medium))
                 Spacer()
             }
-            .padding(.vertical, DS.Spacing.sm)
-            .padding(.horizontal, DS.Spacing.sm)
+            .padding(.vertical, DS.Spacing.sm + 1)
+            .padding(.horizontal, DS.Spacing.sm + 1)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.medium)
-                    .fill(active ? DS.Color.homeChipActive.opacity(0.95) : (hovered ? DS.Color.homeChipHover.opacity(0.72) : .clear))
+                    .fill(active ? DS.Color.homeChipActive : (hovered ? DS.Color.homeChipHover.opacity(0.65) : .clear))
                     .overlay(
                         RoundedRectangle(cornerRadius: DS.Radius.medium)
-                            .stroke(active ? DS.Color.accent.opacity(0.32) : Color.clear, lineWidth: 0.9)
+                            .stroke(active ? DS.Color.accent.opacity(0.42) : (hovered ? Color.black.opacity(0.06) : Color.clear), lineWidth: 1)
                     )
             )
-            .brightness(hovered ? 0.01 : 0)
-            .scaleEffect(hovered ? 1.014 : 1)
+            .brightness(hovered ? 0.012 : 0)
+            .scaleEffect(hovered ? 1.01 : 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FlowDeskHomeCardButtonStyle())
         .foregroundStyle(active ? DS.Color.accent : DS.Color.textPrimary.opacity(0.8))
         .onHover { inside in
-            withAnimation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02)) {
+            withAnimation(FlowDeskMotion.premiumLiftEaseOut) {
                 hoveredSidebarSection = inside ? section : nil
             }
         }

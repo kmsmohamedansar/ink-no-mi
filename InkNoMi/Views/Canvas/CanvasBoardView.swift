@@ -9,6 +9,7 @@ struct CanvasBoardView: View {
     @Bindable var selection: CanvasSelectionModel
 
     @Environment(\.flowDeskTokens) private var tokens
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var panDragTranslation: CGSize = .zero
     @State private var panMomentumTask: Task<Void, Never>?
@@ -557,7 +558,7 @@ struct CanvasBoardView: View {
                     var momentumViewport = boardViewModel.boardState.viewport
                     momentumViewport.offsetX += Double(inertialX * 0.42)
                     momentumViewport.offsetY += Double(inertialY * 0.42)
-                    withAnimation(.interpolatingSpring(stiffness: 170, damping: 24)) {
+                    withAnimation(FlowDeskMotion.smoothEaseOut) {
                         boardViewModel.setViewport(momentumViewport)
                     }
                 }
@@ -582,86 +583,13 @@ struct CanvasBoardView: View {
 
     @ViewBuilder
     private func canvasBackground(showGrid: Bool) -> some View {
-        ZStack {
-            DS.Color.canvas
-
-            RadialGradient(
-                colors: [
-                    Color.white.opacity(0.64),
-                    Color.clear
-                ],
-                center: .center,
-                startRadius: 80,
-                endRadius: 1700
-            )
-            .blendMode(.softLight)
-            .allowsHitTesting(false)
-
-            LinearGradient(
-                colors: [
-                    DS.Color.canvasTopWash.opacity(0.34),
-                    DS.Color.canvasBottom.opacity(0.38)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .blendMode(.normal)
-            .allowsHitTesting(false)
-
-            RadialGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(0.04)
-                ],
-                center: .center,
-                startRadius: 560,
-                endRadius: 2400
-            )
-            .blendMode(.multiply)
-            .allowsHitTesting(false)
-
-            // Ultra-light paper tooth for warmth without visual noise.
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.02),
-                            Color.black.opacity(0.01),
-                            Color.white.opacity(0.012)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .blendMode(.overlay)
-                .allowsHitTesting(false)
-
-            if !draftCanvasPoints.isEmpty {
-                RadialGradient(
-                    colors: [
-                        Color.white.opacity(0.045),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 20,
-                    endRadius: 1200
-                )
-                .blendMode(.screen)
-                .allowsHitTesting(false)
-                .opacity(1)
-            }
-
-            if showGrid {
-                CanvasGridView(
-                    spacing: 32,
-                    lineWidth: 0.5,
-                    lineOpacity: 0.018,
-                    gridInk: .black,
-                    majorLineStride: 0
-                )
-                .allowsHitTesting(false)
-            }
-        }
+        FlowDeskTheme.canvasWorkspaceMatBackground(
+            tokens: tokens,
+            colorScheme: colorScheme,
+            showGrid: showGrid,
+            spotlightCenter: .center,
+            includeFilmGrain: true
+        )
     }
 
     private var canvasTapRippleGesture: some Gesture {

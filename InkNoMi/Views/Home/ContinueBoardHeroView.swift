@@ -62,7 +62,7 @@ struct ContinueBoardHeroView: View {
                     .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
             }
             .frame(maxWidth: .infinity, minHeight: FlowDeskLayout.homeContinueMinHeight, alignment: .leading)
-            .cardContainer(isHovered: $isHovered, scaleOnHover: 1.03)
+            .cardContainer(isHovered: $isHovered, scaleOnHover: DS.Interaction.hoverScale)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .onHover { isHovered = $0 }

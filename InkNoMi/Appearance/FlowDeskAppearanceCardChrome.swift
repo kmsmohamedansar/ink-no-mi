@@ -90,19 +90,21 @@ private struct FlowDeskCardContainerModifier: ViewModifier {
         .overlay {
             shape
                 .strokeBorder(
-                    isHovered
-                        ? tokens.selectionStrokeColor.opacity(0.5)
-                        : Color.primary.opacity(tokens.homeCardBorderNormal),
-                    lineWidth: isHovered
-                        ? FlowDeskLayout.cardBorderLineWidthHover
-                        : FlowDeskLayout.cardBorderLineWidth
+                    Color.black.opacity(0.05),
+                    lineWidth: FlowDeskLayout.cardBorderLineWidth
                 )
                 .allowsHitTesting(false)
+                .overlay {
+                    if isHovered {
+                        shape
+                            .fill(Color.white.opacity(0.06))
+                            .blendMode(.overlay)
+                    }
+                }
         }
-        .brightness(isHovered ? 0.01 : 0)
-        .offset(y: isHovered ? -1.5 : 0)
+        .offset(y: isHovered ? -1 : 0)
         .scaleEffect(isHovered ? scaleOnHover : 1)
-        .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
+        .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
     }
 }
 
@@ -178,7 +180,6 @@ enum FlowDeskFloatingChromeShadowStyle {
 }
 
 private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
-    @Environment(\.flowDeskTokens) private var tokens
     @Environment(\.colorScheme) private var colorScheme
 
     var cornerRadius: CGFloat
@@ -188,18 +189,21 @@ private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let f = shadowStyle.shadowFactors
-        let depthShadow = FlowDeskTheme.depthShadow(for: shadowStyle.depthLevel)
+        let depthShadow = DS.Shadow.medium
         content
             .background {
-                FlowDeskTheme.floatingPanelStackedFill(
-                    tokens: tokens,
-                    colorScheme: colorScheme,
-                    cornerRadius: cornerRadius,
-                    lightOpacity: lightOpacity,
-                    darkOpacity: darkOpacity
-                )
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(darkOpacity * 0.45)
+                                    : Color.white.opacity(lightOpacity * 0.55)
+                            )
+                    }
                 .shadow(
-                    color: depthShadow.color.opacity(Double(f.opacity)),
+                    color: Color.black.opacity(0.12 * Double(f.opacity)),
                     radius: depthShadow.radius * f.radius,
                     x: 0,
                     y: depthShadow.y * f.y
@@ -209,23 +213,16 @@ private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 shape
                     .strokeBorder(
-                        FlowDeskTheme.borderColor(for: shadowStyle.depthLevel, colorScheme: colorScheme),
+                        Color.black.opacity(0.05),
                         lineWidth: FlowDeskLayout.chromeHairlineBorderWidth
                     )
-                    .overlay(alignment: .top) {
-                        Capsule(style: .continuous)
-                            .fill(FlowDeskTheme.topInnerHighlight(for: shadowStyle.depthLevel, colorScheme: colorScheme))
-                            .frame(height: 1.1)
-                            .padding(.horizontal, 8)
-                            .blur(radius: 0.2)
-                    }
             }
     }
 }
 
 extension View {
     func flowDeskFloatingPanelChrome(
-        cornerRadius: CGFloat = FlowDeskLayout.floatingPanelCornerRadius,
+        cornerRadius: CGFloat = 16,
         shadowStyle: FlowDeskFloatingChromeShadowStyle,
         lightTintOpacity: Double = 0.11,
         darkTintOpacity: Double = 0.08

@@ -15,8 +15,8 @@ struct InkNoMiCanvasChromeColumn: View {
         VStack(alignment: .leading, spacing: FlowDeskLayout.spaceM) {
             HStack(spacing: 8) {
                 Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(DS.Color.textSecondary.opacity(0.86))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(DS.Color.textSecondary.opacity(0.72))
                 Text("Tools")
                     .font(DS.Typography.label.weight(.medium))
                     .tracking(0.5)
@@ -124,7 +124,7 @@ struct InkNoMiCanvasChromeColumn: View {
             HStack(spacing: FlowDeskLayout.spaceS) {
                 Image(systemName: item.symbol)
                     .frame(width: 18)
-                    .font(.system(size: active ? 13.2 : 12.6, weight: active ? .bold : (hovered ? .medium : .regular)))
+                    .font(.system(size: active ? 20 : 18, weight: active ? .semibold : .medium))
                 Text(item.label)
                     .font(DS.Typography.body.weight(active ? .semibold : .regular))
                 if !item.enabled {
@@ -142,8 +142,8 @@ struct InkNoMiCanvasChromeColumn: View {
             }
             .frame(height: rowHeight)
             .padding(.horizontal, DS.Spacing.md - 2)
-            .foregroundStyle(active ? tokens.selectionStrokeColor : DS.Color.textPrimary.opacity(0.88))
-            .scaleEffect(active ? 1.012 : (hovered ? 1.016 : 1.0))
+            .foregroundStyle(active ? tokens.selectionStrokeColor.opacity(0.98) : DS.Color.textPrimary.opacity(0.68))
+            .scaleEffect(active ? 1.01 : (hovered ? DS.Interaction.hoverScale : 1.0))
             .brightness(hovered ? 0.016 : 0)
             .offset(x: active ? 1 : 0)
             .offset(y: hovered ? -0.5 : 0)
@@ -156,10 +156,10 @@ struct InkNoMiCanvasChromeColumn: View {
                     }
             }
             .shadow(
-                color: active ? tokens.selectionStrokeColor.opacity(0.24) : Color.clear,
-                radius: active ? 14 : 0,
+                color: active ? Color.black.opacity(0.12) : Color.clear,
+                radius: active ? 20 : 0,
                 x: 0,
-                y: active ? 3 : 0
+                y: active ? 10 : 0
             )
         }
         .buttonStyle(CanvasToolButtonStyle(isActive: active, isHovered: hovered))
@@ -187,7 +187,7 @@ struct InkNoMiCanvasChromeColumn: View {
                 )
                 .brightness(hovered ? 0.015 : 0)
                 .offset(y: hovered ? -0.5 : 0)
-                .scaleEffect(hovered ? 1.015 : 1)
+                .scaleEffect(hovered ? DS.Interaction.hoverScale : 1)
         }
         .buttonStyle(.plain)
         .help(symbol == "arrow.uturn.backward" ? "Undo (Cmd+Z)" : "Redo (Cmd+Shift+Z)")
@@ -224,7 +224,7 @@ struct InkNoMiCanvasChromeColumn: View {
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 8)
-            .scaleEffect(active ? 1.012 : 1)
+            .scaleEffect(active ? 1.01 : 1)
             .background {
                 RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
                     .fill(active ? tokens.selectionStrokeColor.opacity(0.12) : Color.primary.opacity(0.04))
@@ -277,7 +277,7 @@ private struct CanvasToolButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.976 : (isHovered ? 1.018 : (isActive ? 1.012 : 1.0)))
+            .scaleEffect(configuration.isPressed ? DS.Interaction.pressScale : (isHovered ? DS.Interaction.hoverScale : (isActive ? 1.01 : 1.0)))
             .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
             .animation(FlowDeskMotion.standardEaseOut, value: isHovered)
             .animation(FlowDeskMotion.smoothEaseOut, value: isActive)

@@ -25,7 +25,7 @@ enum FlowDeskLayout {
     static let homeBlankCreationMaxWidth: CGFloat = 380
     static let homeRecentRowSpacing: CGFloat = 8
     /// Vertical gap between “Smart canvas” and “Blank board” (tighter than major section rhythm).
-    static let homeCreationCardsVerticalSpacing: CGFloat = 22
+    static let homeCreationCardsVerticalSpacing: CGFloat = 24
 
     // MARK: - Cards (same family as canvas framed elements)
 

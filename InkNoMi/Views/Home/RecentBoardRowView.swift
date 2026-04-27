@@ -41,8 +41,8 @@ struct RecentBoardRowView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.primary)
-                        .scaleEffect(isHovered ? 1.06 : 1)
-                        .animation(.spring(response: 0.30, dampingFraction: 0.78), value: isHovered)
+                        .scaleEffect(isHovered ? DS.Interaction.hoverScale : 1)
+                        .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
                 }
                 .frame(width: 44, height: 44)
                 .clipped()
@@ -89,12 +89,12 @@ struct RecentBoardRowView: View {
                     }
                     .clipped()
                     .contentShape(Rectangle())
-                    .animation(.spring(response: 0.32, dampingFraction: 0.8), value: isHovered)
+                    .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .cardContainer(
                 isHovered: $isHovered,
-                scaleOnHover: 1.024,
+                scaleOnHover: DS.Interaction.hoverScale,
                 contentInsets: FlowDeskLayout.homeRecentRowContentInsets,
                 contentAlignment: .center,
                 contentFillsHeight: true

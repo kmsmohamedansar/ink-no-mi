@@ -161,23 +161,17 @@ struct InspectorPanelView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .background {
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        tokens.inspectorChromeBackground.opacity(colorScheme == .dark ? 0.96 : 0.98),
-                        DS.Color.surfaceFloatingBottom.opacity(colorScheme == .dark ? 0.2 : 0.5)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
                 )
-                FlowDeskTheme.homeAtmosphereWash(colorScheme: colorScheme)
-                    .opacity(colorScheme == .dark ? 0.35 : 0.22)
-                    .allowsHitTesting(false)
-            }
+                .shadow(color: Color.black.opacity(0.12), radius: 20, x: 0, y: 10)
         }
         .overlay(alignment: .leading) {
             Rectangle()
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.088 : 0.032))
+                .fill(Color.black.opacity(0.05))
                 .frame(width: 1)
                 .allowsHitTesting(false)
         }
