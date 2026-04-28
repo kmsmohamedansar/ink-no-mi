@@ -45,49 +45,66 @@ struct ShapeCanvasItemView: View {
     private var chromeCorner: CGFloat { FlowDeskTheme.shapeSelectionChromeCorner }
     private var isConvertingIn: Bool { boardViewModel.convertingShapeIDs.contains(element.id) }
 
+    private var showsResizeChrome: Bool {
+        isSelected && !selection.isMultiSelection
+    }
+
+    private var showsConnectorChrome: Bool {
+        boardViewModel.canvasTool == .select && showsResizeChrome
+    }
+
     var body: some View {
         ZStack {
             ShapeCanvasShapeView(payload: payload)
 
-            RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
-                .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
-                .opacity(isSelected || isActiveContainer ? 1 : 0)
-                .allowsHitTesting(false)
+            // Soft hover hint (no harsh outline).
             RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
-                .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
+                .strokeBorder(DS.Color.accent.opacity(0.22), lineWidth: 1)
                 .opacity(isHovered && !isSelected && !isActiveContainer ? 1 : 0)
                 .allowsHitTesting(false)
+
+            CanvasFramedItemSelectionChrome(
+                cornerRadius: chromeCorner,
+                isVisible: isSelected && !selection.isMultiSelection || isActiveContainer
+            )
         }
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected || isActiveContainer)
-        .shadow(
-            color: Color.black.opacity(isDragging ? 0.14 : 0.05),
-            radius: isDragging ? 14 : 8,
-            x: 0,
-            y: isDragging ? 8 : 2
+        .canvasObjectDepthSurface(
+            isHovered: isHovered,
+            isSelected: isSelected,
+            isActive: isActiveContainer,
+            isDragging: isDragging,
+            tokens: tokens
         )
         .overlay(alignment: .bottomTrailing) {
-            if isSelected, !selection.isMultiSelection {
-                CanvasTextBlockResizeHandle()
-                    .padding(FlowDeskLayout.canvasSelectionChromeInset)
-                    .gesture(resizeGesture)
-                    .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsResizeChrome {
+                    CanvasTextBlockResizeHandle()
+                        .padding(FlowDeskLayout.canvasSelectionChromeInset)
+                        .gesture(resizeGesture)
+                        .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsResizeChrome)
         }
         .overlay {
-            if boardViewModel.canvasTool == .select, isSelected, !selection.isMultiSelection {
-                ShapeConnectorHandlesOverlay(
-                    element: element,
-                    boardViewModel: boardViewModel,
-                    selection: selection
-                )
-                .allowsHitTesting(true)
-                .help("Drag a blue dot to connect to another object (⇧ straight line)")
-                .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsConnectorChrome {
+                    ShapeConnectorHandlesOverlay(
+                        element: element,
+                        boardViewModel: boardViewModel,
+                        selection: selection
+                    )
+                    .allowsHitTesting(true)
+                    .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                    .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsConnectorChrome)
         }
         .offset(composedMoveOffset)
         .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
-        .scaleEffect(isDragging ? 1.01 : 1.0)
+        .scaleEffect(isDragging ? 1.01 : (isHovered ? 1.01 : 1.0))
         .scaleEffect(isConvertingIn ? 0.95 : 1.0)
         .opacity(isConvertingIn ? 0.76 : 1.0)
         .animation(FlowDeskMotion.standardEaseOut, value: isConvertingIn)
@@ -153,10 +170,11 @@ struct ShapeCanvasItemView: View {
                     )
                     moveDragTranslation = .zero
                 } else {
-                    moveDragTranslation = CGSize(
+                    let targetTranslation = CGSize(
                         width: snapped.x - CGFloat(subjectRec.x),
                         height: snapped.y - CGFloat(subjectRec.y)
                     )
+                    moveDragTranslation = moveDragTranslation.smoothedToward(targetTranslation)
                 }
                 boardViewModel.syncGroupMovePreview(leaderId: element.id, translation: moveDragTranslation)
                 boardViewModel.updateAlignmentGuides(guides)

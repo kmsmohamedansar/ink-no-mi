@@ -38,6 +38,42 @@ enum StrokePathSmoothing {
         return path
     }
 
+    /// Samples the **same** Catmull-Rom spline as `smoothPath` into a dense polyline for ink rendering (width taper).
+    static func sampledSmoothPolyline(from points: [CGPoint], samplesPerSegment: Int) -> [CGPoint] {
+        guard !points.isEmpty else { return [] }
+        if points.count == 1 { return points }
+        if points.count == 2 {
+            return lineSubdivisions(from: points[0], to: points[1], steps: max(6, samplesPerSegment))
+        }
+
+        let steps = max(6, samplesPerSegment)
+        var samples: [CGPoint] = []
+
+        for i in 0..<(points.count - 1) {
+            let p0 = i > 0 ? points[i - 1] : points[i]
+            let p1 = points[i]
+            let p2 = points[i + 1]
+            let p3 = (i + 2 < points.count) ? points[i + 2] : p2
+
+            let c1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
+            )
+            let c2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
+
+            let startJ = i == 0 ? 0 : 1
+            for j in startJ...steps {
+                let t = CGFloat(j) / CGFloat(steps)
+                samples.append(cubicBezier(p1, c1, c2, p2, t))
+            }
+        }
+
+        return samples
+    }
+
     /// Skip samples closer than `minDistance` (canvas points) to keep payloads smaller.
     static func decimatedCanvasPoints(_ raw: [CGPoint], minDistance: CGFloat) -> [CGPoint] {
         guard let first = raw.first else { return [] }
@@ -57,20 +93,23 @@ enum StrokePathSmoothing {
 
     /// Fast live pass for in-progress feedback while drawing.
     static func livePreviewPoints(_ raw: [CGPoint]) -> [CGPoint] {
-        let filtered = filterJitter(raw, epsilon: 0.5)
-        let stabilized = lightweightStabilize(filtered, blend: 0.2)
-        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.15)
-        return movingAverageSmooth(decimated, passes: 1, windowRadius: 1)
+        let filtered = filterJitter(raw, epsilon: 0.45)
+        let stabilized = lightweightStabilize(filtered, blend: 0.26)
+        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.0)
+        let window: Int = decimated.count > 40 ? 2 : 1
+        let passes: Int = decimated.count > 120 ? 2 : 1
+        return movingAverageSmooth(decimated, passes: passes, windowRadius: window)
     }
 
     /// Slightly more refined pass after stroke commit.
     static func finalizedStrokePoints(_ raw: [CGPoint]) -> [CGPoint] {
-        let filtered = filterJitter(raw, epsilon: 0.62)
-        let stabilized = lightweightStabilize(filtered, blend: 0.35)
-        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.55)
-        let passes = decimated.count > 800 ? 1 : 2
-        let smoothed = movingAverageSmooth(decimated, passes: passes, windowRadius: 2)
-        return decimatedCanvasPoints(smoothed, minDistance: 1.7)
+        let filtered = filterJitter(raw, epsilon: 0.52)
+        let stabilized = lightweightStabilize(filtered, blend: 0.4)
+        let decimated = decimatedCanvasPoints(stabilized, minDistance: 1.28)
+        let passes = decimated.count > 900 ? 1 : 2
+        let window = decimated.count > 600 ? 2 : 3
+        let smoothed = movingAverageSmooth(decimated, passes: passes, windowRadius: window)
+        return decimatedCanvasPoints(smoothed, minDistance: 1.48)
     }
 
     /// Lightweight point stabilization for subtle jitter resistance without added latency.
@@ -130,5 +169,33 @@ enum StrokePathSmoothing {
             current = next
         }
         return current
+    }
+
+    private static func cubicBezier(
+        _ p0: CGPoint,
+        _ c1: CGPoint,
+        _ c2: CGPoint,
+        _ p3: CGPoint,
+        _ t: CGFloat
+    ) -> CGPoint {
+        let mt = 1 - t
+        let a = mt * mt * mt
+        let b = 3 * mt * mt * t
+        let c = 3 * mt * t * t
+        let d = t * t * t
+        return CGPoint(
+            x: a * p0.x + b * c1.x + c * c2.x + d * p3.x,
+            y: a * p0.y + b * c1.y + c * c2.y + d * p3.y
+        )
+    }
+
+    private static func lineSubdivisions(from a: CGPoint, to b: CGPoint, steps: Int) -> [CGPoint] {
+        let n = max(2, steps)
+        var out: [CGPoint] = []
+        for j in 0...n {
+            let t = CGFloat(j) / CGFloat(n)
+            out.append(CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t))
+        }
+        return out
     }
 }

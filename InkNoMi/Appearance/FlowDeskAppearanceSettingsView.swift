@@ -250,7 +250,7 @@ private struct ThemeCard: View {
                     .padding(6)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FlowDeskPlainInteractionStyle())
     }
 
     private var strip: [Color] {

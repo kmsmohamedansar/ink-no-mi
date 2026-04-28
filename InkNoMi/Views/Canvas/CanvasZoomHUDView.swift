@@ -32,7 +32,7 @@ struct CanvasZoomHUDView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskPlainInteractionStyle())
             .frame(width: 26, height: 26)
             .contentShape(Rectangle())
             .help("Framing: fit (⌘⌥1), center (⌘⌥2), zoom to selection (⌘⌥3)")
@@ -43,7 +43,7 @@ struct CanvasZoomHUDView: View {
                 Image(systemName: "minus.magnifyingglass")
                     .font(.system(size: 12, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskPlainInteractionStyle())
             .help("Zoom out (⌘−)")
 
             Text("\(scalePercent)%")
@@ -57,7 +57,7 @@ struct CanvasZoomHUDView: View {
                 Image(systemName: "plus.magnifyingglass")
                     .font(.system(size: 12, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FlowDeskPlainInteractionStyle())
             .help("Zoom in (⌘+)")
         }
         .padding(.horizontal, FlowDeskLayout.floatingPanelToolbarPaddingH)

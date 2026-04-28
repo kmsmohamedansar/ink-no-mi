@@ -102,6 +102,7 @@ struct HomeView: View {
     @State private var selectedSuggestionIndex = 0
     @State private var heroHasAppeared = false
     @State private var hasShownBoardContent = false
+    @State private var backgroundShiftPhase = false
 
     private var featureGate: FeatureGate {
         FeatureGate(purchaseManager: purchaseManager)
@@ -204,10 +205,20 @@ struct HomeView: View {
                 heroHasAppeared = true
             }
             hasShownBoardContent = !documents.isEmpty
+            if !shouldReduceMotion {
+                backgroundShiftPhase = true
+            }
         }
         .onChange(of: documents.isEmpty) { _, isEmpty in
             if !isEmpty {
                 hasShownBoardContent = true
+            }
+        }
+        .onChange(of: shouldReduceMotion) { _, reduce in
+            if reduce {
+                backgroundShiftPhase = false
+            } else {
+                backgroundShiftPhase = true
             }
         }
     }
@@ -221,7 +232,7 @@ private struct TemplatePreviewView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: FlowDeskLayout.cardCornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [Color(hex: "#F8FAFF"), Color(hex: "#EEF4FF")],
@@ -229,10 +240,13 @@ private struct TemplatePreviewView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            content.padding(14)
+            content.padding(FlowDeskLayout.unifiedCardPadding)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.black.opacity(0.06)))
+        .clipShape(RoundedRectangle(cornerRadius: FlowDeskLayout.cardCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: FlowDeskLayout.cardCornerRadius, style: .continuous)
+                .stroke(Color.black.opacity(0.045))
+        )
     }
 
     @ViewBuilder private var content: some View {
@@ -392,7 +406,7 @@ private extension HomeView {
     }
 
     var premiumCardRadius: CGFloat {
-        max(10, tokens.corners.card - 2)
+        FlowDeskLayout.cardCornerRadius
     }
 
     var premiumCardHoverLift: CGFloat {
@@ -415,10 +429,12 @@ private extension HomeView {
         RoundedRectangle(cornerRadius: premiumCardRadius, style: .continuous)
             .fill(Color.clear)
             .shadow(
-                color: .black.opacity(hovered ? 0.08 : 0.04),
-                radius: hovered ? 14 : 8,
+                color: .black.opacity(
+                    hovered ? tokens.homeCardShadowOpacityHover : tokens.homeCardShadowOpacityNormal
+                ),
+                radius: hovered ? tokens.homeCardShadowRadiusHover : tokens.homeCardShadowRadiusNormal,
                 x: 0,
-                y: hovered ? 6 : 2
+                y: hovered ? FlowDeskLayout.cardShadowYHover : FlowDeskLayout.cardShadowYNormal
             )
     }
 
@@ -429,11 +445,23 @@ private extension HomeView {
     }
 
     var creationBackground: some View {
-        ZStack {
+        let driftA: CGFloat = shouldReduceMotion ? 0 : (backgroundShiftPhase ? 8 : -8)
+        let driftB: CGFloat = shouldReduceMotion ? 0 : (backgroundShiftPhase ? -7 : 7)
+        return ZStack {
+            // Layer 1: stable base tone.
             tokens.workspaceBackground
+            // Layer 2: broad gradient wash for depth.
+            LinearGradient(
+                colors: [
+                    DS.Color.homeMainBackground.opacity(0.78),
+                    DS.Color.homeMainBackgroundEdge.opacity(0.56)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             RadialGradient(
                 colors: [Color.white.opacity(0.82), Color.clear],
-                center: UnitPoint(x: 0.5, y: 0.04),
+                center: UnitPoint(x: 0.5 + (backgroundShiftPhase ? 0.008 : -0.008), y: 0.04),
                 startRadius: 20,
                 endRadius: 520
             )
@@ -441,17 +469,100 @@ private extension HomeView {
                 .fill(tokens.accentSoft)
                 .blur(radius: 120)
                 .frame(width: 380, height: 380)
-                .offset(x: -250, y: -160)
-                .opacity(0.45)
+                .offset(x: -250 + driftA, y: -160 + (driftA * 0.5))
+                .opacity(backgroundShiftPhase ? 0.47 : 0.43)
             Circle()
                 .fill(tokens.accentGradientEnd.opacity(0.15))
                 .blur(radius: 160)
                 .frame(width: 420, height: 420)
-                .offset(x: 340, y: -120)
-                .opacity(0.45)
+                .offset(x: 340 + driftB, y: -120 + (driftB * 0.4))
+                .opacity(backgroundShiftPhase ? 0.47 : 0.43)
+            brandMotifOverlay
+                .opacity(0.24)
+            // Layer 3: ultra-subtle texture to avoid flat digital surfaces.
+            creationTextureOverlay
+                .opacity(0.32)
             creationGridOverlay
         }
+        .animation(
+            shouldReduceMotion
+                ? nil
+                : FlowDeskMotion.slowEaseInOut
+                    .speed(0.2)
+                    .repeatForever(autoreverses: true),
+            value: backgroundShiftPhase
+        )
         .ignoresSafeArea()
+    }
+
+    var creationTextureOverlay: some View {
+        Canvas { context, size in
+            let dotColor = DS.Color.textPrimary.opacity(0.045)
+            let step: CGFloat = 6
+            var y: CGFloat = 0
+            while y < size.height {
+                var x: CGFloat = 0
+                while x < size.width {
+                    // Deterministic pseudo-noise pattern (stable across frames).
+                    let seed = Int((x * 13) + (y * 7))
+                    if seed % 17 == 0 {
+                        context.fill(
+                            Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)),
+                            with: .color(dotColor)
+                        )
+                    }
+                    x += step
+                }
+                y += step
+            }
+        }
+        .blendMode(.softLight)
+        .allowsHitTesting(false)
+    }
+
+    var brandMotifOverlay: some View {
+        GeometryReader { geo in
+            let motifColor = DS.Color.accent.opacity(0.075)
+            ZStack {
+                // Soft corner motifs (echoes the product's shape/flow identity).
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(motifColor, lineWidth: 1)
+                    .frame(width: 74, height: 48)
+                    .rotationEffect(.degrees(-7))
+                    .offset(x: -geo.size.width * 0.34, y: -geo.size.height * 0.28)
+
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(motifColor.opacity(0.86), lineWidth: 1)
+                    .frame(width: 62, height: 42)
+                    .rotationEffect(.degrees(9))
+                    .offset(x: geo.size.width * 0.32, y: -geo.size.height * 0.23)
+
+                Circle()
+                    .strokeBorder(motifColor.opacity(0.8), lineWidth: 1)
+                    .frame(width: 44, height: 44)
+                    .offset(x: geo.size.width * 0.29, y: geo.size.height * 0.27)
+
+                Path { path in
+                    let x0 = geo.size.width * 0.19
+                    let y0 = geo.size.height * 0.76
+                    path.move(to: CGPoint(x: x0, y: y0))
+                    path.addQuadCurve(
+                        to: CGPoint(x: x0 + 58, y: y0 - 12),
+                        control: CGPoint(x: x0 + 26, y: y0 + 16)
+                    )
+                    path.addQuadCurve(
+                        to: CGPoint(x: x0 + 110, y: y0 + 8),
+                        control: CGPoint(x: x0 + 84, y: y0 - 28)
+                    )
+                }
+                .stroke(
+                    motifColor.opacity(0.82),
+                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round)
+                )
+            }
+        }
+        .blendMode(.softLight)
+        .allowsHitTesting(false)
     }
 
     var creationGridOverlay: some View {
@@ -497,7 +608,7 @@ private extension HomeView {
                 }
                 Text("InkNoMi")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .foregroundStyle(DS.Color.textPrimary)
             }
             .padding(.bottom, DS.Spacing.xs)
 
@@ -587,7 +698,7 @@ private extension HomeView {
                             .fill(Color.white.opacity(0.88))
                             .overlay(
                                 Capsule(style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
                             )
                     )
             }
@@ -618,7 +729,8 @@ private extension HomeView {
                     }
                 } label: {
                     Text(filter.rawValue)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.bodyCompact, weight: .medium))
+                        .tracking(FlowDeskTypeTracking.body)
                         .foregroundStyle(active ? DS.Color.accent : DS.Color.textSecondary)
                         .padding(.horizontal, DS.Spacing.md)
                         .padding(.vertical, 9)
@@ -634,7 +746,7 @@ private extension HomeView {
                 }
                 .buttonStyle(FlowDeskHomeCardButtonStyle())
                 .onHover { inside in
-                    withAnimation(FlowDeskMotion.premiumLiftEaseOut) {
+                    withAnimation(FlowDeskMotion.hoverEase) {
                         hoveredFilter = inside ? filter : nil
                     }
                 }
@@ -646,14 +758,15 @@ private extension HomeView {
         VStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(isFirstBoardJourney ? "Create your first board" : "Start creating")
-                    .font(.system(size: 36, weight: .bold))
-                    .tracking(-0.2)
+                    .font(FlowDeskFont.display(size: FlowDeskTypeScale.h1 + 2, weight: .bold))
+                    .tracking(FlowDeskTypeTracking.displayH1)
                     .lineSpacing(1.05)
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .flowDeskTitleForeground()
                     .frame(maxWidth: .infinity, alignment: .center)
                 Text(isFirstBoardJourney ? "Pick a starter board or template and be creating in seconds." : "Capture an idea, pick a template, then jump straight into your board.")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Color(hex: "#4B5563"))
+                    .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.body, weight: .regular))
+                    .tracking(FlowDeskTypeTracking.body)
+                    .flowDeskSubtitleForeground()
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 520, alignment: .center)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -667,11 +780,11 @@ private extension HomeView {
                             "",
                             text: $creationPromptText,
                             prompt: Text("I want to create...")
-                                .font(.system(size: 15, weight: .regular))
-                                .foregroundStyle(Color(hex: "#9CA3AF"))
+                                .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.body, weight: .regular))
+                                .foregroundStyle(DS.Color.textTertiary)
                         )
                         .textFieldStyle(.plain)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.body, weight: .medium))
                         .focused($isCreationPromptFocused)
                         .onSubmit {
                             applyPrimarySmartStartSuggestion()
@@ -695,13 +808,7 @@ private extension HomeView {
                                 .frame(width: 38, height: 38)
                                 .background(
                                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [DS.Color.accent, DS.Color.accent.opacity(0.9)],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            )
-                                        )
+                                        .fill(DS.Color.premiumBlueGradient)
                                         .opacity(creationPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
                                 )
                         }
@@ -722,7 +829,7 @@ private extension HomeView {
                     }
                     .padding(.horizontal, 4)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
                 .padding(.top, 10)
                 .padding(.bottom, shouldShowSmartStartSuggestions ? 14 : 10)
                 .background(
@@ -742,7 +849,7 @@ private extension HomeView {
                             y: isCreationPromptFocused ? 12 : 5
                         )
                 )
-                .animation(FlowDeskMotion.premiumLiftEaseOut, value: isCreationPromptFocused)
+                .animation(FlowDeskMotion.uiHoverLift, value: isCreationPromptFocused)
 
                 if shouldShowSmartStartSuggestions {
                     smartStartSuggestionPanel
@@ -772,13 +879,7 @@ private extension HomeView {
                     .padding(.vertical, 10)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .fill(DS.Color.premiumBlueGradient)
                     )
 
                     Button("Use template") {
@@ -794,7 +895,7 @@ private extension HomeView {
                             .fill(Color.white.opacity(0.82))
                             .overlay(
                                 Capsule(style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
                             )
                     )
                 }
@@ -802,11 +903,11 @@ private extension HomeView {
                 if isFirstBoardJourney {
                     Text("Recommended: Brainstorm Board (free) opens with a polished starter layout.")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(hex: "#6B7280"))
+                        .foregroundStyle(DS.Color.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 22)
             .frame(maxWidth: 700, alignment: .leading)
             .background(
@@ -829,7 +930,7 @@ private extension HomeView {
         .frame(maxWidth: .infinity, alignment: .center)
         .opacity(heroHasAppeared ? 1 : 0)
         .offset(y: heroHasAppeared ? 0 : 8)
-        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.25), value: heroHasAppeared)
+        .animation(shouldReduceMotion ? nil : FlowDeskMotion.slowEaseOut, value: heroHasAppeared)
     }
 
     var smartStartSuggestionPanel: some View {
@@ -848,10 +949,10 @@ private extension HomeView {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(suggestion.title)
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#111827"))
+                                .foregroundStyle(DS.Color.textPrimary)
                             Text(suggestion.description)
                                 .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color(hex: "#5E6878"))
+                                .foregroundStyle(DS.Color.textSecondary)
                             if let structureHint = suggestion.structureHint {
                                 Text("Hint: \(structureHint)")
                                     .font(.system(size: 11, weight: .medium))
@@ -886,7 +987,7 @@ private extension HomeView {
                 )
                 .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 8)
         )
-        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.16), value: selectedSuggestionIndex)
+        .animation(shouldReduceMotion ? nil : FlowDeskMotion.fastEaseOut, value: selectedSuggestionIndex)
     }
 
     func applyPrimarySmartStartSuggestion() {
@@ -939,20 +1040,20 @@ private extension HomeView {
         } label: {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(hex: "#111827"))
-                .padding(.horizontal, 18)
+                .foregroundStyle(DS.Color.textPrimary)
+                .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
                 .padding(.vertical, 10)
                 .background(
                     Capsule(style: .continuous)
                         .fill(Color.white.opacity(0.92))
-                        .overlay(Capsule(style: .continuous).stroke(Color.black.opacity(0.08), lineWidth: 1))
+                        .overlay(Capsule(style: .continuous).stroke(Color.black.opacity(0.06), lineWidth: 1))
                         .background(premiumCardShadow(hovered: hovered))
                 )
                 .scaleEffect(hovered ? 1.02 : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .accessibilityLabel("\(title) template")
-        .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.18), value: hovered)
+        .animation(shouldReduceMotion ? nil : FlowDeskMotion.hoverEase, value: hovered)
         .onHover { inside in
             hoveredIntentChip = inside ? templateID : nil
         }
@@ -962,10 +1063,10 @@ private extension HomeView {
         let isHovered = hoveredCommandIcon == id
         return Image(systemName: symbol)
             .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(Color(hex: "#6B7280"))
+            .foregroundStyle(DS.Color.textSecondary)
             .opacity(isHovered ? 1 : 0.6)
             .onHover { inside in
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(FlowDeskMotion.hoverEase) {
                     hoveredCommandIcon = inside ? id : nil
                 }
             }
@@ -1030,7 +1131,7 @@ private extension HomeView {
                     if isPrimary {
                         Text("Recommended")
                             .font(.system(size: 10.5, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#4B5563"))
+                                    .foregroundStyle(DS.Color.textSecondary)
                             .padding(.horizontal, DS.Spacing.sm)
                             .padding(.vertical, 3)
                                     .background(Capsule(style: .continuous).fill(Color.white.opacity(0.82)))
@@ -1038,10 +1139,10 @@ private extension HomeView {
                 }
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text(subtitle)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(hex: "#4B5563"))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .lineLimit(2)
                 if isPrimary {
                     HStack(spacing: 6) {
@@ -1053,7 +1154,7 @@ private extension HomeView {
                     .foregroundStyle(DS.Color.accent)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, minHeight: 142, alignment: .leading)
             .background(
@@ -1080,7 +1181,7 @@ private extension HomeView {
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .disabled(!enabled)
         .onHover { inside in
-            withAnimation(FlowDeskMotion.hoverGlow) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredQuickAction = inside && enabled ? id : nil
             }
         }
@@ -1165,18 +1266,18 @@ private extension HomeView {
                         .foregroundStyle(DS.Color.accent)
                     Text(title)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color(hex: "#111827"))
+                        .foregroundStyle(DS.Color.textPrimary)
                 }
                 Text(subtitle)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
                     .lineLimit(2)
                 Spacer(minLength: 0)
                 Text("Open template")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(DS.Color.accent)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 150, alignment: .leading)
             .background(
@@ -1192,7 +1293,7 @@ private extension HomeView {
             .scaleEffect((hoveredStarterTemplateID == templateID) ? premiumCardHoverScale : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
-        .animation(.easeOut(duration: 0.18), value: hoveredStarterTemplateID == templateID)
+        .animation(FlowDeskMotion.hoverEase, value: hoveredStarterTemplateID == templateID)
         .onHover { inside in
             hoveredStarterTemplateID = inside ? templateID : nil
         }
@@ -1217,10 +1318,10 @@ private extension HomeView {
             VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 Text("Go further with InkNoMi Pro")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .foregroundStyle(DS.Color.textPrimary)
                 Text("Unlimited boards and advanced templates when you need them.")
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
             Spacer()
             Button("Upgrade") {
@@ -1236,7 +1337,7 @@ private extension HomeView {
                     .fill(Color.white.opacity(0.84))
                     .overlay(
                         Capsule(style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
                     )
             )
 
@@ -1274,13 +1375,13 @@ private extension HomeView {
                     .foregroundStyle(DS.Color.accent)
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .foregroundStyle(DS.Color.textPrimary)
                 Spacer()
                 Image(systemName: "arrow.up.forward")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(DS.Color.textSecondary)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1295,7 +1396,7 @@ private extension HomeView {
             .scaleEffect(hoveredWorkflowID == templateID ? premiumCardHoverScale : 1)
         }
         .buttonStyle(FlowDeskHomeCardButtonStyle())
-        .animation(.easeOut(duration: 0.18), value: hoveredWorkflowID == templateID)
+        .animation(FlowDeskMotion.hoverEase, value: hoveredWorkflowID == templateID)
         .onHover { inside in
             hoveredWorkflowID = inside ? templateID : nil
         }
@@ -1403,7 +1504,7 @@ private extension HomeView {
                                     .frame(height: 108)
                                 .brightness(hovered ? 0.028 : 0)
                                     .scaleEffect(hovered ? 1.01 : 1)
-                                .animation(FlowDeskMotion.hoverGlow, value: hovered)
+                                .animation(FlowDeskMotion.hoverEase, value: hovered)
 
                                 HStack {
                                     Image(systemName: template.icon)
@@ -1419,16 +1520,16 @@ private extension HomeView {
                                 }
                                 Text(template.title)
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(Color(hex: "#111827"))
+                                    .foregroundStyle(DS.Color.textPrimary)
                                 Text(template.description)
                                     .font(.system(size: 13, weight: .regular))
-                                    .foregroundStyle(Color(hex: "#6B7280"))
+                                    .foregroundStyle(DS.Color.textSecondary)
                                     .lineLimit(2)
                                 Text(template.isProTemplate && !purchaseManager.isProUser && !isScreenshotPolishMode ? "Use this template (Pro)" : "Use this template")
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(DS.Color.accent)
                             }
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
                             .padding(.vertical, 16)
                             .frame(maxWidth: .infinity, minHeight: 250, alignment: .leading)
                             .background(
@@ -1448,7 +1549,7 @@ private extension HomeView {
                         .buttonStyle(FlowDeskHomeCardButtonStyle())
                         .accessibilityLabel("Template \(template.title)")
                         .onHover { inside in
-            withAnimation(FlowDeskMotion.hoverGlow) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                                 hoveredTemplateID = inside ? template.id : nil
                             }
                         }
@@ -1487,7 +1588,7 @@ private extension HomeView {
         }
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.06))
+                .stroke(Color.black.opacity(0.045))
         )
     }
 
@@ -1498,7 +1599,7 @@ private extension HomeView {
                     Text("Open app settings to adjust appearance and board behavior.")
                     .font(.system(size: 13, weight: .regular))
                     .lineSpacing(DS.Typography.bodyLineSpacing - 1.5)
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
                 #if os(macOS)
                 SettingsLink {
                     Text("Open Settings")
@@ -1510,17 +1611,11 @@ private extension HomeView {
                 .padding(.vertical, 8)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(DS.Color.premiumBlueGradient)
                 )
                 #endif
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
@@ -1562,8 +1657,9 @@ private extension HomeView {
                     .frame(height: 96)
                 HStack {
                     Text(document.title)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color(hex: "#111827"))
+                        .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.body, weight: .semibold))
+                        .tracking(FlowDeskTypeTracking.body)
+                        .flowDeskTitleForeground()
                         .lineLimit(1)
                     Spacer()
                     favoriteButton(for: document)
@@ -1576,12 +1672,12 @@ private extension HomeView {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#6B7280"))
+                            .foregroundStyle(DS.Color.textSecondary)
                             .frame(width: 24, height: 24)
                             .background(
                                 Circle()
                                     .fill(Color.white.opacity(0.9))
-                                    .overlay(Circle().stroke(Color.black.opacity(0.08)))
+                                    .overlay(Circle().stroke(Color.black.opacity(0.06)))
                             )
                     }
                     .menuStyle(.borderlessButton)
@@ -1589,9 +1685,9 @@ private extension HomeView {
                 }
                 Text("Edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1615,7 +1711,7 @@ private extension HomeView {
         .accessibilityLabel("Board \(document.title)")
         .focusable()
         .onHover { inside in
-            withAnimation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02)) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredBoardID = inside ? document.id : nil
             }
         }
@@ -1633,25 +1729,25 @@ private extension HomeView {
                     .frame(width: 80, height: 52)
                 Text(document.title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color(hex: "#111827"))
+                    .foregroundStyle(DS.Color.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 boardTypeChip(document)
                 Text(document.updatedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
                 favoriteButton(for: document)
                 Menu {
                     boardContextMenu(for: document)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#6B7280"))
+                        .foregroundStyle(DS.Color.textSecondary)
                 }
                 .menuStyle(.borderlessButton)
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1675,7 +1771,7 @@ private extension HomeView {
         .contextMenu { boardContextMenu(for: document) }
         .focusable()
         .onHover { inside in
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredBoardID = inside ? document.id : nil
             }
         }
@@ -1685,7 +1781,7 @@ private extension HomeView {
         HStack(spacing: DS.Spacing.sm) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color(hex: "#6B7280"))
+                    .foregroundStyle(DS.Color.textSecondary)
                 TextField("Search boards", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14, weight: .medium))
@@ -1698,7 +1794,7 @@ private extension HomeView {
                     .fill(Color.white.opacity(0.9))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
                     )
             )
 
@@ -1733,7 +1829,7 @@ private extension HomeView {
                             .fill(Color.white.opacity(0.9))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
                             )
                     )
             }
@@ -1757,7 +1853,7 @@ private extension HomeView {
                     } label: {
                         Text(filter.rawValue)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(active ? DS.Color.accent : Color(hex: "#6B7280"))
+                            .foregroundStyle(active ? DS.Color.accent : DS.Color.textSecondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(
@@ -1798,7 +1894,7 @@ private extension HomeView {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
             )
             .clipped()
     }
@@ -1899,12 +1995,14 @@ private extension HomeView {
     func sectionHeader(_ text: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.xs) {
             Text(text)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Color(hex: "#111827"))
+                .font(FlowDeskFont.display(size: FlowDeskTypeScale.h2, weight: .semibold))
+                .tracking(FlowDeskTypeTracking.displayH2)
+                .flowDeskTitleForeground()
             Text(subtitle)
-                .font(.system(size: 13, weight: .regular))
+                .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.bodyCompact, weight: .regular))
+                .tracking(FlowDeskTypeTracking.body)
                 .lineSpacing(DS.Typography.bodyLineSpacing - 1.5)
-                .foregroundStyle(Color(hex: "#6B7280"))
+                .flowDeskSubtitleForeground()
         }
         .padding(.top, DS.Typography.sectionTopSpacing)
     }
@@ -1938,12 +2036,14 @@ private extension HomeView {
                     .foregroundStyle(DS.Color.accent.opacity(0.9))
             }
             Text(title)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color(hex: "#111827"))
+                .font(FlowDeskFont.display(size: FlowDeskTypeScale.body, weight: .semibold))
+                .tracking(FlowDeskTypeTracking.displayTight)
+                .flowDeskTitleForeground()
             Text(detail)
-                .font(.system(size: 13, weight: .regular))
+                .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.label, weight: .regular))
+                .tracking(FlowDeskTypeTracking.body)
                 .lineSpacing(DS.Typography.bodyLineSpacing - 1)
-                .foregroundStyle(Color(hex: "#6B7280"))
+                .flowDeskSubtitleForeground()
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
             HStack(spacing: 8) {
@@ -1961,7 +2061,7 @@ private extension HomeView {
                                     .fill(Color.white.opacity(0.88))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
                                     )
                             )
                     }
@@ -1970,7 +2070,7 @@ private extension HomeView {
                 }
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, FlowDeskLayout.unifiedCardPadding)
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
         .background(
@@ -2042,7 +2142,7 @@ private extension HomeView {
         .buttonStyle(FlowDeskHomeCardButtonStyle())
         .foregroundStyle(active ? DS.Color.accent : DS.Color.textPrimary.opacity(0.8))
         .onHover { inside in
-            withAnimation(FlowDeskMotion.premiumLiftEaseOut) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredSidebarSection = inside ? section : nil
             }
         }

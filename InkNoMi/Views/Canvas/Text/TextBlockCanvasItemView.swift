@@ -30,6 +30,14 @@ struct TextBlockCanvasItemView: View {
         moveDragStartCanvasOrigin != nil
     }
 
+    private var showsResizeChrome: Bool {
+        isSelected && !isEditing && !selection.isMultiSelection
+    }
+
+    private var showsConnectorChrome: Bool {
+        boardViewModel.canvasTool == .select && showsResizeChrome
+    }
+
     /// Multi-select drag: leader uses local snap translation; followers mirror shared preview.
     private var composedMoveOffset: CGSize {
         if boardViewModel.optionDuplicateSourceElementID == element.id {
@@ -49,7 +57,16 @@ struct TextBlockCanvasItemView: View {
 
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
-                .fill(tokens.canvasTextBlockFill)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            FlowDeskTheme.harmonizedColor(tokens.canvasTextBlockFill).opacity(0.985),
+                            FlowDeskTheme.harmonizedColor(tokens.canvasTextBlockFill).opacity(0.955)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .shadow(
                     color: Color.black.opacity(
                         isDragging ? 0.14 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
@@ -62,15 +79,27 @@ struct TextBlockCanvasItemView: View {
                     RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
                         .strokeBorder(Color.primary.opacity(tokens.canvasTextBlockBorderOpacity), lineWidth: 0.5)
                 }
+                .overlay {
+                    RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.34),
+                                    Color.clear,
+                                    Color.black.opacity(0.045)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 0.8
+                        )
+                        .blendMode(.softLight)
+                }
 
             Group {
                 if isEditing {
-                    let font = NSFont.systemFont(
-                        ofSize: CGFloat(displayPayload.fontSize),
-                        weight: displayPayload.isBold ? .semibold : .regular
-                    )
                     TextEditor(text: $draftText)
-                        .font(Font(font))
+                        .font(displayPayload.swiftUIFont)
                         .foregroundStyle(displayPayload.color.swiftUIColor)
                         .scrollContentBackground(.hidden)
                         .scrollIndicators(.hidden)
@@ -83,10 +112,10 @@ struct TextBlockCanvasItemView: View {
             }
             .padding(FlowDeskTheme.textBlockContentPadding)
 
-            RoundedRectangle(cornerRadius: FlowDeskTheme.textBlockCornerRadius, style: .continuous)
-                .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
-                .opacity(isSelected ? 1 : 0)
-                .allowsHitTesting(false)
+            CanvasFramedItemSelectionChrome(
+                cornerRadius: FlowDeskTheme.textBlockCornerRadius,
+                isVisible: isSelected
+            )
             RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                 .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
                 .opacity(isHovered && !isSelected ? 1 : 0)
@@ -95,24 +124,30 @@ struct TextBlockCanvasItemView: View {
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .animation(FlowDeskMotion.smoothEaseOut, value: isSelected && !selection.isMultiSelection)
         .overlay(alignment: .bottomTrailing) {
-            if isSelected, !isEditing, !selection.isMultiSelection {
-                CanvasTextBlockResizeHandle()
-                    .padding(FlowDeskLayout.canvasSelectionChromeInset)
-                    .gesture(resizeGesture)
-                    .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsResizeChrome {
+                    CanvasTextBlockResizeHandle()
+                        .padding(FlowDeskLayout.canvasSelectionChromeInset)
+                        .gesture(resizeGesture)
+                        .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsResizeChrome)
         }
         .overlay {
-            if boardViewModel.canvasTool == .select, isSelected, !isEditing, !selection.isMultiSelection {
-                ShapeConnectorHandlesOverlay(
-                    element: element,
-                    boardViewModel: boardViewModel,
-                    selection: selection
-                )
-                .allowsHitTesting(true)
-                .help("Drag a blue dot to connect to another object (⇧ straight line)")
-                .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsConnectorChrome {
+                    ShapeConnectorHandlesOverlay(
+                        element: element,
+                        boardViewModel: boardViewModel,
+                        selection: selection
+                    )
+                    .allowsHitTesting(true)
+                    .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                    .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsConnectorChrome)
         }
         .offset(composedMoveOffset)
         .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))

@@ -40,6 +40,51 @@ struct CanvasElementChrome: View {
     }
 }
 
+extension View {
+    /// Shared object-depth language for canvas elements: base shadow, hover lift, active soft glow.
+    func canvasObjectDepthSurface(
+        isHovered: Bool,
+        isSelected: Bool,
+        isActive: Bool = false,
+        isDragging: Bool,
+        tokens: FlowDeskAppearanceTokens
+    ) -> some View {
+        let focused = isSelected || isActive
+        let baseOpacity = isDragging
+            ? 0.14
+            : (focused ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
+        let baseRadius = isDragging
+            ? 14
+            : (focused ? tokens.canvasItemShadowRadiusSelected : tokens.canvasItemShadowRadiusNormal)
+        let baseY = isDragging
+            ? 8
+            : (focused ? tokens.canvasItemShadowYSelected : tokens.canvasItemShadowYNormal)
+        let hoverOpacity = (!focused && isHovered && !isDragging) ? 0.07 : 0
+        let hoverRadius: CGFloat = (!focused && isHovered && !isDragging) ? 11 : 0
+        let hoverY: CGFloat = (!focused && isHovered && !isDragging) ? 4 : 0
+        let hoverGlowOpacity = (!focused && isHovered && !isDragging) ? 0.16 : 0
+        let hoverGlowRadius: CGFloat = (!focused && isHovered && !isDragging) ? 14 : 0
+        let activeGlowOpacity = focused ? 0.2 : 0
+        let activeGlowRadius: CGFloat = focused ? 18 : 0
+
+        return self
+            .shadow(color: Color.black.opacity(baseOpacity), radius: baseRadius, x: 0, y: baseY)
+            .shadow(color: Color.black.opacity(hoverOpacity), radius: hoverRadius, x: 0, y: hoverY)
+            .shadow(color: tokens.selectionStrokeColor.opacity(hoverGlowOpacity), radius: hoverGlowRadius, x: 0, y: 0)
+            .shadow(color: tokens.selectionStrokeColor.opacity(activeGlowOpacity), radius: activeGlowRadius, x: 0, y: 0)
+    }
+}
+
+extension CGSize {
+    /// Tiny drag smoothing to reduce mechanical jitter while preserving responsiveness.
+    func smoothedToward(_ target: CGSize, response: CGFloat = 0.2) -> CGSize {
+        CGSize(
+            width: width + (target.width - width) * response,
+            height: height + (target.height - height) * response
+        )
+    }
+}
+
 private extension CanvasElementKind {
     var displayName: String {
         switch self {

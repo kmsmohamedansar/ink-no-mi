@@ -15,8 +15,16 @@ struct StickyNoteInspectorSection: View {
 
     var body: some View {
         if let payload {
-            Section {
-                LabeledContent("Paper") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Sticky note")
+                    .font(FlowDeskTypography.inspectorEyebrow)
+                    .tracking(0.85)
+                    .foregroundStyle(DS.Color.textTertiary)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Paper")
+                        .font(FlowDeskTypography.inspectorLabel)
+                        .foregroundStyle(DS.Color.textSecondary)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 36), spacing: 8)], spacing: 8) {
                         ForEach(StickyNoteColorPreset.allCases, id: \.self) { preset in
                             let selected = StickyNoteColorPreset.nearest(to: payload.backgroundColor) == preset
@@ -38,28 +46,22 @@ struct StickyNoteInspectorSection: View {
                                         y: FlowDeskTheme.canvasAuxiliaryLabelShadowY
                                     )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(FlowDeskPlainInteractionStyle())
                             .help(preset.displayName)
                         }
                     }
                 }
 
-                LabeledContent("Text size") {
-                    Stepper(
-                        value: fontSizeBinding(fallback: payload.fontSize),
-                        in: 11 ... 24,
-                        step: 1
-                    ) {
-                        Text(
-                            "\(Int(canvasViewModel.boardState.elements.first { $0.id == elementID }?.resolvedStickyNotePayload().fontSize ?? payload.fontSize)) pt"
-                        )
-                        .monospacedDigit()
-                    }
-                }
+                InspectorLabeledSlider(
+                    title: "Text size",
+                    value: fontSizeBinding(fallback: payload.fontSize),
+                    range: 11 ... 24,
+                    step: 1,
+                    valueLabel:
+                        "\(Int(canvasViewModel.boardState.elements.first { $0.id == elementID }?.resolvedStickyNotePayload().fontSize ?? payload.fontSize)) pt"
+                )
 
                 Toggle("Bold", isOn: boldBinding(fallback: payload.isBold))
-            } header: {
-                FlowDeskInspectorSectionHeader("Sticky note")
             }
         }
     }

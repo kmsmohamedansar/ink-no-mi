@@ -9,9 +9,17 @@ extension CanvasBoardViewModel {
     }
 
     func clearAlignmentGuides(after delay: TimeInterval) {
-        _ = delay
-        withAnimation(.easeOut(duration: 0.16)) {
-            activeAlignmentGuides = []
+        if delay <= 0 {
+            withAnimation(FlowDeskMotion.fastEaseOut) {
+                activeAlignmentGuides = []
+            }
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            withAnimation(FlowDeskMotion.fastEaseOut) {
+                self.activeAlignmentGuides = []
+            }
         }
     }
 

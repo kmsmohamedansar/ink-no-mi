@@ -43,9 +43,11 @@ struct CanvasGridView: View {
                 row += 1
             }
             let minorColor = gridInk.opacity(lineOpacity)
-            let majorColor = gridInk.opacity(min(lineOpacity * 1.2, 0.08))
+            // Major lines are subtly stronger for drafting rhythm (every 4 units by default).
+            let majorBoost = min(lineOpacity * 1.18, lineOpacity + 0.012)
+            let majorColor = gridInk.opacity(min(majorBoost, 0.07))
             context.stroke(minor, with: .color(minorColor), lineWidth: lineWidth)
-            context.stroke(major, with: .color(majorColor), lineWidth: lineWidth * 1.15)
+            context.stroke(major, with: .color(majorColor), lineWidth: lineWidth * 1.06)
         }
     }
 }

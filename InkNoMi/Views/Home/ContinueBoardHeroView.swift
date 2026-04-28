@@ -19,8 +19,8 @@ struct ContinueBoardHeroView: View {
                 VStack(alignment: .leading, spacing: FlowDeskLayout.spaceS) {
                     HStack(alignment: .center, spacing: FlowDeskLayout.spaceS) {
                         Image(systemName: "arrow.turn.down.left")
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                            .flowDeskStandardIcon()
+                            .foregroundStyle(DS.Color.accent.opacity(0.62))
                         if let template {
                             FlowDeskTemplateChip(label: template.homeChipLabel)
                         }
@@ -49,7 +49,7 @@ struct ContinueBoardHeroView: View {
                     .frame(width: 24, height: 28)
                     .overlay {
                         Image(systemName: "chevron.forward")
-                            .font(.subheadline.weight(.semibold))
+                            .flowDeskStandardIcon(size: DS.Icon.accessorySize)
                             .foregroundStyle(
                                 isHovered
                                     ? tokens.selectionStrokeColor.opacity(0.88)
@@ -59,7 +59,7 @@ struct ContinueBoardHeroView: View {
                     }
                     .clipped()
                     .contentShape(Rectangle())
-                    .animation(FlowDeskMotion.premiumLiftEaseOut.delay(0.02), value: isHovered)
+                    .animation(FlowDeskMotion.hoverEase, value: isHovered)
             }
             .frame(maxWidth: .infinity, minHeight: FlowDeskLayout.homeContinueMinHeight, alignment: .leading)
             .cardContainer(isHovered: $isHovered, scaleOnHover: DS.Interaction.hoverScale)

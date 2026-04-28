@@ -38,47 +38,81 @@ enum FlowDeskTheme {
         }
     }
 
+    /// Subtle global palette harmonization: gently reduce saturation and blend toward warm-paper neutral.
+    static func harmonizedColor(_ color: Color, desaturation: CGFloat = 0.07, warmth: CGFloat = 0.06) -> Color {
+        #if os(macOS)
+        guard let converted = NSColor(color).usingColorSpace(.deviceRGB) else { return color }
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        converted.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        let reducedS = max(0, s * (1 - desaturation))
+        let toned = NSColor(hue: h, saturation: reducedS, brightness: b, alpha: a).usingColorSpace(.deviceRGB) ?? converted
+
+        var r1: CGFloat = 0
+        var g1: CGFloat = 0
+        var b1: CGFloat = 0
+        var a1: CGFloat = 0
+        toned.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        // Warm neutral anchor (#F4EFE6-ish) for subtle cohesion.
+        let wr: CGFloat = 0.956
+        let wg: CGFloat = 0.937
+        let wb: CGFloat = 0.902
+        let t = max(0, min(1, warmth))
+        let out = NSColor(
+            red: r1 * (1 - t) + wr * t,
+            green: g1 * (1 - t) + wg * t,
+            blue: b1 * (1 - t) + wb * t,
+            alpha: a1
+        )
+        return Color(out)
+        #else
+        return color
+        #endif
+    }
+
     static func surfaceGradient(for level: DepthLevel, colorScheme: ColorScheme) -> LinearGradient {
         switch (level, colorScheme) {
         case (.base, .light):
             return LinearGradient(
-                colors: [DS.Color.canvasTopWash, DS.Color.canvasBottom],
+                colors: [harmonizedColor(DS.Color.canvasTopWash), harmonizedColor(DS.Color.canvasBottom)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case (.elevated, .light):
             return LinearGradient(
-                colors: [DS.Color.surfaceTop, DS.Color.surfaceBottom],
+                colors: [harmonizedColor(DS.Color.surfaceTop), harmonizedColor(DS.Color.surfaceBottom)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case (.floating, .light):
             return LinearGradient(
-                colors: [DS.Color.surfaceFloatingTop, DS.Color.surfaceFloatingBottom],
+                colors: [harmonizedColor(DS.Color.surfaceFloatingTop), harmonizedColor(DS.Color.surfaceFloatingBottom)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case (.base, .dark):
             return LinearGradient(
-                colors: [Color.white.opacity(0.06), Color.black.opacity(0.12)],
+                colors: [harmonizedColor(Color.white.opacity(0.06)), harmonizedColor(Color.black.opacity(0.12))],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case (.elevated, .dark):
             return LinearGradient(
-                colors: [Color.white.opacity(0.11), Color.black.opacity(0.2)],
+                colors: [harmonizedColor(Color.white.opacity(0.11)), harmonizedColor(Color.black.opacity(0.2))],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case (.floating, .dark):
             return LinearGradient(
-                colors: [Color.white.opacity(0.15), Color.black.opacity(0.24)],
+                colors: [harmonizedColor(Color.white.opacity(0.15)), harmonizedColor(Color.black.opacity(0.24))],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         @unknown default:
             return LinearGradient(
-                colors: [DS.Color.surfaceTop, DS.Color.surfaceBottom],
+                colors: [harmonizedColor(DS.Color.surfaceTop), harmonizedColor(DS.Color.surfaceBottom)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -337,103 +371,168 @@ enum FlowDeskTheme {
         return img
     }()
 
-    /// Token-driven board mat: base → grid → one vertical depth multiply → light top wash → edge vignette → optional grain (no stacked radial/center/depth overlays).
+    /// Layered board “environment”: warm base → center lift → top air wash → readable grid → soft vignette → paper grain.
+    /// Light mode uses a warm stone mat so the surface reads as physical workspace, not cold flat grey.
     @ViewBuilder
     static func canvasWorkspaceMatBackground(
         tokens: FlowDeskAppearanceTokens,
         colorScheme: ColorScheme,
         showGrid: Bool,
         spotlightCenter: UnitPoint,
-        includeFilmGrain: Bool
+        zoomScale: CGFloat = 1,
+        idleLuminanceAmount: Double = 0,
+        gridFadeCenter: UnitPoint = .center,
+        includeFilmGrain: Bool,
+        interactionLift: Bool = false
     ) -> some View {
-        let gridOpacity = tokens.gridLineOpacity * tokens.canvasGridEmphasis * 0.68
-        let topWash = (colorScheme == .dark ? tokens.canvasTopWashOpacity * 0.48 : tokens.canvasTopWashOpacity) * 0.42
-        let spotlightOpacity = colorScheme == .dark ? 0.06 : 0.12
-        let vignetteOpacity = tokens.canvasVignetteOpacity * (colorScheme == .dark ? 1.08 : 1.22)
+        let isLight = colorScheme == .light
+        /// Warm neutral paper base (premium light canvas).
+        let matBaseLight = Color(hex: "#F4F1EA")
+        /// Light taupe grid ink — paired with low opacity so lines stay auxiliary.
+        let gridInkLight = Color(hex: "#ADA8A2")
+        let gridLineOpacityBase: Double = {
+            let base = tokens.gridLineOpacity * tokens.canvasGridEmphasis
+            if isLight {
+                return min(base * 0.92, 0.038)
+            }
+            return min(base * 0.74, 0.054)
+        }()
+        // Zoom-aware drafting feel: fade grid when zoomed out, sharpen as you zoom in.
+        let zoomT = min(max((zoomScale - 0.25) / 1.75, 0), 1) // normalized around useful drafting range
+        let gridLineOpacity = gridLineOpacityBase * (0.62 + 0.56 * zoomT)
+        let gridLineWidth = FlowDeskLayout.gridLineWidth * (0.92 + 0.24 * zoomT)
+        /// Radial center lift — subtle physical-surface lighting (target ~0.06–0.1 range).
+        let radialPeak: Double = isLight ? 0.09 : 0.07
+        /// Ultra-subtle grayscale noise (1–2%) so the surface avoids digital flatness.
+        let grainOpacity: Double = {
+            let floor = 0.01
+            let ceiling = 0.02
+            if includeFilmGrain {
+                return min(max(tokens.canvasGrainOpacity, floor), ceiling)
+            }
+            return 0
+        }()
 
         ZStack {
-            tokens.canvasWorkspaceBackground
-
-            if showGrid {
-                CanvasGridOverlay(
-                    spacing: 24,
-                    lineWidth: FlowDeskLayout.gridLineWidth,
-                    lineOpacity: gridOpacity,
-                    gridInk: tokens.canvasGridInk,
-                    majorLineStride: 0
-                )
+            Group {
+                if isLight {
+                    matBaseLight
+                } else {
+                    tokens.canvasWorkspaceBackground
+                }
             }
 
-            // Layer 2: radial center lift + edge falloff, anchored to viewport center.
+            // Center radial lift — reads as ambient light on the mat.
             RadialGradient(
                 colors: [
-                    Color.white.opacity(spotlightOpacity),
-                    Color.white.opacity(spotlightOpacity * 0.45),
+                    Color.white.opacity(radialPeak),
+                    Color.white.opacity(radialPeak * 0.35),
                     Color.clear
                 ],
                 center: spotlightCenter,
-                startRadius: 60,
-                endRadius: 760
+                startRadius: 80,
+                endRadius: 920
             )
             .blendMode(.softLight)
             .allowsHitTesting(false)
 
+            // Top wash: white → transparent (open, airy ceiling light).
             LinearGradient(
                 colors: [
-                    Color.white.opacity(tokens.canvasTopWashOpacity * 0.85),
-                    Color(nsColor: NSColor(red: 0.961, green: 0.949, blue: 0.918, alpha: 1)).opacity(tokens.canvasBottomDepthOpacity)
+                    Color.white.opacity(isLight ? 0.42 : 0.14),
+                    Color.white.opacity(0)
                 ],
                 startPoint: .top,
-                endPoint: .bottom
+                endPoint: UnitPoint(x: 0.5, y: 0.45)
             )
             .blendMode(.normal)
             .allowsHitTesting(false)
 
+            // Ultra-subtle vertical depth pass: barely brighter at top, slightly warmer/darker near bottom.
             LinearGradient(
                 colors: [
-                    Color.white.opacity(topWash),
-                    Color.white.opacity(0)
+                    Color.white.opacity(isLight ? 0.03 : 0.018),
+                    Color.clear,
+                    Color(hex: "#D9D1C5").opacity(isLight ? 0.026 : 0.016)
                 ],
                 startPoint: .top,
-                endPoint: UnitPoint(x: 0.5, y: 0.38)
+                endPoint: .bottom
             )
             .blendMode(.softLight)
+            .opacity(isLight ? 0.88 : 0.74)
             .allowsHitTesting(false)
 
-            RadialGradient(
+            // Idle luminance drift (10–15s cadence): barely perceptible life in the surface.
+            Color.white
+                .opacity((isLight ? 0.0032 : 0.0024) * abs(idleLuminanceAmount))
+                .blendMode(idleLuminanceAmount >= 0 ? .softLight : .multiply)
+                .allowsHitTesting(false)
+
+            // Gentle vertical depth (warm floor) — keeps hierarchy without muddy grey.
+            LinearGradient(
                 colors: [
                     Color.clear,
-                    tokens.canvasGridInk.opacity(tokens.canvasVignetteOpacity * 0.55)
+                    Color(hex: "#E5E0D8").opacity(isLight ? 0.38 : 0.2)
+                ],
+                startPoint: UnitPoint(x: 0.5, y: 0.35),
+                endPoint: .bottom
+            )
+            .blendMode(.multiply)
+            .opacity(isLight ? 0.55 : 0.45)
+            .allowsHitTesting(false)
+
+            if showGrid {
+                CanvasGridOverlay(
+                    spacing: 24,
+                    lineWidth: gridLineWidth,
+                    lineOpacity: gridLineOpacity,
+                    gridInk: isLight ? gridInkLight : tokens.canvasGridInk.opacity(0.92),
+                    majorLineStride: 4
+                )
+                .mask {
+                    GeometryReader { proxy in
+                        let fadeRadius = hypot(proxy.size.width, proxy.size.height) * 0.5
+                        RadialGradient(
+                            stops: [
+                                .init(color: .white, location: 0),
+                                .init(color: .white.opacity(0.9), location: 0.22),
+                                .init(color: .white.opacity(0.52), location: 0.52),
+                                .init(color: .white.opacity(0.06), location: 1)
+                            ],
+                            center: gridFadeCenter,
+                            startRadius: 0,
+                            endRadius: fadeRadius
+                        )
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+
+            // Ultra-soft vignette — subtle edge darkening to keep attention near center.
+            RadialGradient(
+                stops: [
+                    .init(color: .clear, location: 0.55),
+                    .init(color: Color.black.opacity(isLight ? 0.018 : 0.03), location: 0.82),
+                    .init(color: Color.black.opacity(isLight ? 0.032 : 0.05), location: 1)
                 ],
                 center: .center,
-                startRadius: 380,
+                startRadius: 760,
                 endRadius: 2_900
             )
             .blendMode(.multiply)
-            .opacity(vignetteOpacity > 0 ? 1 : 0)
             .allowsHitTesting(false)
 
-            // Layer 3: extremely subtle edge dimming around the current viewport focus.
-            RadialGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(vignetteOpacity * 0.42)
-                ],
-                center: spotlightCenter,
-                startRadius: 460,
-                endRadius: 2_200
-            )
-            .blendMode(.multiply)
-            .allowsHitTesting(false)
-
-            if includeFilmGrain, tokens.canvasGrainOpacity > 0.0001 {
+            if includeFilmGrain, grainOpacity > 0.0001 {
                 Image(nsImage: canvasMatGrainTileNSImage)
                     .resizable(resizingMode: .tile)
-                    .blendMode(.overlay)
-                    .opacity(tokens.canvasGrainOpacity)
+                    .saturation(0)
+                    .blendMode(.softLight)
+                    .opacity(grainOpacity)
                     .allowsHitTesting(false)
             }
         }
+        .brightness(interactionLift ? 0.015 : 0)
+        .animation(FlowDeskMotion.fastEaseOut, value: interactionLift)
     }
 }
 
@@ -451,10 +550,10 @@ struct FlowDeskInspectorSectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(DS.Typography.label.weight(.medium))
+            .font(FlowDeskTypography.inspectorEyebrow)
             .foregroundStyle(DS.Color.textTertiary.opacity(colorScheme == .dark ? 0.86 : 1))
             .textCase(.uppercase)
-            .tracking(DS.Typography.labelTracking + 0.2)
+            .tracking(FlowDeskTypeTracking.labelUppercase)
             .padding(.bottom, FlowDeskLayout.inspectorSectionHeaderBottomSpacing)
     }
 }
@@ -466,11 +565,11 @@ struct FlowDeskWordmark: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text("Ink")
-                .font(.system(size: 21, weight: .semibold, design: .rounded))
-                .tracking(-0.35)
+                .font(FlowDeskFont.display(size: FlowDeskTypeScale.h2, weight: .semibold))
+                .tracking(FlowDeskTypeTracking.displayH2)
             Text(" no Mi")
-                .font(.system(size: 21, weight: .medium, design: .rounded))
-                .tracking(-0.22)
+                .font(FlowDeskFont.uiText(size: FlowDeskTypeScale.h2, weight: .medium))
+                .tracking(FlowDeskTypeTracking.displayTight)
                 .foregroundStyle(.secondary)
         }
         .foregroundStyle(.primary)
@@ -528,26 +627,3 @@ struct FlowDeskSheetsStackMark: View {
     }
 }
 
-/// Centered canvas empty state: same sheets language as the sidebar, tuned for the board.
-struct FlowDeskCanvasWorkspaceHint: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        VStack(spacing: 20) {
-            FlowDeskSheetsStackMark(size: 88)
-            VStack(spacing: 8) {
-                Text("Your canvas is ready")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.55 : 0.42))
-                    .multilineTextAlignment(.center)
-                Text("Draw freely, add notes, or start from a template.")
-                    .font(.system(size: 12.5, weight: .regular, design: .rounded))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.38 : 0.32))
-                    .frame(maxWidth: 280)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}

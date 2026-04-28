@@ -112,7 +112,7 @@ struct NewBoardSheetView: View {
             }
             Spacer()
             Button("Cancel", action: onCancel)
-                .buttonStyle(.plain)
+                .buttonStyle(FlowDeskPlainInteractionStyle())
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 24)
@@ -154,7 +154,7 @@ struct NewBoardSheetView: View {
                                         .stroke(draft.startMode == mode ? tokens.accent.opacity(0.4) : Color.primary.opacity(0.12), lineWidth: 1)
                                 )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(FlowDeskPlainInteractionStyle())
                     }
                 }
 
@@ -211,7 +211,7 @@ struct NewBoardSheetView: View {
                                             .fill(draft.selectedTemplateID == template.id ? tokens.accent.opacity(0.12) : Color.primary.opacity(0.05))
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(FlowDeskPlainInteractionStyle())
                             }
                         }
                     }

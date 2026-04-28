@@ -14,39 +14,29 @@ struct StrokeInspectorSection: View {
 
     var body: some View {
         if let strokePayload {
-            Section {
-                LabeledContent("Color") {
-                    ColorPicker(
-                        "",
-                        selection: colorBinding(fallback: strokePayload.color),
-                        supportsOpacity: true
-                    )
-                    .labelsHidden()
-                }
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Stroke")
+                    .font(FlowDeskTypography.inspectorEyebrow)
+                    .tracking(0.85)
+                    .foregroundStyle(DS.Color.textTertiary)
 
-                LabeledContent("Width") {
-                    Stepper(
-                        value: lineWidthBinding(fallback: strokePayload.lineWidth),
-                        in: 1 ... 24,
-                        step: 0.5
-                    ) {
-                        Text(String(format: "%.1f pt", strokePayload.lineWidth))
-                            .monospacedDigit()
-                    }
-                }
+                InspectorColorPreviewRow(title: "Color", color: colorBinding(fallback: strokePayload.color), supportsOpacity: true)
 
-                LabeledContent("Opacity") {
-                    Stepper(
-                        value: opacityBinding(fallback: strokePayload.opacity),
-                        in: 0.15 ... 1,
-                        step: 0.05
-                    ) {
-                        Text(String(format: "%.0f%%", strokePayload.opacity * 100))
-                            .monospacedDigit()
-                    }
-                }
-            } header: {
-                FlowDeskInspectorSectionHeader("Stroke")
+                InspectorLabeledSlider(
+                    title: "Width",
+                    value: lineWidthBinding(fallback: strokePayload.lineWidth),
+                    range: 1 ... 24,
+                    step: 0.5,
+                    valueLabel: String(format: "%.1f pt", strokePayload.lineWidth)
+                )
+
+                InspectorLabeledSlider(
+                    title: "Opacity",
+                    value: opacityBinding(fallback: strokePayload.opacity),
+                    range: 0.15 ... 1,
+                    step: 0.01,
+                    valueLabel: String(format: "%.0f%%", strokePayload.opacity * 100)
+                )
             }
         }
     }

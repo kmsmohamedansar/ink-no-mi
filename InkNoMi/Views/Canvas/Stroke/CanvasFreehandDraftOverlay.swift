@@ -8,17 +8,26 @@ struct CanvasFreehandDraftOverlay: View {
     let opacity: Double
 
     var body: some View {
-        let previewPoints = StrokePathSmoothing.livePreviewPoints(canvasPoints)
-        let path = StrokePathSmoothing.smoothPath(from: previewPoints)
-        path
-            .stroke(
-                color.swiftUIColor.opacity(opacity),
-                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        Canvas { context, size in
+            let preview = StrokePathSmoothing.livePreviewPoints(canvasPoints)
+            guard !preview.isEmpty else { return }
+
+            let sampled: [CGPoint] = {
+                if preview.count == 1 { return preview }
+                return StrokePathSmoothing.sampledSmoothPolyline(from: preview, samplesPerSegment: 9)
+            }()
+
+            InkStyleStrokeDrawing.drawInkStroke(
+                context: &context,
+                sampledPoints: sampled,
+                color: color.swiftUIColor,
+                baseLineWidth: lineWidth,
+                baseOpacity: CGFloat(opacity)
             )
-            .transaction { tx in
-                // Keep in-flight drawing updates immediate; avoid per-point animation churn.
-                tx.animation = nil
-            }
-            .allowsHitTesting(false)
+        }
+        .transaction { tx in
+            tx.animation = nil
+        }
+        .allowsHitTesting(false)
     }
 }

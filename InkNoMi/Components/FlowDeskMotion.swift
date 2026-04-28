@@ -3,22 +3,45 @@ import SwiftUI
 /// Central animation timings and curves used across canvas microinteractions.
 @MainActor
 enum FlowDeskMotion {
-    static let quickEaseOut = Animation.easeOut(duration: 0.12)
-    static let microQuickEaseOut = Animation.easeOut(duration: 0.09)
-    static let standardEaseOut = Animation.easeOut(duration: 0.2)
-    static let smoothEaseOut = Animation.easeOut(duration: 0.15)
-    static let lightSpring = Animation.easeOut(duration: 0.14)
-    static let mellowSpring = Animation.easeOut(duration: 0.15)
-    static let premiumLiftEaseOut = Animation.easeOut(duration: 0.12)
-    static let pressCompress = Animation.easeOut(duration: 0.08)
-    static let pressRebound = Animation.easeOut(duration: 0.12)
-    static let hoverGlow = Animation.easeOut(duration: 0.14)
-    static let modalEnter = Animation.easeOut(duration: 0.15).delay(0.02)
-    static let canvasEnter = Animation.easeOut(duration: 0.26).delay(0.05)
-    static let selectionGlowIn = Animation.easeOut(duration: 0.2).delay(0.03)
-    static let selectionPulseOut = Animation.easeOut(duration: 0.22)
-    static let snapCueFlash = Animation.easeOut(duration: 0.1)
-    static let drawingLiftFade = Animation.easeOut(duration: 0.12)
+    /// Unified motion language durations.
+    static let fastDuration: Double = 0.12
+    static let mediumDuration: Double = 0.18
+    static let slowDuration: Double = 0.24
+
+    static let fastEaseOut = Animation.easeOut(duration: fastDuration)
+    static let mediumEaseOut = Animation.easeOut(duration: mediumDuration)
+    static let slowEaseOut = Animation.easeOut(duration: slowDuration)
+    static let fastEaseInOut = Animation.easeInOut(duration: fastDuration)
+    static let mediumEaseInOut = Animation.easeInOut(duration: mediumDuration)
+    static let slowEaseInOut = Animation.easeInOut(duration: slowDuration)
+
+    /// Existing semantic aliases now mapped to fast/medium/slow tokens.
+    static let hoverEase = fastEaseOut
+    static let uiPressDown = fastEaseOut
+    static let uiPressRelease = fastEaseOut
+    static let uiHoverLift = hoverEase
+    static let uiRouteTransition = mediumEaseOut
+    static let uiOverlayPresent = mediumEaseOut
+
+    static let quickEaseOut = fastEaseOut
+    static let microQuickEaseOut = fastEaseOut
+    static let standardEaseOut = mediumEaseOut
+    static let smoothEaseOut = mediumEaseOut
+    static let lightSpring = fastEaseOut
+    static let mellowSpring = mediumEaseOut
+    static let premiumLiftEaseOut = hoverEase
+    static let pressCompress = fastEaseOut
+    static let pressRebound = mediumEaseOut
+    static let hoverGlow = hoverEase
+    static let modalEnter = mediumEaseOut
+    /// Primary shell navigation (home ↔ editor): snappy; element canvas drops use separate timings.
+    static let canvasEnter = mediumEaseOut
+    static let selectionGlowIn = mediumEaseOut
+    static let selectionPulseOut = slowEaseOut
+
+    static let handleInsertSpring = Animation.spring(response: 0.3, dampingFraction: 0.8)
+    static let snapCueFlash = fastEaseOut
+    static let drawingLiftFade = fastEaseOut
 
     static let insertTransition: AnyTransition = .asymmetric(
         insertion: .opacity.combined(with: .scale(scale: 0.96)),
@@ -26,10 +49,14 @@ enum FlowDeskMotion {
     )
 
     static let deleteTransition: AnyTransition = .opacity.combined(with: .scale(scale: 0.95))
-    static let handleTransition: AnyTransition = .scale(scale: 0.84).combined(with: .opacity)
+    static let handleTransition: AnyTransition = .asymmetric(
+        insertion: .scale(scale: 0.48, anchor: .bottomTrailing)
+            .combined(with: .opacity)
+            .combined(with: .offset(x: 4, y: 4)),
+        removal: .scale(scale: 0.88, anchor: .bottomTrailing).combined(with: .opacity)
+    )
     static let modalEntryTransition: AnyTransition = .opacity
         .combined(with: .scale(scale: 0.965))
-        .combined(with: .offset(y: 12))
 }
 
 private struct FlowDeskModalEntranceModifier: ViewModifier {
@@ -38,8 +65,7 @@ private struct FlowDeskModalEntranceModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.97)
-            .offset(y: isVisible ? 0 : 10)
+            .scaleEffect(isVisible ? 1 : 0.965)
             .animation(FlowDeskMotion.modalEnter, value: isVisible)
             .onAppear {
                 isVisible = true
@@ -48,7 +74,7 @@ private struct FlowDeskModalEntranceModifier: ViewModifier {
 }
 
 extension View {
-    /// Subtle fade + scale + upward settle for sheet/modal content.
+    /// Subtle fade + scale-up entrance for modal content.
     func flowDeskModalEntrance() -> some View {
         modifier(FlowDeskModalEntranceModifier())
     }

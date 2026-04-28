@@ -4,9 +4,18 @@ import SwiftUI
 struct CanvasEditorInspectorSection: View {
     @Bindable var canvasViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
+    
+    private var canShowArrange: Bool {
+        selection.primarySelectedID != nil && !selection.isMultiSelection
+    }
 
     var body: some View {
-        Section {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Edit")
+                .font(FlowDeskTypography.inspectorEyebrow)
+                .tracking(0.85)
+                .foregroundStyle(DS.Color.textTertiary)
+
             HStack(spacing: 10) {
                 Button("Duplicate") {
                     canvasViewModel.duplicateAllSelectedElements(selection: selection)
@@ -27,33 +36,32 @@ struct CanvasEditorInspectorSection: View {
                 .disabled(!selection.hasSelection)
             }
 
-            Menu {
-                Button("Bring to Front") {
-                    canvasViewModel.bringSelectionToFront(selection: selection)
+            if canShowArrange {
+                Menu {
+                    Button("Bring to Front") {
+                        canvasViewModel.bringSelectionToFront(selection: selection)
+                    }
+                    Button("Bring Forward") {
+                        canvasViewModel.bringSelectionForward(selection: selection)
+                    }
+                    .disabled(!canvasViewModel.canBringSelectionForward(selection: selection))
+                    Button("Send Backward") {
+                        canvasViewModel.sendSelectionBackward(selection: selection)
+                    }
+                    .disabled(!canvasViewModel.canSendSelectionBackward(selection: selection))
+                    Button("Send to Back") {
+                        canvasViewModel.sendSelectionToBack(selection: selection)
+                    }
+                } label: {
+                    Label("Arrange stacking", systemImage: "square.3.layers.3d")
                 }
-                Button("Bring Forward") {
-                    canvasViewModel.bringSelectionForward(selection: selection)
-                }
-                .disabled(!canvasViewModel.canBringSelectionForward(selection: selection))
-                Button("Send Backward") {
-                    canvasViewModel.sendSelectionBackward(selection: selection)
-                }
-                .disabled(!canvasViewModel.canSendSelectionBackward(selection: selection))
-                Button("Send to Back") {
-                    canvasViewModel.sendSelectionToBack(selection: selection)
-                }
-            } label: {
-                Label("Arrange stacking", systemImage: "square.3.layers.3d")
             }
-            .disabled(selection.primarySelectedID == nil)
 
             if selection.isMultiSelection {
-                Text("Arrange applies to one item at a time. Select a single element for stacking controls.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Use the multi-select toolbar for align/distribute actions.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DS.Color.textSecondary)
             }
-        } header: {
-            FlowDeskInspectorSectionHeader("Edit")
         }
     }
 }

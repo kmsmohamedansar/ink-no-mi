@@ -139,6 +139,7 @@ struct CanvasExportSheet: View {
                     RoundedRectangle(cornerRadius: DS.Radius.xxLarge, style: .continuous)
                         .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 1)
                 )
+                .flowDeskDepthShadows(FlowDeskDepth.modalChrome)
         )
         .onChange(of: viewModel.options.format) { _, _ in viewModel.refreshPreview() }
         .onChange(of: viewModel.options.scope) { _, _ in viewModel.refreshPreview() }
@@ -326,8 +327,14 @@ struct CanvasExportSheet: View {
             } label: {
                 HStack(spacing: 8) {
                     if viewModel.isExporting {
-                        ProgressView()
-                            .controlSize(.small)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 16, height: 16)
+                            .flowDeskSkeletonShimmer()
+                            .overlay {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
                     }
                     Text(viewModel.isExporting ? "Exporting..." : "Export")
                         .font(DS.Typography.toolLabel.weight(.semibold))
@@ -336,13 +343,7 @@ struct CanvasExportSheet: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [DS.Color.primaryAccent.opacity(0.94), DS.Color.secondaryAccent.opacity(0.9)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(DS.Color.premiumBlueGradient)
                 )
                 .foregroundStyle(Color.white)
             }
@@ -366,7 +367,7 @@ struct CanvasExportSheet: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(
                             selected
-                                ? AnyShapeStyle(LinearGradient(colors: [DS.Color.primaryAccent, DS.Color.secondaryAccent], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                ? AnyShapeStyle(DS.Color.premiumBlueGradient)
                                 : AnyShapeStyle(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
                         )
                 )

@@ -26,7 +26,9 @@
 		A10000000000000000000013 /* CanvasBoardState+Sample.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* CanvasBoardState+Sample.swift */; };
 		A10000000000000000000014 /* CanvasScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* CanvasScreenView.swift */; };
 		A10000000000000000000015 /* CanvasBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* CanvasBoardView.swift */; };
+		A10000000000000000000B3 /* CanvasEmptyWorkspaceOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000B3 /* CanvasEmptyWorkspaceOverlay.swift */; };
 		A10000000000000000000016 /* CanvasElementChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* CanvasElementChrome.swift */; };
+		A10000000000000000000B1 /* CanvasSelectionChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000B1 /* CanvasSelectionChrome.swift */; };
 		A10000000000000000000017 /* TextBlockPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* TextBlockPayload.swift */; };
 		A10000000000000000000018 /* CanvasBoardViewModel+TextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* CanvasBoardViewModel+TextBlocks.swift */; };
 		A10000000000000000000019 /* TextBlockCanvasItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* TextBlockCanvasItemView.swift */; };
@@ -48,6 +50,7 @@
 		A10000000000000000000029 /* CanvasBoardViewModel+Strokes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* CanvasBoardViewModel+Strokes.swift */; };
 		A1000000000000000000002A /* StrokePathSmoothing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* StrokePathSmoothing.swift */; };
 		A1000000000000000000002B /* FreehandStrokeShapeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002B /* FreehandStrokeShapeView.swift */; };
+		A10000000000000000000B2 /* InkStyleStrokeDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000B2 /* InkStyleStrokeDrawing.swift */; };
 		A1000000000000000000002C /* StrokeCanvasItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002C /* StrokeCanvasItemView.swift */; };
 		A1000000000000000000002D /* CanvasFreehandDraftOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002D /* CanvasFreehandDraftOverlay.swift */; };
 		A1000000000000000000002E /* DrawingToolInspectorSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002E /* DrawingToolInspectorSection.swift */; };
@@ -87,6 +90,7 @@
 		A10000000000000000000057 /* FlowDeskRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000057 /* FlowDeskRootView.swift */; };
 		A10000000000000000000058 /* FlowDeskLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* FlowDeskLayout.swift */; };
 		A10000000000000000000059 /* FlowDeskTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* FlowDeskTypography.swift */; };
+		A100000000000000000001E0 /* FlowDeskDepthHierarchy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000001E0 /* FlowDeskDepthHierarchy.swift */; };
 		A10000000000000000000060 /* FlowDeskInteractionStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* FlowDeskInteractionStyles.swift */; };
 		A10000000000000000000061 /* FlowDeskCanvasClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000061 /* FlowDeskCanvasClipboard.swift */; };
 		A10000000000000000000062 /* CanvasBoardViewModel+Clipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* CanvasBoardViewModel+Clipboard.swift */; };
@@ -119,6 +123,7 @@
 		A10000000000000000000098 /* CanvasExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000098 /* CanvasExportSheet.swift */; };
 		A10000000000000000000099 /* ScreenshotModeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* ScreenshotModeService.swift */; };
 		A100000000000000000000A0 /* KeyboardShortcutsOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A0 /* KeyboardShortcutsOverlayView.swift */; };
+		A100000000000000000001D0 /* InspectorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000001D0 /* InspectorChrome.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -144,6 +149,8 @@
 		A20000000000000000000014 /* CanvasScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScreenView.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* CanvasBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasBoardView.swift; sourceTree = "<group>"; };
 		A20000000000000000000016 /* CanvasElementChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasElementChrome.swift; sourceTree = "<group>"; };
+		A20000000000000000000B1 /* CanvasSelectionChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSelectionChrome.swift; sourceTree = "<group>"; };
+		A20000000000000000000B3 /* CanvasEmptyWorkspaceOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasEmptyWorkspaceOverlay.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* TextBlockPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBlockPayload.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* CanvasBoardViewModel+TextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasBoardViewModel+TextBlocks.swift"; sourceTree = "<group>"; };
 		A20000000000000000000019 /* TextBlockCanvasItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBlockCanvasItemView.swift; sourceTree = "<group>"; };
@@ -165,6 +172,7 @@
 		A20000000000000000000029 /* CanvasBoardViewModel+Strokes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasBoardViewModel+Strokes.swift"; sourceTree = "<group>"; };
 		A2000000000000000000002A /* StrokePathSmoothing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokePathSmoothing.swift; sourceTree = "<group>"; };
 		A2000000000000000000002B /* FreehandStrokeShapeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreehandStrokeShapeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000B2 /* InkStyleStrokeDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkStyleStrokeDrawing.swift; sourceTree = "<group>"; };
 		A2000000000000000000002C /* StrokeCanvasItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeCanvasItemView.swift; sourceTree = "<group>"; };
 		A2000000000000000000002D /* CanvasFreehandDraftOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFreehandDraftOverlay.swift; sourceTree = "<group>"; };
 		A2000000000000000000002E /* DrawingToolInspectorSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingToolInspectorSection.swift; sourceTree = "<group>"; };
@@ -204,6 +212,7 @@
 		A20000000000000000000057 /* FlowDeskRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskRootView.swift; sourceTree = "<group>"; };
 		A20000000000000000000058 /* FlowDeskLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskLayout.swift; sourceTree = "<group>"; };
 		A20000000000000000000059 /* FlowDeskTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskTypography.swift; sourceTree = "<group>"; };
+		A200000000000000000001E0 /* FlowDeskDepthHierarchy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskDepthHierarchy.swift; sourceTree = "<group>"; };
 		A20000000000000000000060 /* FlowDeskInteractionStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskInteractionStyles.swift; sourceTree = "<group>"; };
 		A20000000000000000000061 /* FlowDeskCanvasClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDeskCanvasClipboard.swift; sourceTree = "<group>"; };
 		A20000000000000000000062 /* CanvasBoardViewModel+Clipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CanvasBoardViewModel+Clipboard.swift"; sourceTree = "<group>"; };
@@ -236,6 +245,7 @@
 		A20000000000000000000098 /* CanvasExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Export/CanvasExportSheet.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000099 /* ScreenshotModeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Services/ScreenshotModeService.swift; sourceTree = SOURCE_ROOT; };
 		A200000000000000000000A0 /* KeyboardShortcutsOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkNoMi/Views/KeyboardShortcutsOverlayView.swift; sourceTree = SOURCE_ROOT; };
+		A200000000000000000001D0 /* InspectorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorChrome.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -361,12 +371,14 @@
 				A2000000000000000000000C /* CanvasGridOverlay.swift */,
 				A20000000000000000000058 /* FlowDeskLayout.swift */,
 				A20000000000000000000059 /* FlowDeskTypography.swift */,
+				A200000000000000000001E0 /* FlowDeskDepthHierarchy.swift */,
 				A20000000000000000000060 /* FlowDeskInteractionStyles.swift */,
 				A20000000000000000000094 /* FlowDeskMotion.swift */,
 				A20000000000000000000095 /* DesignSystem.swift */,
 				A20000000000000000000043 /* FlowDeskTheme.swift */,
 				A2000000000000000000000D /* BoardEmptySelectionView.swift */,
 				A20000000000000000000016 /* CanvasElementChrome.swift */,
+				A20000000000000000000B1 /* CanvasSelectionChrome.swift */,
 				A2000000000000000000001B /* CanvasTextBlockResizeHandle.swift */,
 				A20000000000000000000039 /* CanvasAlignmentGuidesOverlay.swift */,
 				A20000000000000000000065 /* CanvasMultiSelectionBoundsOverlay.swift */,
@@ -426,6 +438,7 @@
 				A20000000000000000000088 /* CanvasMultiSelectionToolbarView.swift */,
 				A20000000000000000000089 /* CanvasZoomHUDView.swift */,
 				A20000000000000000000015 /* CanvasBoardView.swift */,
+				A20000000000000000000B3 /* CanvasEmptyWorkspaceOverlay.swift */,
 				A40000000000000000000019 /* Connector */,
 				A40000000000000000000012 /* Text */,
 				A40000000000000000000013 /* Sticky */,
@@ -439,6 +452,7 @@
 		A40000000000000000000010 /* Inspector */ = {
 			isa = PBXGroup;
 			children = (
+				A200000000000000000001D0 /* InspectorChrome.swift */,
 				A2000000000000000000001C /* TextBlockInspectorSection.swift */,
 				A20000000000000000000021 /* StickyNoteInspectorSection.swift */,
 				A20000000000000000000026 /* ShapeInspectorSection.swift */,
@@ -492,6 +506,7 @@
 			children = (
 				A2000000000000000000002A /* StrokePathSmoothing.swift */,
 				A2000000000000000000002B /* FreehandStrokeShapeView.swift */,
+				A20000000000000000000B2 /* InkStyleStrokeDrawing.swift */,
 				A2000000000000000000002C /* StrokeCanvasItemView.swift */,
 				A2000000000000000000002D /* CanvasFreehandDraftOverlay.swift */,
 			);
@@ -686,6 +701,7 @@
 				A10000000000000000000088 /* CanvasMultiSelectionToolbarView.swift in Sources */,
 				A10000000000000000000089 /* CanvasZoomHUDView.swift in Sources */,
 				A10000000000000000000015 /* CanvasBoardView.swift in Sources */,
+				A10000000000000000000B3 /* CanvasEmptyWorkspaceOverlay.swift in Sources */,
 				A10000000000000000000086 /* ConnectorCanvasItemView.swift in Sources */,
 				A10000000000000000000087 /* ShapeConnectorHandlesOverlay.swift in Sources */,
 				A10000000000000000000090 /* FlowDeskConnectorVisuals.swift in Sources */,
@@ -697,6 +713,7 @@
 				A10000000000000000000025 /* ShapeCanvasItemView.swift in Sources */,
 				A1000000000000000000002A /* StrokePathSmoothing.swift in Sources */,
 				A1000000000000000000002B /* FreehandStrokeShapeView.swift in Sources */,
+				A10000000000000000000B2 /* InkStyleStrokeDrawing.swift in Sources */,
 				A1000000000000000000002C /* StrokeCanvasItemView.swift in Sources */,
 				A1000000000000000000002D /* CanvasFreehandDraftOverlay.swift in Sources */,
 				A10000000000000000000032 /* ChartBlockChartView.swift in Sources */,
@@ -713,6 +730,7 @@
 				A1000000000000000000000C /* CanvasGridOverlay.swift in Sources */,
 				A10000000000000000000058 /* FlowDeskLayout.swift in Sources */,
 				A10000000000000000000059 /* FlowDeskTypography.swift in Sources */,
+				A100000000000000000001E0 /* FlowDeskDepthHierarchy.swift in Sources */,
 				A10000000000000000000060 /* FlowDeskInteractionStyles.swift in Sources */,
 				A10000000000000000000094 /* FlowDeskMotion.swift in Sources */,
 				A10000000000000000000095 /* DesignSystem.swift in Sources */,
@@ -721,9 +739,11 @@
 				A10000000000000000000098 /* CanvasExportSheet.swift in Sources */,
 				A10000000000000000000099 /* ScreenshotModeService.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardShortcutsOverlayView.swift in Sources */,
+				A100000000000000000001D0 /* InspectorChrome.swift in Sources */,
 				A10000000000000000000043 /* FlowDeskTheme.swift in Sources */,
 				A1000000000000000000000D /* BoardEmptySelectionView.swift in Sources */,
 				A10000000000000000000016 /* CanvasElementChrome.swift in Sources */,
+				A10000000000000000000B1 /* CanvasSelectionChrome.swift in Sources */,
 				A10000000000000000000039 /* CanvasAlignmentGuidesOverlay.swift in Sources */,
 				A10000000000000000000065 /* CanvasMultiSelectionBoundsOverlay.swift in Sources */,
 				A1000000000000000000003C /* CanvasElementEditorContextMenuItems.swift in Sources */,

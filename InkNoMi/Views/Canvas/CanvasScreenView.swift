@@ -17,65 +17,91 @@ struct CanvasScreenView: View {
     @State private var showShortcutHelp = false
     @State private var exportSheetViewModel: CanvasExportSheetViewModel?
     @State private var titleAutosaveTask: Task<Void, Never>?
+    @FocusState private var isBoardTitleFocused: Bool
+    @State private var isBoardTitleHovered = false
+    @State private var toolPanelOffset: CGSize = .zero
+    @State private var toolPanelDragOffset: CGSize = .zero
+    @State private var toolPanelSize: CGSize = .zero
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            FlowDeskTheme.premiumBackgroundBase()
-                .ignoresSafeArea()
-                .opacity(didFadeBackground ? 1 : 0.9)
-                .animation(FlowDeskMotion.canvasEnter, value: didFadeBackground)
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                FlowDeskTheme.premiumBackgroundBase()
+                    .ignoresSafeArea()
+                    .opacity(didFadeBackground ? 1 : 0.9)
+                    .animation(FlowDeskMotion.canvasEnter, value: didFadeBackground)
 
-            CanvasBoardView(
-                boardViewModel: boardViewModel,
-                selection: selection
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            InkNoMiCanvasChromeColumn(
-                boardViewModel: boardViewModel,
-                selection: selection,
-                compactMode: isFocusModeEnabled,
-                screenshotPolishMode: screenshotPolishMode
-            )
-            .padding(.leading, DS.Spacing.lg)
-            .padding(.top, DS.Spacing.lg)
-            .padding(.bottom, DS.Spacing.lg)
-            .transition(.move(edge: .leading).combined(with: .opacity))
-
-            if showCommandPalette {
-                CommandPaletteView(
-                    isPresented: $showCommandPalette,
-                    commands: commandPaletteCommands
+                CanvasBoardView(
+                    boardViewModel: boardViewModel,
+                    selection: selection
                 )
-                .zIndex(1_000_000)
-            }
-
-            if showShortcutHelp {
-                KeyboardShortcutsOverlayView(isPresented: $showShortcutHelp)
-                    .zIndex(1_000_001)
-            }
-
-            if isFocusModeEnabled {
-                VStack {
-                    Spacer()
-                    Text("Press Esc to exit Focus Mode")
-                        .font(DS.Typography.caption.weight(.medium))
-                        .foregroundStyle(DS.Color.textTertiary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
-                                .overlay(
-                                    Capsule(style: .continuous)
-                                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
-                                )
-                        )
-                        .padding(.bottom, DS.Spacing.lg)
-                }
+                .flowDeskDepthShadows(FlowDeskDepth.canvasWorkspace)
+                .brightness(isImmersiveEditingActive ? 0.01 : 0)
+                .contrast(isImmersiveEditingActive ? 1.01 : 1)
+                .animation(FlowDeskMotion.mediumEaseOut, value: isImmersiveEditingActive)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
-                .transition(.opacity)
+
+                InkNoMiCanvasChromeColumn(
+                    boardViewModel: boardViewModel,
+                    selection: selection,
+                    compactMode: isFocusModeEnabled,
+                    screenshotPolishMode: screenshotPolishMode
+                )
+                .opacity(immersivePanelOpacity)
+                .background(
+                    GeometryReader { panelGeo in
+                        Color.clear
+                            .onAppear {
+                                toolPanelSize = panelGeo.size
+                            }
+                            .onChange(of: panelGeo.size) { _, newSize in
+                                toolPanelSize = newSize
+                                toolPanelOffset = clampedToolPanelOffset(toolPanelOffset, in: geo.size)
+                            }
+                    }
+                )
+                .offset(
+                    x: DS.Spacing.lg + toolPanelOffset.width + toolPanelDragOffset.width,
+                    y: DS.Spacing.lg + toolPanelOffset.height + toolPanelDragOffset.height
+                )
+                .gesture(toolPanelDragGesture(in: geo.size))
+                .transition(.move(edge: .leading).combined(with: .opacity))
+
+                if showCommandPalette {
+                    CommandPaletteView(
+                        isPresented: $showCommandPalette,
+                        commands: commandPaletteCommands
+                    )
+                    .zIndex(1_000_000)
+                }
+
+                if showShortcutHelp {
+                    KeyboardShortcutsOverlayView(isPresented: $showShortcutHelp)
+                        .zIndex(1_000_001)
+                }
+
+                if isFocusModeEnabled {
+                    VStack {
+                        Spacer()
+                        Text("Press Esc to exit Focus Mode")
+                            .font(DS.Typography.caption.weight(.medium))
+                            .foregroundStyle(DS.Color.textTertiary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme), lineWidth: 0.8)
+                                    )
+                            )
+                            .padding(.bottom, DS.Spacing.lg)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -92,7 +118,7 @@ struct CanvasScreenView: View {
         .onChange(of: document.title) { _, _ in
             scheduleTitleAutosave()
         }
-        .navigationTitle(document.title)
+        .navigationTitle(boardTitleForWindowChrome)
         #if os(macOS)
         .navigationSubtitle("Last edited \(document.updatedAt.formatted(date: .abbreviated, time: .shortened))")
         #endif
@@ -106,12 +132,13 @@ struct CanvasScreenView: View {
         .overlay(alignment: .bottom) {
             if !isFocusModeEnabled && !screenshotPolishMode {
                 minimalStatusBar
+                    .opacity(immersivePanelOpacity)
                     .padding(.horizontal, DS.Spacing.lg)
                     .padding(.bottom, DS.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: isFocusModeEnabled)
+        .animation(FlowDeskMotion.mediumEaseInOut, value: isFocusModeEnabled)
         .canvasScreenKeyCommands(
             boardViewModel: boardViewModel,
             selection: selection,
@@ -133,192 +160,29 @@ struct CanvasScreenView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                if let onBackHome {
-                    Button(action: onBackHome) {
-                        Label("Home", systemImage: "chevron.left")
+                HStack(spacing: FlowDeskLayout.windowToolbarLeadingClusterSpacing) {
+                    if let onBackHome {
+                        Button(action: onBackHome) {
+                            Label("Home", systemImage: "chevron.left")
+                        }
+                        .help("Back to Home dashboard")
                     }
-                    .help("Back to Home dashboard")
+
+                    canvasBoardInlineTitle
+
+                    if !screenshotPolishMode {
+                        saveStatusMetaChip
+                    }
                 }
-
-                TextField("Canvas title", text: $document.title)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 180, idealWidth: 240, maxWidth: 320)
-                    .onSubmit {
-                        persistTitleNow()
-                    }
-
-                if !screenshotPolishMode {
-                    HStack(spacing: 10) {
-                        saveStatusBadge
-                        saveStatusTimestampLabel
-                    }
-
-                    toolContextChip
-                }
+                .opacity(immersivePanelOpacity)
             }
 
             ToolbarItemGroup(placement: .automatic) {
-                Menu {
-                    Button("Undo") {
-                        boardViewModel.undoBoard()
-                    }
-                    .disabled(!boardViewModel.canUndoBoard)
-                    .keyboardShortcut("z", modifiers: [.command])
-                    .help("Undo the last change on this board")
+                canvasPrimaryActionsToolbarCluster
+                    .opacity(immersivePanelOpacity)
+            }
 
-                    Button("Redo") {
-                        boardViewModel.redoBoard()
-                    }
-                    .disabled(!boardViewModel.canRedoBoard)
-                    .keyboardShortcut("z", modifiers: [.command, .shift])
-                    .help("Redo a previously undone change")
-
-                    Divider()
-
-                    Button("Duplicate") {
-                        boardViewModel.duplicateAllSelectedElements(selection: selection)
-                    }
-                    .disabled(!selection.hasSelection)
-                    .keyboardShortcut("d", modifiers: [.command])
-                    .help("Duplicate the selected items on this board")
-
-                    Divider()
-
-                    Button("Copy") {
-                        boardViewModel.copySelectedElementsToPasteboard(selection: selection)
-                    }
-                    .disabled(!selection.hasSelection)
-                    .keyboardShortcut("c", modifiers: [.command])
-                    .help("Copy selected canvas items to paste elsewhere on this board")
-
-                    Button("Paste") {
-                        boardViewModel.pasteClipboardElements(selection: selection)
-                    }
-                    .disabled(!boardViewModel.canPasteFromClipboard)
-                    .keyboardShortcut("v", modifiers: [.command])
-                    .help("Paste items copied from this board in Ink no Mi (not plain text from other apps)")
-
-                    Divider()
-
-                    Menu("Arrange") {
-                        Button("Bring to Front") {
-                            boardViewModel.bringSelectionToFront(selection: selection)
-                        }
-                        Button("Bring Forward") {
-                            boardViewModel.bringSelectionForward(selection: selection)
-                        }
-                        .disabled(!boardViewModel.canBringSelectionForward(selection: selection))
-                        Button("Send Backward") {
-                            boardViewModel.sendSelectionBackward(selection: selection)
-                        }
-                        .disabled(!boardViewModel.canSendSelectionBackward(selection: selection))
-                        Button("Send to Back") {
-                            boardViewModel.sendSelectionToBack(selection: selection)
-                        }
-                    }
-                    .disabled(selection.primarySelectedID == nil)
-
-                    Divider()
-
-                    Button("Delete", role: .destructive) {
-                        boardViewModel.deleteSelectedElements(selection: selection)
-                    }
-                    .disabled(!selection.hasSelection)
-                    .help("Remove selected items from the board")
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Edit")
-                            .font(DS.Typography.toolLabel)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                    .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
-                            )
-                    )
-                }
-                .buttonStyle(FlowDeskToolbarButtonStyle())
-                .frame(minHeight: 40)
-                .accessibilityLabel("Edit controls")
-
-                Menu {
-                    Toggle("Show grid", isOn: gridBinding)
-                    Divider()
-                    Button("Fit board to content") {
-                        boardViewModel.fitViewportToBoardContent()
-                    }
-                    .keyboardShortcut("1", modifiers: [.command, .option])
-                    .help("Zoom and pan so everything on the board is visible (⌘⌥1)")
-                    Button("Center on content") {
-                        boardViewModel.centerViewportOnBoardContent(canvasMargin: 48)
-                    }
-                    .keyboardShortcut("2", modifiers: [.command, .option])
-                    .help("Pan so exported content is centered at the current zoom (⌘⌥2)")
-                    Button("Zoom to selection") {
-                        boardViewModel.fitViewportToSelection(selection: selection)
-                    }
-                    .disabled(!selection.hasSelection)
-                    .keyboardShortcut("3", modifiers: [.command, .option])
-                    .help("Zoom and pan to fit the selected items (⌘⌥3)")
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "rectangle.split.2x1")
-                            .font(.system(size: 14, weight: .medium))
-                        Text("View")
-                            .font(DS.Typography.toolLabel)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                    .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
-                            )
-                    )
-                }
-                .help("Grid, canvas framing, insert items in view, and charts")
-                .buttonStyle(FlowDeskToolbarButtonStyle())
-                .frame(minHeight: 40)
-                .accessibilityLabel("View controls")
-
-                Menu {
-                    Button("Export board…") {
-                        exportSheetViewModel = CanvasExportSheetViewModel(
-                            boardState: boardViewModel.boardState,
-                            documentTitle: document.title,
-                            selectedElementIDs: selection.selectedElementIDs,
-                            viewportSnapshot: boardViewModel.insertionViewportSnapshot
-                        )
-                    }
-                    .help("Open advanced export options")
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                        .font(DS.Typography.toolLabel)
-                        .labelStyle(.titleAndIcon)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                        .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
-                                )
-                        )
-                }
-                .help("Open export sheet")
-                .buttonStyle(FlowDeskToolbarButtonStyle())
-                .frame(minHeight: 40)
-                .accessibilityLabel("Export controls")
-
+            ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
                     Button("Keyboard Shortcuts") {
                         showCommandPalette = false
@@ -326,23 +190,16 @@ struct CanvasScreenView: View {
                     }
                     .keyboardShortcut("/", modifiers: [.shift])
                 } label: {
-                    Label("Help", systemImage: "questionmark.circle")
-                        .font(DS.Typography.toolLabel)
-                        .labelStyle(.titleAndIcon)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                                        .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.8)
-                                )
-                        )
+                    Image(systemName: "questionmark.circle")
+                        .flowDeskStandardIcon()
+                        .foregroundStyle(DS.Color.accent.opacity(0.66))
+                        .frame(width: 34, height: 30)
+                        .contentShape(Rectangle())
                 }
-                .help("Show keyboard shortcuts")
-                .buttonStyle(FlowDeskToolbarButtonStyle())
-
+                .menuStyle(.borderlessButton)
+                .help("Help — keyboard shortcuts")
+                .accessibilityLabel("Help")
+                .opacity(immersivePanelOpacity)
             }
         }
         .sheet(item: $exportSheetViewModel) { viewModel in
@@ -350,6 +207,104 @@ struct CanvasScreenView: View {
                 .presentationDetents([.height(640), .large])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var boardTitleForWindowChrome: String {
+        let trimmed = document.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Untitled board" : trimmed
+    }
+
+    private var isImmersiveEditingActive: Bool {
+        boardViewModel.editingTextElementID != nil
+            || boardViewModel.editingStickyNoteElementID != nil
+            || boardViewModel.editingConnectorLabelElementID != nil
+    }
+
+    private var immersivePanelOpacity: Double {
+        isImmersiveEditingActive ? 0.9 : 1
+    }
+
+    private var boardTitleDisplayString: String {
+        let trimmed = document.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Untitled board" : trimmed
+    }
+
+    private var boardTitleForegroundColor: Color {
+        document.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? DS.Color.textTertiary
+            : DS.Color.textPrimary
+    }
+
+    private var boardTitleUnderlineOpacity: Double {
+        if isBoardTitleFocused { return 0.52 }
+        if isBoardTitleHovered { return 0.34 }
+        return 0
+    }
+
+    /// Document-style title: large display type, tap to edit, plain field when focused, underline on hover/focus.
+    private var canvasBoardInlineTitle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .leading) {
+                if isBoardTitleFocused {
+                    TextField(
+                        "",
+                        text: $document.title,
+                        prompt: Text("Untitled board").foregroundStyle(DS.Color.textTertiary)
+                    )
+                    .textFieldStyle(.plain)
+                    .font(DS.Typography.boardTitle)
+                    .tracking(DS.Typography.boardTitleTracking)
+                    .foregroundStyle(DS.Color.textPrimary)
+                    .focused($isBoardTitleFocused)
+                    .onSubmit {
+                        isBoardTitleFocused = false
+                        persistTitleNow()
+                    }
+                } else {
+                    Text(boardTitleDisplayString)
+                        .font(DS.Typography.boardTitle)
+                        .tracking(DS.Typography.boardTitleTracking)
+                        .foregroundStyle(boardTitleForegroundColor)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isBoardTitleFocused = true
+                        }
+                }
+            }
+            .frame(
+                minWidth: FlowDeskLayout.windowToolbarBoardTitleMinWidth,
+                idealWidth: FlowDeskLayout.windowToolbarBoardTitleIdealWidth,
+                maxWidth: FlowDeskLayout.windowToolbarBoardTitleMaxWidth,
+                alignment: .leading
+            )
+            .frame(minHeight: 28, alignment: .leading)
+
+            Rectangle()
+                .fill(DS.Color.textPrimary.opacity(0.88))
+                .frame(height: isBoardTitleFocused ? 1.35 : 1.15)
+                .opacity(boardTitleUnderlineOpacity)
+                .animation(FlowDeskMotion.mediumEaseInOut, value: boardTitleUnderlineOpacity)
+                .animation(FlowDeskMotion.fastEaseInOut, value: isBoardTitleFocused)
+        }
+        .frame(
+            maxWidth: FlowDeskLayout.windowToolbarBoardTitleMaxWidth,
+            alignment: .leading
+        )
+        .onHover { isBoardTitleHovered = $0 }
+        .onChange(of: isBoardTitleFocused) { _, focused in
+            if !focused {
+                persistTitleNow()
+            }
+        }
+        .onExitCommand {
+            isBoardTitleFocused = false
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Board title")
+        .accessibilityValue(boardTitleDisplayString)
+        .accessibilityHint("Tap to edit this board’s name")
     }
 
     private var gridBinding: Binding<Bool> {
@@ -361,6 +316,172 @@ struct CanvasScreenView: View {
                 boardViewModel.setViewport(viewport)
             }
         )
+    }
+
+    /// Unified **Edit | View | Export** control — one surface, clear segments (product toolbar, not ad-hoc pills).
+    private var canvasPrimaryActionsToolbarCluster: some View {
+        HStack(spacing: 0) {
+            Menu {
+                Button("Undo") {
+                    boardViewModel.undoBoard()
+                }
+                .disabled(!boardViewModel.canUndoBoard)
+                .keyboardShortcut("z", modifiers: [.command])
+                .help("Undo the last change on this board")
+
+                Button("Redo") {
+                    boardViewModel.redoBoard()
+                }
+                .disabled(!boardViewModel.canRedoBoard)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .help("Redo a previously undone change")
+
+                Divider()
+
+                Button("Duplicate") {
+                    boardViewModel.duplicateAllSelectedElements(selection: selection)
+                }
+                .disabled(!selection.hasSelection)
+                .keyboardShortcut("d", modifiers: [.command])
+                .help("Duplicate the selected items on this board")
+
+                Divider()
+
+                Button("Copy") {
+                    boardViewModel.copySelectedElementsToPasteboard(selection: selection)
+                }
+                .disabled(!selection.hasSelection)
+                .keyboardShortcut("c", modifiers: [.command])
+                .help("Copy selected canvas items to paste elsewhere on this board")
+
+                Button("Paste") {
+                    boardViewModel.pasteClipboardElements(selection: selection)
+                }
+                .disabled(!boardViewModel.canPasteFromClipboard)
+                .keyboardShortcut("v", modifiers: [.command])
+                .help("Paste items copied from this board in Ink no Mi (not plain text from other apps)")
+
+                Divider()
+
+                Menu("Arrange") {
+                    Button("Bring to Front") {
+                        boardViewModel.bringSelectionToFront(selection: selection)
+                    }
+                    Button("Bring Forward") {
+                        boardViewModel.bringSelectionForward(selection: selection)
+                    }
+                    .disabled(!boardViewModel.canBringSelectionForward(selection: selection))
+                    Button("Send Backward") {
+                        boardViewModel.sendSelectionBackward(selection: selection)
+                    }
+                    .disabled(!boardViewModel.canSendSelectionBackward(selection: selection))
+                    Button("Send to Back") {
+                        boardViewModel.sendSelectionToBack(selection: selection)
+                    }
+                }
+                .disabled(selection.primarySelectedID == nil)
+
+                Divider()
+
+                Button("Delete", role: .destructive) {
+                    boardViewModel.deleteSelectedElements(selection: selection)
+                }
+                .disabled(!selection.hasSelection)
+                .help("Remove selected items from the board")
+            } label: {
+                canvasToolbarNamedSegmentLabel(icon: "slider.horizontal.3", title: "Edit")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Undo, clipboard, layering, delete")
+            .accessibilityLabel("Edit")
+
+            canvasToolbarSegmentDivider
+
+            Menu {
+                Toggle("Show grid", isOn: gridBinding)
+                Divider()
+                Button("Fit board to content") {
+                    boardViewModel.fitViewportToBoardContent()
+                }
+                .keyboardShortcut("1", modifiers: [.command, .option])
+                .help("Zoom and pan so everything on the board is visible (⌘⌥1)")
+                Button("Center on content") {
+                    boardViewModel.centerViewportOnBoardContent(canvasMargin: 48)
+                }
+                .keyboardShortcut("2", modifiers: [.command, .option])
+                .help("Pan so exported content is centered at the current zoom (⌘⌥2)")
+                Button("Zoom to selection") {
+                    boardViewModel.fitViewportToSelection(selection: selection)
+                }
+                .disabled(!selection.hasSelection)
+                .keyboardShortcut("3", modifiers: [.command, .option])
+                .help("Zoom and pan to fit the selected items (⌘⌥3)")
+            } label: {
+                canvasToolbarNamedSegmentLabel(icon: "rectangle.split.2x1", title: "View")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Grid, zoom, and how the canvas is framed")
+            .accessibilityLabel("View")
+
+            canvasToolbarSegmentDivider
+
+            Menu {
+                Button("Export board…") {
+                    exportSheetViewModel = CanvasExportSheetViewModel(
+                        boardState: boardViewModel.boardState,
+                        documentTitle: document.title,
+                        selectedElementIDs: selection.selectedElementIDs,
+                        viewportSnapshot: boardViewModel.insertionViewportSnapshot
+                    )
+                }
+                .help("PNG, PDF, and options")
+            } label: {
+                canvasToolbarNamedSegmentLabel(icon: "square.and.arrow.up", title: "Export")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Export or share this board")
+            .accessibilityLabel("Export")
+        }
+        .padding(.horizontal, FlowDeskLayout.windowToolbarPrimaryClusterPaddingH)
+        .padding(.vertical, FlowDeskLayout.windowToolbarPrimaryClusterPaddingV)
+        .background(
+            RoundedRectangle(cornerRadius: FlowDeskLayout.windowToolbarPrimaryClusterCornerRadius, style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .elevated, colorScheme: colorScheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: FlowDeskLayout.windowToolbarPrimaryClusterCornerRadius, style: .continuous)
+                        .stroke(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme), lineWidth: 0.85)
+                )
+        )
+        .frame(minHeight: 34)
+    }
+
+    private var canvasToolbarSegmentDivider: some View {
+        Rectangle()
+            .fill(FlowDeskTheme.borderColor(for: .elevated, colorScheme: colorScheme).opacity(0.42))
+            .frame(width: 1, height: FlowDeskLayout.windowToolbarSegmentDividerHeight)
+            .padding(.vertical, 2)
+    }
+
+    private func canvasToolbarNamedSegmentLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .flowDeskStandardIcon()
+                .foregroundStyle(DS.Color.accent.opacity(0.64))
+                .frame(width: 15, alignment: .center)
+            Text(title)
+                .font(DS.Typography.toolLabel)
+                .foregroundStyle(DS.Color.textPrimary)
+            Image(systemName: "chevron.down")
+                .flowDeskStandardIcon(size: 10)
+                .foregroundStyle(DS.Color.textTertiary.opacity(0.92))
+                .padding(.leading, 1)
+        }
+        .padding(.horizontal, FlowDeskLayout.windowToolbarSegmentPaddingH)
+        .padding(.vertical, FlowDeskLayout.windowToolbarSegmentPaddingV)
+        .contentShape(Rectangle())
     }
 
     private func performQuickExport() {
@@ -436,7 +557,7 @@ struct CanvasScreenView: View {
     private var saveStatusBadge: some View {
         HStack(spacing: 6) {
             Image(systemName: saveBadgeIconName)
-                .font(.system(size: 11, weight: .semibold))
+                .flowDeskStandardIcon(size: DS.Icon.accessorySize)
                 .foregroundStyle(saveBadgeColor)
 
             Text(saveBadgeTitle)
@@ -461,13 +582,19 @@ struct CanvasScreenView: View {
         )
     }
 
-    private var saveStatusTimestampLabel: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { _ in
-            Text(lastEditedText)
+    private var saveStatusMetaChip: some View {
+        HStack(spacing: 8) {
+            saveStatusBadge
+            Rectangle()
+                .fill(DS.Color.textTertiary.opacity(0.3))
+                .frame(width: 1, height: 12)
+            Text(lastEditedText.replacingOccurrences(of: "Last edited ", with: ""))
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Color.textTertiary)
                 .monospacedDigit()
+                .lineLimit(1)
         }
+        .padding(.horizontal, 4)
     }
 
     private var saveBadgeTitle: String {
@@ -540,7 +667,7 @@ struct CanvasScreenView: View {
     private func editorStatChip(icon: String, text: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
+                .flowDeskStandardIcon(size: DS.Icon.accessorySize)
             Text(text)
                 .font(DS.Typography.caption.weight(.medium))
                 .monospacedDigit()
@@ -561,7 +688,7 @@ struct CanvasScreenView: View {
     private var toolContextChip: some View {
         HStack(spacing: 5) {
             Image(systemName: "cursorarrow.motionlines")
-                .font(.system(size: 11, weight: .medium))
+                .flowDeskStandardIcon(size: DS.Icon.accessorySize)
             Text("Tool: \(currentToolName) (\(currentToolShortcut))")
                 .font(DS.Typography.caption.weight(.medium))
         }
@@ -657,6 +784,48 @@ struct CanvasScreenView: View {
         case .line: return "Line"
         case .arrow: return "Arrow"
         }
+    }
+
+    private func toolPanelDragGesture(in availableSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                toolPanelDragOffset = value.translation
+            }
+            .onEnded { value in
+                let proposed = CGSize(
+                    width: toolPanelOffset.width + value.translation.width,
+                    height: toolPanelOffset.height + value.translation.height
+                )
+                toolPanelDragOffset = .zero
+                withAnimation(FlowDeskMotion.fastEaseOut) {
+                    toolPanelOffset = snappedToolPanelOffset(
+                        clampedToolPanelOffset(proposed, in: availableSize),
+                        in: availableSize
+                    )
+                }
+            }
+    }
+
+    private func clampedToolPanelOffset(_ offset: CGSize, in availableSize: CGSize) -> CGSize {
+        let horizontalLimit = max(0, availableSize.width - toolPanelSize.width - (DS.Spacing.lg * 2))
+        let verticalLimit = max(0, availableSize.height - toolPanelSize.height - (DS.Spacing.lg * 2))
+        return CGSize(
+            width: min(max(offset.width, 0), horizontalLimit),
+            height: min(max(offset.height, 0), verticalLimit)
+        )
+    }
+
+    private func snappedToolPanelOffset(_ offset: CGSize, in availableSize: CGSize) -> CGSize {
+        let horizontalLimit = max(0, availableSize.width - toolPanelSize.width - (DS.Spacing.lg * 2))
+        let verticalLimit = max(0, availableSize.height - toolPanelSize.height - (DS.Spacing.lg * 2))
+        let snapDistance: CGFloat = 42
+        var x = offset.width
+        var y = offset.height
+        if x < snapDistance { x = 0 }
+        if (horizontalLimit - x) < snapDistance { x = horizontalLimit }
+        if y < snapDistance { y = 0 }
+        if (verticalLimit - y) < snapDistance { y = verticalLimit }
+        return CGSize(width: x, height: y)
     }
 
     private func scheduleTitleAutosave() {

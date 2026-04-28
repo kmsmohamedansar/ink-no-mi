@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Blank-first, labeled vertical tool sidebar for explicit mode control.
+/// Professional vertical tool palette: grouped like Figma’s toolbar — explicit modes, shortcut badges, accent selection.
 struct InkNoMiCanvasChromeColumn: View {
     @Environment(\.flowDeskTokens) private var tokens
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var appearanceManager: AppearanceManager
 
@@ -13,32 +14,33 @@ struct InkNoMiCanvasChromeColumn: View {
     @State private var hoveredTool: CanvasToolMode?
     @State private var hoveredActionSymbol: String?
 
-    private let rowHeight: CGFloat = 36
+    private let rowHeight: CGFloat = 40
     private var shouldReduceMotion: Bool {
         reduceMotion || appearanceManager.settings.motionLevel != .full
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FlowDeskLayout.spaceM) {
+        VStack(alignment: .leading, spacing: 10) {
             if !compactMode {
                 HStack(spacing: 8) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(DS.Color.textSecondary.opacity(0.72))
+                    Image(systemName: "slider.horizontal.3")
+                        .flowDeskStandardIcon(size: 15)
+                        .foregroundStyle(DS.Color.accent.opacity(0.62))
                     Text("Tools")
-                        .font(DS.Typography.label.weight(.medium))
-                        .tracking(0.5)
+                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(0.6)
                         .foregroundStyle(DS.Color.textSecondary)
                 }
             }
 
-            VStack(alignment: .leading, spacing: FlowDeskLayout.spaceXS) {
+            VStack(alignment: .leading, spacing: 0) {
                 toolGroup("Selection", items: [.select])
+                paletteGroupDivider()
                 toolGroup("Drawing", items: [.pen, .pencil])
+                paletteGroupDivider()
                 toolGroup("Content", items: [.text, .stickyNote])
-                toolGroup("Shapes", items: [.shape])
-                toolGroup("Connections", items: [.connect])
-                toolGroup("Extras", items: [.chart])
+                paletteGroupDivider()
+                toolGroup("Structure", items: [.shape, .connect, .chart])
             }
 
             if !compactMode, boardViewModel.canvasTool == .shape {
@@ -54,7 +56,9 @@ struct InkNoMiCanvasChromeColumn: View {
             }
 
             if !compactMode {
-                Divider().opacity(0.18)
+                Divider()
+                    .opacity(0.18)
+                    .padding(.vertical, 2)
 
                 HStack(spacing: FlowDeskLayout.spaceS) {
                     compactActionButton(symbol: "arrow.uturn.backward", enabled: boardViewModel.canUndoBoard) {
@@ -75,23 +79,53 @@ struct InkNoMiCanvasChromeColumn: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .animation(FlowDeskMotion.standardEaseOut, value: activeToolHint)
 
-            Text("Shortcuts: V Select  ·  H Pan  ·  P Pen  ·  N Note  ·  T Text  ·  R/L/A Shapes")
+            Text("H pan · G grid · ? shortcuts")
                     .font(DS.Typography.caption)
                     .foregroundStyle(DS.Color.textTertiary)
-                    .padding(.top, 2)
+                    .padding(.top, 4)
             }
         }
         .padding(.horizontal, DS.Spacing.md)
         .padding(.vertical, DS.Spacing.md)
-        .frame(width: compactMode ? 190 : 216, alignment: .leading)
+        .frame(width: compactMode ? 200 : 236, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Canvas tools")
         .flowDeskFloatingPanelChrome(
             cornerRadius: DS.Radius.large,
             shadowStyle: .toolPalette,
-            lightTintOpacity: 0.08,
-            darkTintOpacity: 0.07
+            lightTintOpacity: 0.10,
+            darkTintOpacity: 0.08
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.14 : 0.42),
+                            Color.white.opacity(0.04)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+                .blendMode(.overlay)
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.large - 1, style: .continuous)
+                .strokeBorder(Color.black.opacity(colorScheme == .dark ? 0.35 : 0.06), lineWidth: 0.5)
+                .padding(1)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func paletteGroupDivider() -> some View {
+        Rectangle()
+            .fill(DS.Color.border.opacity(colorScheme == .dark ? 0.35 : 0.22))
+            .frame(height: 1)
+            .padding(.vertical, 9)
+            .padding(.leading, 4)
     }
 
     private var toolItems: [ToolItem] {
@@ -109,13 +143,14 @@ struct InkNoMiCanvasChromeColumn: View {
 
     @ViewBuilder
     private func toolGroup(_ title: String, items: [CanvasToolMode]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(DS.Typography.label.weight(.medium))
-                .foregroundStyle(DS.Color.textSecondary)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(DS.Color.textTertiary)
                 .textCase(.uppercase)
-                .tracking(0.72)
-                .padding(.leading, 8)
+                .tracking(0.85)
+                .padding(.leading, 6)
+                .padding(.bottom, 3)
             ForEach(items, id: \.self) { mode in
                 if let item = toolItems.first(where: { $0.mode == mode }) {
                     labeledToolButton(item)
@@ -124,53 +159,100 @@ struct InkNoMiCanvasChromeColumn: View {
         }
     }
 
+    private func shortcutBadgeText(for mode: CanvasToolMode) -> String? {
+        switch mode {
+        case .select: return "V"
+        case .pen: return "P"
+        case .pencil: return "B"
+        case .text: return "T"
+        case .stickyNote: return "N"
+        case .shape: return "R"
+        case .connect: return "K"
+        case .chart: return "—"
+        case .smartInk: return nil
+        }
+    }
+
     private func labeledToolButton(_ item: ToolItem) -> some View {
         let active = boardViewModel.canvasTool == item.mode
         let hovered = hoveredTool == item.mode
+        let badge = shortcutBadgeText(for: item.mode)
+        let activeBackground = LinearGradient(
+            colors: [
+                DS.Color.accent.opacity(colorScheme == .dark ? 0.94 : 0.9),
+                DS.Color.accent.opacity(colorScheme == .dark ? 0.82 : 0.78)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
         return Button {
             guard item.enabled else { return }
             boardViewModel.applyCanvasToolSelection(item.mode, fromKeyboard: false)
         } label: {
-            HStack(spacing: FlowDeskLayout.spaceS) {
+            HStack(spacing: 10) {
                 Image(systemName: item.symbol)
-                    .frame(width: 18)
-                    .font(.system(size: active ? 20 : 18, weight: active ? .semibold : .medium))
+                    .flowDeskStandardIcon(size: 17)
+                    .frame(width: 22, alignment: .center)
+                    .foregroundStyle(active ? Color.white.opacity(0.995) : DS.Color.textPrimary.opacity(0.88))
+
                 Text(item.label)
-                    .font(DS.Typography.body.weight(active ? .semibold : .regular))
+                    .font(.system(size: 13, weight: active ? .semibold : .regular))
+                    .foregroundStyle(active ? Color.white.opacity(0.99) : DS.Color.textPrimary.opacity(0.86))
+                    .lineLimit(1)
+
                 if !item.enabled && !screenshotPolishMode {
                     Text("Soon")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
+                        .foregroundStyle(active ? Color.white.opacity(0.7) : .secondary)
+                        .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color.primary.opacity(0.08))
+                                .fill(active ? Color.white.opacity(0.15) : Color.primary.opacity(0.08))
                         )
                 }
-                Spacer(minLength: 0)
+
+                Spacer(minLength: 4)
+
+                if let badge, item.enabled || screenshotPolishMode {
+                    Text(badge)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(
+                            active
+                                ? Color.white.opacity(0.62)
+                                : Color.secondary.opacity(colorScheme == .dark ? 0.82 : 0.78)
+                        )
+                        .frame(minWidth: 18, alignment: .trailing)
+                }
             }
             .frame(height: rowHeight)
-            .padding(.horizontal, DS.Spacing.md - 2)
-            .foregroundStyle(active ? tokens.selectionStrokeColor.opacity(0.98) : DS.Color.textPrimary.opacity(0.68))
-            .scaleEffect(shouldReduceMotion ? 1 : (active ? 1.01 : (hovered ? DS.Interaction.hoverScale : 1.0)))
-            .brightness(hovered ? 0.016 : 0)
-            .offset(x: active ? 1 : 0)
-            .offset(y: shouldReduceMotion ? 0 : (hovered ? -0.5 : 0))
+            .padding(.horizontal, 8)
             .background {
-                RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                    .fill(active ? DS.Color.accent.opacity(0.22) : (hovered ? DS.Color.hover.opacity(0.95) : Color.clear))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: FlowDeskLayout.chromeCompactCornerRadius, style: .continuous)
-                            .strokeBorder(active ? tokens.selectionStrokeColor.opacity(0.56) : DS.Color.border.opacity(1.15), lineWidth: active ? 1.0 : 0.8)
-                    }
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(active ? AnyShapeStyle(activeBackground) : AnyShapeStyle(hovered ? DS.Color.accent.opacity(colorScheme == .dark ? 0.14 : 0.09) : Color.clear))
+            }
+            .overlay {
+                if active {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.28 : 0.34), lineWidth: 0.65)
+                        .blendMode(.overlay)
+                }
             }
             .shadow(
-                color: active ? Color.black.opacity(0.12) : Color.clear,
-                radius: active ? 20 : 0,
+                color: active
+                    ? DS.Color.accent.opacity(colorScheme == .dark ? 0.5 : 0.4)
+                    : (hovered ? Color.black.opacity(colorScheme == .dark ? 0.35 : 0.10) : .clear),
+                radius: active ? 14 : (hovered ? 6 : 0),
                 x: 0,
-                y: active ? 10 : 0
+                y: active ? 5 : (hovered ? 2 : 0)
             )
+            .shadow(
+                color: active ? Color.white.opacity(colorScheme == .dark ? 0.12 : 0.16) : .clear,
+                radius: active ? 6 : 0,
+                x: 0,
+                y: -1
+            )
+            .scaleEffect(shouldReduceMotion ? 1 : (hovered && !active ? 1.02 : 1.0))
         }
         .buttonStyle(CanvasToolButtonStyle(isActive: active, isHovered: hovered))
         .help(tooltip(for: item))
@@ -178,12 +260,12 @@ struct InkNoMiCanvasChromeColumn: View {
         .focusable(true)
         .accessibilityLabel("\(item.label) tool")
         .onHover { inside in
-            withAnimation(FlowDeskMotion.quickEaseOut) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredTool = inside ? item.mode : nil
             }
         }
-        .animation(shouldReduceMotion ? nil : FlowDeskMotion.smoothEaseOut, value: active)
-        .animation(shouldReduceMotion ? nil : FlowDeskMotion.standardEaseOut, value: hovered)
+        .animation(shouldReduceMotion ? nil : FlowDeskMotion.fastEaseOut, value: active)
+        .animation(shouldReduceMotion ? nil : FlowDeskMotion.hoverEase, value: hovered)
         .opacity(item.enabled ? 1 : (screenshotPolishMode ? 0.88 : 0.55))
         .disabled(!item.enabled)
     }
@@ -192,7 +274,7 @@ struct InkNoMiCanvasChromeColumn: View {
         let hovered = hoveredActionSymbol == symbol
         return Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
+                .flowDeskStandardIcon()
                 .frame(width: 32, height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -200,7 +282,7 @@ struct InkNoMiCanvasChromeColumn: View {
                 )
                 .brightness(hovered ? 0.015 : 0)
                 .offset(y: shouldReduceMotion ? 0 : (hovered ? -0.5 : 0))
-                .scaleEffect(shouldReduceMotion ? 1 : (hovered ? DS.Interaction.hoverScale : 1))
+                .scaleEffect(shouldReduceMotion ? 1 : (hovered ? 1.02 : 1))
         }
         .buttonStyle(.plain)
         .help(symbol == "arrow.uturn.backward" ? "Undo (Cmd+Z)" : "Redo (Cmd+Shift+Z)")
@@ -209,7 +291,7 @@ struct InkNoMiCanvasChromeColumn: View {
         .accessibilityLabel(symbol == "arrow.uturn.backward" ? "Undo" : "Redo")
         .disabled(!enabled)
         .onHover { inside in
-            withAnimation(FlowDeskMotion.quickEaseOut) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredActionSymbol = inside ? symbol : nil
             }
         }
@@ -232,6 +314,7 @@ struct InkNoMiCanvasChromeColumn: View {
         } label: {
             HStack(spacing: FlowDeskLayout.spaceS) {
                 Image(systemName: option.symbol)
+                    .flowDeskStandardIcon()
                     .frame(width: 16)
                 Text(option.label)
                     .font(DS.Typography.caption)
@@ -256,15 +339,15 @@ struct InkNoMiCanvasChromeColumn: View {
 
     private var activeToolHint: String {
         switch boardViewModel.canvasTool {
-        case .select: return "Select: move, resize, and edit elements"
-        case .connect: return "Connect: drag between objects to link"
-        case .pen: return "Pen: free drawing with smooth stroke"
-        case .pencil: return "Pencil: softer sketching stroke"
-        case .text: return "Text: click canvas to insert a text block"
-        case .stickyNote: return "Note: click canvas to place a sticky"
-        case .shape: return "Shape: click or drag to create clean shapes"
-        case .chart: return "Chart: insert and edit chart elements"
-        case .smartInk: return "Smart Ink: explicit convert actions only"
+        case .select: return "Click an item to select. Drag to move."
+        case .connect: return "Drag from a connector handle to link objects."
+        case .pen: return "Click and drag to draw."
+        case .pencil: return "Click and drag to sketch softly."
+        case .text: return "Click the canvas to place a text block."
+        case .stickyNote: return "Click the canvas to place a sticky note."
+        case .shape: return "Click or drag to create a shape."
+        case .chart: return "Click the canvas to insert a chart."
+        case .smartInk: return "Select ink, then convert from the toolbar."
         }
     }
 
@@ -297,10 +380,10 @@ private struct CanvasToolButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? DS.Interaction.pressScale : (isHovered ? DS.Interaction.hoverScale : (isActive ? 1.01 : 1.0)))
-            .animation(FlowDeskMotion.quickEaseOut, value: configuration.isPressed)
-            .animation(FlowDeskMotion.standardEaseOut, value: isHovered)
-            .animation(FlowDeskMotion.smoothEaseOut, value: isActive)
+            .scaleEffect(configuration.isPressed ? DS.Interaction.pressScale : (isHovered ? 1.02 : (isActive ? 1.002 : 1.0)))
+            .animation(configuration.isPressed ? FlowDeskMotion.uiPressDown : FlowDeskMotion.uiPressRelease, value: configuration.isPressed)
+            .animation(FlowDeskMotion.hoverEase, value: isHovered)
+            .animation(FlowDeskMotion.fastEaseOut, value: isActive)
     }
 }
 

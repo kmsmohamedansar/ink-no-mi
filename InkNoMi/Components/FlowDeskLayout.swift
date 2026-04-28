@@ -45,10 +45,12 @@ enum FlowDeskLayout {
     static let homeCreationCardTitleSubtitleSpacing: CGFloat = 6
 
     static let homeContinueMinHeight: CGFloat = 108
-    static let homeCardPadding: CGFloat = 18
+    /// Unified internal card padding across Home + canvas framed cards.
+    static let unifiedCardPadding: CGFloat = 16
+    static let homeCardPadding: CGFloat = unifiedCardPadding
 
-    static let homeRecentRowHorizontalPadding: CGFloat = 18
-    static let homeRecentRowVerticalPadding: CGFloat = 14
+    static let homeRecentRowHorizontalPadding: CGFloat = unifiedCardPadding
+    static let homeRecentRowVerticalPadding: CGFloat = unifiedCardPadding
 
     /// Uniform insets for `cardContainer` on creation / continue cards.
     static var homeCardContentInsets: EdgeInsets {
@@ -60,7 +62,7 @@ enum FlowDeskLayout {
         )
     }
 
-    /// Insets for `cardContainer` on recent-board rows.
+    /// Insets for `cardContainer` on recent-board rows (same rhythm as other cards).
     static var homeRecentRowContentInsets: EdgeInsets {
         EdgeInsets(
             top: homeRecentRowVerticalPadding,
@@ -71,7 +73,12 @@ enum FlowDeskLayout {
     }
 
     /// Interior padding for text blocks and chart bodies (aligned with home cards).
-    static let canvasCardContentPadding = EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+    static let canvasCardContentPadding = EdgeInsets(
+        top: unifiedCardPadding,
+        leading: unifiedCardPadding,
+        bottom: unifiedCardPadding,
+        trailing: unifiedCardPadding
+    )
 
     static let chartTitleElementSpacing: CGFloat = 12
 
@@ -101,7 +108,8 @@ enum FlowDeskLayout {
 
     // MARK: - Canvas
 
-    static let gridLineWidth: CGFloat = 0.32
+    /// Hairline-adjacent; paired with low-opacity ink so the grid stays supportive.
+    static let gridLineWidth: CGFloat = 0.22
     /// Every Nth grid interval reads slightly stronger (spatial hierarchy).
     static let gridMajorLineStride: Int = 5
 
@@ -174,4 +182,24 @@ enum FlowDeskLayout {
 
     /// Subtle pill/chip behind template labels (home, sidebar metadata).
     static let chipBackgroundOpacity: Double = 0.07
+
+    // MARK: - Window toolbar (canvas editor)
+
+    /// Space between major leading items (back, title field, status cluster).
+    static let windowToolbarLeadingClusterSpacing: CGFloat = 14
+    /// Between save badge, relative time, and tool chip.
+    static let windowToolbarMetaClusterSpacing: CGFloat = 10
+    /// Outer padding of the unified Edit | View | Export bar.
+    static let windowToolbarPrimaryClusterPaddingH: CGFloat = 5
+    static let windowToolbarPrimaryClusterPaddingV: CGFloat = 5
+    static let windowToolbarPrimaryClusterCornerRadius: CGFloat = 10
+    /// Interior padding for each labeled segment inside the cluster.
+    static let windowToolbarSegmentPaddingH: CGFloat = 11
+    static let windowToolbarSegmentPaddingV: CGFloat = 6
+    /// Vertical rule between toolbar segments (optical center with label cap height).
+    static let windowToolbarSegmentDividerHeight: CGFloat = 15
+    /// Inline board title field in the window toolbar (document-style).
+    static let windowToolbarBoardTitleMinWidth: CGFloat = 200
+    static let windowToolbarBoardTitleIdealWidth: CGFloat = 300
+    static let windowToolbarBoardTitleMaxWidth: CGFloat = 420
 }

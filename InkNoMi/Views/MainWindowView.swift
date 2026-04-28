@@ -93,7 +93,7 @@ struct MainWindowView: View {
                     #endif
                 } else if isFocusModeEnabled {
                     detailContent
-                        .transition(.opacity.combined(with: .scale(scale: 0.996)))
+                        .transition(workspaceEnterTransition)
                 } else {
                     NavigationSplitView {
                         DocumentSidebarView(
@@ -108,7 +108,7 @@ struct MainWindowView: View {
                     } detail: {
                         detailContent
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.996)))
+                    .transition(workspaceEnterTransition)
                 }
             }
             if isCommandPalettePresented {
@@ -130,9 +130,9 @@ struct MainWindowView: View {
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.992)))
-        .animation(FlowDeskMotion.canvasEnter, value: route)
-        .animation(FlowDeskMotion.quickEaseOut, value: isCommandPalettePresented)
-        .animation(.easeInOut(duration: 0.2), value: isFocusModeEnabled)
+        .animation(FlowDeskMotion.uiRouteTransition, value: route)
+        .animation(FlowDeskMotion.uiOverlayPresent, value: isCommandPalettePresented)
+        .animation(FlowDeskMotion.uiRouteTransition, value: isFocusModeEnabled)
         .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar(isFocusModeEnabled ? .hidden : .visible, for: .windowToolbar)
         .flowDeskToolbarChrome(appearanceTokens)
@@ -362,6 +362,10 @@ struct MainWindowView: View {
             selection = document
             route = .editor
         }
+    }
+
+    private var workspaceEnterTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.988))
     }
 
     private func duplicateBoard(_ document: FlowDocument) {
@@ -679,13 +683,13 @@ struct MainWindowView: View {
         .padding(.vertical, 8)
         .background(
             Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.thinMaterial)
                 .overlay(
                     Capsule(style: .continuous)
                         .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        .flowDeskDepthShadows(FlowDeskDepth.floatingChromeScaled(mult1: 0.88, mult2: 0.72, y1: 0.85, y2: 0.85))
     }
 
     #if DEBUG

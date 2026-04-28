@@ -152,71 +152,118 @@ struct FlowDeskTemplateChip: View {
 
 // MARK: - Floating canvas chrome (palette, toolbars, HUD, tips)
 
-/// Shadow tier for one family of lifted surfaces (see `flowDeskFloatingPanelChrome`).
+/// Shadow + material tier for lifted surfaces (see `flowDeskDepthHierarchy` layers 3–4).
 enum FlowDeskFloatingChromeShadowStyle {
+    /// Layer 3 — primary floating chrome (tools, inspector-scale panels).
     case toolPalette
+    /// Layer 3 — lighter HUD / contextual strips.
     case contextualToolbar
     case compactHUD
+    /// Layer 4 — modals, command surfaces, blocking overlays.
+    case modalPanel
 
-    fileprivate var shadowFactors: (opacity: CGFloat, radius: CGFloat, y: CGFloat) {
+    fileprivate var shadowLayers: [FlowDeskDepthShadow] {
         switch self {
         case .toolPalette:
-            return (1, 1, 1)
+            return FlowDeskDepth.floatingChrome
         case .contextualToolbar:
-            return (0.9, 0.7, 0.68)
+            return FlowDeskDepth.floatingChromeScaled(mult1: 0.9, mult2: 0.78, y1: 0.9, y2: 0.9)
         case .compactHUD:
-            return (0.82, 0.66, 0.62)
+            return FlowDeskDepth.floatingChromeScaled(mult1: 0.82, mult2: 0.66, y1: 0.86, y2: 0.86)
+        case .modalPanel:
+            return FlowDeskDepth.modalChrome
         }
     }
 
-    fileprivate var depthLevel: FlowDeskTheme.DepthLevel {
+    fileprivate var panelMaterial: Material {
         switch self {
-        case .compactHUD:
-            return .elevated
-        case .contextualToolbar, .toolPalette:
-            return .floating
+        case .modalPanel:
+            return .regularMaterial
+        default:
+            return .thinMaterial
         }
     }
 }
 
 private struct FlowDeskFloatingPanelChromeModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered = false
 
     var cornerRadius: CGFloat
     var shadowStyle: FlowDeskFloatingChromeShadowStyle
     var lightOpacity: Double
     var darkOpacity: Double
 
+    private var baseTint: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(darkOpacity * 0.45)
+            : Color.white.opacity(lightOpacity * 0.55)
+    }
+
+    private var frostedOpacity: Double {
+        colorScheme == .dark ? 0.18 : 0.14
+    }
+
+    private var sheenGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: Color.white.opacity(colorScheme == .dark ? 0.12 : 0.2), location: 0),
+                .init(color: Color.white.opacity(colorScheme == .dark ? 0.04 : 0.07), location: 0.28),
+                .init(color: Color.clear, location: 0.58),
+                .init(color: Color.black.opacity(colorScheme == .dark ? 0.08 : 0.04), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var rimLightColor: Color {
+        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.26)
+    }
+
+    private var panelHoverGlowColor: Color {
+        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.12)
+    }
+
     func body(content: Content) -> some View {
-        let f = shadowStyle.shadowFactors
-        let depthShadow = DS.Shadow.medium
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         content
             .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                shape
+                    .fill(shadowStyle.panelMaterial)
                     .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                colorScheme == .dark
-                                    ? Color.white.opacity(darkOpacity * 0.45)
-                                    : Color.white.opacity(lightOpacity * 0.55)
-                            )
+                        shape.fill(.ultraThinMaterial).opacity(frostedOpacity)
                     }
-                .shadow(
-                    color: Color.black.opacity(0.12 * Double(f.opacity)),
-                    radius: depthShadow.radius * f.radius,
-                    x: 0,
-                    y: depthShadow.y * f.y
-                )
+                    .overlay {
+                        shape.fill(baseTint)
+                    }
+                    .overlay {
+                        shape.fill(sheenGradient).blendMode(.softLight)
+                    }
             }
+            .flowDeskDepthShadows(shadowStyle.shadowLayers)
+            .shadow(
+                color: panelHoverGlowColor.opacity(isHovered ? 1 : 0),
+                radius: isHovered ? 16 : 0,
+                x: 0,
+                y: 0
+            )
             .overlay {
-                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 shape
                     .strokeBorder(
                         Color.black.opacity(0.05),
                         lineWidth: FlowDeskLayout.chromeHairlineBorderWidth
                     )
+                    .overlay {
+                        shape
+                            .strokeBorder(rimLightColor, lineWidth: 0.6)
+                            .blendMode(.overlay)
+                    }
             }
+            .onHover { hovering in
+                isHovered = hovering
+            }
+            .animation(FlowDeskMotion.hoverEase, value: isHovered)
     }
 }
 

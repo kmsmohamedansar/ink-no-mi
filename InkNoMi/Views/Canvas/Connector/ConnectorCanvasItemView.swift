@@ -313,7 +313,7 @@ struct ConnectorCanvasItemView: View {
         .frame(width: 24, height: 24)
         .contentShape(Circle())
         .position(local)
-        .animation(.easeOut(duration: 0.14), value: hoveredEndpoint)
+        .animation(FlowDeskMotion.hoverEase, value: hoveredEndpoint)
         .onHover { inside in
             if inside {
                 hoveredEndpoint = isStart

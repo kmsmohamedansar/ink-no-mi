@@ -67,7 +67,7 @@ struct ShapeConnectorHandlesOverlay: View {
         .frame(width: 20, height: 20)
         .contentShape(Circle())
         .position(local)
-        .animation(FlowDeskMotion.standardEaseOut, value: hoveredEdge)
+        .animation(FlowDeskMotion.hoverEase, value: hoveredEdge)
         .onHover { inside in
             if inside {
                 hoveredEdge = edge

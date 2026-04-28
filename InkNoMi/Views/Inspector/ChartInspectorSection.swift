@@ -14,60 +14,74 @@ struct ChartInspectorSection: View {
     var body: some View {
         Group {
             if let chartPayload {
-                Section {
-                    Picker("Type", selection: kindBinding(fallback: chartPayload.kind)) {
-                        ForEach(FlowDeskChartKind.allCases, id: \.self) { kind in
-                            Text(kind.inspectorTitle).tag(kind)
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Chart")
+                            .font(FlowDeskTypography.inspectorEyebrow)
+                            .tracking(0.85)
+                            .foregroundStyle(DS.Color.textTertiary)
 
-                    TextField("Title", text: titleBinding(fallback: chartPayload.title))
-                        .textFieldStyle(.roundedBorder)
-
-                    Toggle("Show title", isOn: showTitleBinding(fallback: chartPayload.showTitle))
-                } header: {
-                    FlowDeskInspectorSectionHeader("Chart")
-                }
-
-                Section {
-                    ForEach(0 ..< chartPayload.points.count, id: \.self) { index in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            TextField(
-                                "Label",
-                                text: labelBinding(index: index, fallback: rowLabel(at: index) ?? "")
-                            )
-                            .textFieldStyle(.roundedBorder)
-                            .frame(minWidth: 72)
-
-                            TextField(
-                                "Value",
-                                value: valueBinding(index: index, fallback: rowValue(at: index) ?? 0),
-                                format: .number
-                            )
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 72)
-                            .multilineTextAlignment(.trailing)
-
-                            Button {
-                                removeRow(at: index)
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Type")
+                                .font(FlowDeskTypography.inspectorLabel)
+                                .foregroundStyle(DS.Color.textSecondary)
+                            Picker("", selection: kindBinding(fallback: chartPayload.kind)) {
+                                Text("Bar").tag(FlowDeskChartKind.bar)
+                                Text("Line").tag(FlowDeskChartKind.line)
                             }
-                            .buttonStyle(.borderless)
-                            .help("Remove row")
-                            .disabled(chartPayload.points.count <= 1)
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
                         }
+
+                        TextField("Title", text: titleBinding(fallback: chartPayload.title))
+                            .textFieldStyle(.roundedBorder)
+
+                        Toggle("Show title", isOn: showTitleBinding(fallback: chartPayload.showTitle))
                     }
 
-                    Button {
-                        addRow()
-                    } label: {
-                        Label("Add row", systemImage: "plus.circle")
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Data")
+                            .font(FlowDeskTypography.inspectorEyebrow)
+                            .tracking(0.85)
+                            .foregroundStyle(DS.Color.textTertiary)
+
+                        ForEach(0 ..< chartPayload.points.count, id: \.self) { index in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                TextField(
+                                    "Label",
+                                    text: labelBinding(index: index, fallback: rowLabel(at: index) ?? "")
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .frame(minWidth: 72)
+
+                                TextField(
+                                    "Value",
+                                    value: valueBinding(index: index, fallback: rowValue(at: index) ?? 0),
+                                    format: .number
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 72)
+                                .multilineTextAlignment(.trailing)
+
+                                Button {
+                                    removeRow(at: index)
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .symbolRenderingMode(.hierarchical)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Remove row")
+                                .disabled(chartPayload.points.count <= 1)
+                            }
+                        }
+
+                        Button {
+                            addRow()
+                        } label: {
+                            Label("Add row", systemImage: "plus.circle")
+                        }
                     }
-                } header: {
-                    FlowDeskInspectorSectionHeader("Data")
                 }
             }
         }

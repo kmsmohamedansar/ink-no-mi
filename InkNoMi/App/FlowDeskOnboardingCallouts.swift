@@ -30,7 +30,7 @@ struct FlowDeskOnboardingTipCard: View {
                         .font(.title3)
                         .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FlowDeskPlainInteractionStyle())
                 .help("Dismiss tips")
             }
 

@@ -38,9 +38,8 @@ struct RecentBoardRowView: View {
                         }
 
                     Image(systemName: "rectangle.stack.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.primary)
+                        .flowDeskStandardIcon(size: 18)
+                        .foregroundStyle(DS.Color.accent.opacity(isHovered ? 0.84 : 0.7))
                         .scaleEffect(isHovered ? DS.Interaction.hoverScale : 1)
                         .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
                 }
@@ -83,8 +82,8 @@ struct RecentBoardRowView: View {
                     .frame(width: 22, height: 24)
                     .overlay {
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                            .flowDeskStandardIcon(size: DS.Icon.accessorySize)
+                            .foregroundStyle(DS.Color.accent.opacity(isHovered ? 0.72 : 0.5))
                             .offset(x: isHovered ? 3 : 0)
                     }
                     .clipped()

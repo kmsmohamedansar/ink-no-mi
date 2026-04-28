@@ -89,7 +89,7 @@ struct CommandPaletteView: View {
                                 .background(rowBackground(isSelected: index == selectedIndex))
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(FlowDeskPlainInteractionStyle())
                             .focusable(true)
                             .focused($focusedRowID, equals: command.id)
                             .accessibilityLabel(command.title)
@@ -102,9 +102,9 @@ struct CommandPaletteView: View {
             .frame(width: 560)
             .flowDeskFloatingPanelChrome(
                 cornerRadius: 16,
-                shadowStyle: .toolPalette,
-                lightTintOpacity: 0.12,
-                darkTintOpacity: 0.08
+                shadowStyle: .modalPanel,
+                lightTintOpacity: 0.14,
+                darkTintOpacity: 0.10
             )
         }
         .onAppear {

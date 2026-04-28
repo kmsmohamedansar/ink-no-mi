@@ -72,7 +72,7 @@ struct FlowDeskFirstRunOnboardingView: View {
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(
-                .easeInOut(duration: 2.4)
+                FlowDeskMotion.slowEaseInOut
                 .repeatForever(autoreverses: true)
             ) {
                 animateIcon = true
@@ -89,7 +89,7 @@ struct FlowDeskFirstRunOnboardingView: View {
     }
 
     private var animationStyle: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.28)
+        reduceMotion ? nil : FlowDeskMotion.slowEaseOut
     }
 
     @ViewBuilder
@@ -160,13 +160,7 @@ struct FlowDeskFirstRunOnboardingView: View {
         .padding(.vertical, 10)
         .background(
             Capsule(style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(DS.Color.premiumBlueGradient)
         )
         .keyboardShortcut(.defaultAction)
     }

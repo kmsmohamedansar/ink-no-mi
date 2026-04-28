@@ -8,6 +8,8 @@ struct TextBlockPayload: Codable, Equatable, Sendable {
     /// Font size in points (canvas space).
     var fontSize: Double
     var isBold: Bool
+    var fontFamily: TextBlockFontFamily
+    var fontWeight: TextBlockFontWeight
     var color: CanvasRGBAColor
     var alignment: TextBlockAlignment
 
@@ -15,9 +17,76 @@ struct TextBlockPayload: Codable, Equatable, Sendable {
         text: "",
         fontSize: 15,
         isBold: false,
+        fontFamily: .systemSans,
+        fontWeight: .regular,
         color: .defaultText,
         alignment: .leading
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case fontSize
+        case isBold
+        case fontFamily
+        case fontWeight
+        case color
+        case alignment
+    }
+
+    init(
+        text: String,
+        fontSize: Double,
+        isBold: Bool,
+        fontFamily: TextBlockFontFamily = .systemSans,
+        fontWeight: TextBlockFontWeight = .regular,
+        color: CanvasRGBAColor,
+        alignment: TextBlockAlignment
+    ) {
+        self.text = text
+        self.fontSize = fontSize
+        self.isBold = isBold
+        self.fontFamily = fontFamily
+        self.fontWeight = fontWeight
+        self.color = color
+        self.alignment = alignment
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedBold = try container.decodeIfPresent(Bool.self, forKey: .isBold) ?? false
+        let decodedWeight = try container.decodeIfPresent(TextBlockFontWeight.self, forKey: .fontWeight)
+
+        text = try container.decode(String.self, forKey: .text)
+        fontSize = try container.decode(Double.self, forKey: .fontSize)
+        isBold = decodedBold
+        fontFamily = try container.decodeIfPresent(TextBlockFontFamily.self, forKey: .fontFamily) ?? .systemSans
+        fontWeight = decodedWeight ?? (decodedBold ? .semibold : .regular)
+        color = try container.decode(CanvasRGBAColor.self, forKey: .color)
+        alignment = try container.decode(TextBlockAlignment.self, forKey: .alignment)
+    }
+}
+
+enum TextBlockFontFamily: String, Codable, CaseIterable, Sendable {
+    case systemSans
+    case rounded
+    case serif
+    case monospaced
+
+    var displayName: String {
+        switch self {
+        case .systemSans: return "System"
+        case .rounded: return "Rounded"
+        case .serif: return "Serif"
+        case .monospaced: return "Mono"
+        }
+    }
+}
+
+enum TextBlockFontWeight: String, Codable, CaseIterable, Sendable {
+    case regular
+    case medium
+    case semibold
+    case bold
 }
 
 enum TextBlockAlignment: String, Codable, CaseIterable, Sendable {
@@ -73,4 +142,31 @@ extension TextBlockAlignment {
         case .trailing: return .topTrailing
         }
     }
+}
+
+extension TextBlockPayload {
+    var swiftUIFont: Font {
+        switch fontFamily {
+        case .systemSans:
+            return .system(size: CGFloat(fontSize), weight: fontWeight.swiftUIFontWeight)
+        case .rounded:
+            return .system(size: CGFloat(fontSize), weight: fontWeight.swiftUIFontWeight, design: .rounded)
+        case .serif:
+            return .system(size: CGFloat(fontSize), weight: fontWeight.swiftUIFontWeight, design: .serif)
+        case .monospaced:
+            return .system(size: CGFloat(fontSize), weight: fontWeight.swiftUIFontWeight, design: .monospaced)
+        }
+    }
+}
+
+private extension TextBlockFontWeight {
+    var swiftUIFontWeight: Font.Weight {
+        switch self {
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        case .bold: return .bold
+        }
+    }
+
 }

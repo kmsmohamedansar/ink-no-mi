@@ -11,20 +11,32 @@ struct CanvasSelectionToolbarView: View {
     @Environment(\.flowDeskTokens) private var tokens
     @Environment(\.colorScheme) private var colorScheme
 
+    private var hasKindSpecificControls: Bool {
+        switch elementKind {
+        case .textBlock, .stickyNote, .shape:
+            return true
+        default:
+            return false
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: FlowDeskLayout.floatingPanelToolbarInnerSpacing) {
             quickActionsRow
-            Group {
-                switch elementKind {
-                case .textBlock:
-                    textBlockContent
-                case .stickyNote:
-                    stickyContent
-                case .shape:
-                    shapeContent
-                default:
-                    EmptyView()
+            if hasKindSpecificControls {
+                Group {
+                    switch elementKind {
+                    case .textBlock:
+                        textBlockContent
+                    case .stickyNote:
+                        stickyContent
+                    case .shape:
+                        shapeContent
+                    default:
+                        EmptyView()
+                    }
                 }
+                .transition(.opacity.combined(with: .offset(y: 6)))
             }
         }
         .padding(.horizontal, FlowDeskLayout.floatingPanelToolbarPaddingH)
@@ -34,6 +46,8 @@ struct CanvasSelectionToolbarView: View {
             lightTintOpacity: 0.11,
             darkTintOpacity: 0.07
         )
+        .animation(FlowDeskMotion.fastEaseOut, value: elementKind)
+        .animation(FlowDeskMotion.fastEaseOut, value: hasKindSpecificControls)
         .fixedSize()
     }
 
@@ -43,7 +57,7 @@ struct CanvasSelectionToolbarView: View {
                 boardViewModel.duplicateElement(id: elementID, selection: selection)
             } label: {
                 Image(systemName: "plus.square.on.square")
-                    .font(.caption.weight(.semibold))
+                    .flowDeskStandardIcon()
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -57,7 +71,7 @@ struct CanvasSelectionToolbarView: View {
                 boardViewModel.deleteElements(ids: [elementID], selection: selection)
             } label: {
                 Image(systemName: "trash")
-                    .font(.caption.weight(.semibold))
+                    .flowDeskStandardIcon()
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -70,6 +84,7 @@ struct CanvasSelectionToolbarView: View {
             Rectangle()
                 .fill(Color.primary.opacity(0.12))
                 .frame(width: 1, height: 16)
+                .opacity(hasKindSpecificControls ? 1 : 0)
         }
     }
 
@@ -80,30 +95,47 @@ struct CanvasSelectionToolbarView: View {
         if let payload = currentTextPayload() {
             let fontSize = boardViewModel.boardState.elements.first(where: { $0.id == elementID })?
                 .resolvedTextPayload().fontSize ?? payload.fontSize
-            HStack(spacing: 6) {
-                ColorPicker(
-                    "",
-                    selection: textColorBinding(fallback: payload.color),
-                    supportsOpacity: true
-                )
-                .labelsHidden()
-                .frame(width: 24, height: 22)
-                .help("Text color")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    ColorPicker(
+                        "",
+                        selection: textColorBinding(fallback: payload.color),
+                        supportsOpacity: true
+                    )
+                    .labelsHidden()
+                    .frame(width: 24, height: 22)
+                    .help("Text color")
 
-                Stepper(value: textFontSizeBinding(fallback: payload.fontSize), in: 10 ... 72, step: 1) {
+                    Menu(payload.fontFamily.displayName) {
+                        Picker("Font", selection: textFontFamilyBinding(fallback: payload.fontFamily)) {
+                            ForEach(TextBlockFontFamily.allCases, id: \.self) { family in
+                                Text(family.displayName).tag(family)
+                            }
+                        }
+                    }
+                    .controlSize(.mini)
+
+                    Menu(payload.fontWeight.rawValue.capitalized) {
+                        Picker("Weight", selection: textFontWeightBinding(fallback: payload.fontWeight)) {
+                            ForEach(TextBlockFontWeight.allCases, id: \.self) { weight in
+                                Text(weight.rawValue.capitalized).tag(weight)
+                            }
+                        }
+                    }
+                    .controlSize(.mini)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Size")
+                        .font(.caption2)
+                        .foregroundStyle(DS.Color.textSecondary)
+                    Slider(value: textFontSizeBinding(fallback: payload.fontSize), in: 10 ... 72, step: 1)
+                        .frame(width: 110)
                     Text("\(Int(fontSize))")
                         .font(.caption2.weight(.semibold))
                         .monospacedDigit()
                         .frame(minWidth: 28, alignment: .trailing)
                 }
-                .controlSize(.mini)
-
-                Toggle(isOn: textBoldBinding(fallback: payload.isBold)) {
-                    Image(systemName: "bold")
-                        .font(.caption.weight(.semibold))
-                }
-                .toggleStyle(.button)
-                .controlSize(.mini)
             }
             .labelsHidden()
         }
@@ -128,14 +160,29 @@ struct CanvasSelectionToolbarView: View {
         )
     }
 
-    private func textBoldBinding(fallback: Bool) -> Binding<Bool> {
+    private func textFontWeightBinding(fallback: TextBlockFontWeight) -> Binding<TextBlockFontWeight> {
         Binding(
             get: {
-                boardViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().isBold
+                boardViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().fontWeight
                     ?? fallback
             },
             set: { newValue in
-                boardViewModel.updateTextPayload(id: elementID) { $0.isBold = newValue }
+                boardViewModel.updateTextPayload(id: elementID) {
+                    $0.fontWeight = newValue
+                    $0.isBold = (newValue == .semibold || newValue == .bold)
+                }
+            }
+        )
+    }
+
+    private func textFontFamilyBinding(fallback: TextBlockFontFamily) -> Binding<TextBlockFontFamily> {
+        Binding(
+            get: {
+                boardViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().fontFamily
+                    ?? fallback
+            },
+            set: { newValue in
+                boardViewModel.updateTextPayload(id: elementID) { $0.fontFamily = newValue }
             }
         )
     }
@@ -207,7 +254,7 @@ struct CanvasSelectionToolbarView: View {
 
                 Toggle(isOn: shapeStrokeVisibleBinding(fallback: payload.lineWidth)) {
                     Image(systemName: "circle.dashed")
-                        .font(.caption.weight(.medium))
+                        .flowDeskStandardIcon(size: 12)
                 }
                 .toggleStyle(.button)
                 .controlSize(.mini)

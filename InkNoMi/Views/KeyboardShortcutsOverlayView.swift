@@ -27,7 +27,7 @@ struct KeyboardShortcutsOverlayView: View {
                                     .fill(DS.Color.hover.opacity(0.75))
                             )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(FlowDeskPlainInteractionStyle())
                     .help("Close")
                 }
 
@@ -51,9 +51,9 @@ struct KeyboardShortcutsOverlayView: View {
             .frame(width: 560)
             .flowDeskFloatingPanelChrome(
                 cornerRadius: 18,
-                shadowStyle: .toolPalette,
-                lightTintOpacity: 0.13,
-                darkTintOpacity: 0.09
+                shadowStyle: .modalPanel,
+                lightTintOpacity: 0.14,
+                darkTintOpacity: 0.10
             )
         }
         .onKeyPress(.escape) {

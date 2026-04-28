@@ -3,8 +3,6 @@ import SwiftUI
 
 /// Bounding-box chrome, selection, and move for a persisted freehand stroke (no resize in v1).
 struct StrokeCanvasItemView: View {
-    @Environment(\.flowDeskTokens) private var tokens
-
     let element: CanvasElementRecord
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
@@ -21,6 +19,23 @@ struct StrokeCanvasItemView: View {
         selection.isSelected(element.id)
     }
 
+    private var isDragging: Bool {
+        moveDragStartCanvasOrigin != nil
+    }
+
+    /// Slight zoom compensation keeps perceived stroke weight steadier across zoom levels.
+    private var zoomCompensatedLineWidth: CGFloat {
+        let zoom = max(0.25, min(4, CGFloat(boardViewModel.boardState.viewport.scale)))
+        let compensation = pow(zoom, -0.12) // subtle, not absolute lock
+        let clamped = min(max(compensation, 0.9), 1.12)
+        return CGFloat(payload.lineWidth) * clamped
+    }
+
+    private var strokeDragScale: CGFloat {
+        if isConverting { return 0.985 }
+        return isDragging ? 1.01 : 1.0
+    }
+
     private var chromeCorner: CGFloat { FlowDeskTheme.strokeSelectionChromeCorner }
     private var isConverting: Bool { boardViewModel.convertingStrokeIDs.contains(element.id) }
 
@@ -29,15 +44,14 @@ struct StrokeCanvasItemView: View {
             FreehandStrokeShapeView(
                 points: payload.points,
                 color: payload.color,
-                lineWidth: CGFloat(payload.lineWidth),
+                lineWidth: zoomCompensatedLineWidth,
                 opacity: payload.opacity
             )
 
-            if isSelected {
-                RoundedRectangle(cornerRadius: chromeCorner, style: .continuous)
-                    .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
-                    .allowsHitTesting(false)
-            }
+            CanvasFramedItemSelectionChrome(
+                cornerRadius: chromeCorner,
+                isVisible: isSelected
+            )
             if isHovered && !isSelected {
                 RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                     .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
@@ -45,9 +59,11 @@ struct StrokeCanvasItemView: View {
             }
         }
         .offset(moveDragTranslation)
+        .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
+        .scaleEffect(strokeDragScale)
         .opacity(isConverting ? 0 : 1)
-        .scaleEffect(isConverting ? 0.985 : 1)
-        .animation(.easeOut(duration: 0.16), value: isConverting)
+        .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
+        .animation(FlowDeskMotion.fastEaseOut, value: isConverting)
         .contentShape(Rectangle())
         .onTapGesture {
             guard boardViewModel.canvasTool == .select else { return }

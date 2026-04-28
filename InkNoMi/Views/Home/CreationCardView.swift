@@ -77,9 +77,10 @@ struct CreationCardView: View {
                         }
 
                     Image(systemName: systemImage)
-                        .font(.system(size: iconPointSize, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.primary)
+                        .flowDeskStandardIcon(size: iconPointSize)
+                        .foregroundStyle(
+                            DS.Color.accent.opacity(isHovered ? 0.88 : 0.74)
+                        )
                         .scaleEffect(isHovered ? DS.Interaction.hoverScale : 1)
                         .animation(FlowDeskMotion.premiumLiftEaseOut, value: isHovered)
                 }

@@ -2,58 +2,67 @@ import SwiftUI
 
 struct DS {
     struct Color {
-        // Strict visual system.
-        static let background = SwiftUI.Color(hex: "#F7F4EE")
-        static let cardBackground = SwiftUI.Color(hex: "#FFFFFF")
-        static let primaryAccent = SwiftUI.Color(hex: "#336DFF")
-        static let secondaryAccent = SwiftUI.Color(hex: "#6F7FF7")
-        static let borderSubtle = SwiftUI.Color.black.opacity(0.05)
-        static let borderStrong = SwiftUI.Color.black.opacity(0.08)
-        static let textPrimary = SwiftUI.Color(hex: "#111827")
-        static let textSecondary = SwiftUI.Color(hex: "#4B5563")
-        static let textTertiary = SwiftUI.Color(hex: "#9CA3AF")
+        // Warm neutrals (stone-tinted), rich primary blues — avoids cold “default SaaS grey”.
+        static let background = SwiftUI.Color(hex: "#F5F2EC")
+        static let cardBackground = SwiftUI.Color(hex: "#FFFDF9")
+        static let primaryAccent = SwiftUI.Color(hex: "#2957EE")
+        static let secondaryAccent = SwiftUI.Color(hex: "#8BA3FF")
+        static let premiumBlueStart = SwiftUI.Color(hex: "#1F4DFF")
+        static let premiumBlueEnd = SwiftUI.Color(hex: "#6FA8FF")
+        static let borderSubtle = SwiftUI.Color(hex: "#2F2A27").opacity(0.045)
+        static let borderStrong = SwiftUI.Color(hex: "#2F2A27").opacity(0.075)
+        static let textPrimary = SwiftUI.Color(hex: "#171310")
+        static let textSecondary = SwiftUI.Color(hex: "#6B625A")
+        static let textTertiary = SwiftUI.Color(hex: "#B5ABA2")
 
         // Compatibility aliases used across existing UI.
         static let canvas = background
-        static let canvasTopWash = SwiftUI.Color(hex: "#FBF8F3")
-        static let canvasBottom = SwiftUI.Color(hex: "#EEE8DE")
+        static let canvasTopWash = SwiftUI.Color(hex: "#FBF9F5")
+        static let canvasBottom = SwiftUI.Color(hex: "#EDE8DD")
         static let appBackground = background
-        static let backgroundCenterLift = SwiftUI.Color(hex: "#FCFAF6")
-        static let backgroundEdgeShade = SwiftUI.Color(hex: "#EDE6DA")
-        static let backgroundVignette = SwiftUI.Color.black.opacity(0.045)
-        static let surfaceTop = SwiftUI.Color(hex: "#FFFFFF")
-        static let surfaceBottom = SwiftUI.Color(hex: "#F7F3EC")
-        static let surfaceFloatingTop = SwiftUI.Color(hex: "#FFFFFF")
-        static let surfaceFloatingBottom = SwiftUI.Color(hex: "#F6F1E8")
+        static let backgroundCenterLift = SwiftUI.Color(hex: "#FCFAF7")
+        static let backgroundEdgeShade = SwiftUI.Color(hex: "#E8E2D8")
+        static let backgroundVignette = SwiftUI.Color(hex: "#292524").opacity(0.045)
+        static let surfaceTop = SwiftUI.Color(hex: "#FFFDF9")
+        static let surfaceBottom = SwiftUI.Color(hex: "#F4EFE6")
+        static let surfaceFloatingTop = SwiftUI.Color(hex: "#FFFDF9")
+        static let surfaceFloatingBottom = SwiftUI.Color(hex: "#F2EDE4")
         static let panel = cardBackground.opacity(0.92)
         static let border = borderSubtle
         static let borderWarm = borderStrong
         static let topInnerHighlight = SwiftUI.Color.white.opacity(0.46)
-        static let hover = SwiftUI.Color.black.opacity(0.045)
+        static let hover = SwiftUI.Color(hex: "#312B28").opacity(0.045)
         static let accent = primaryAccent
-        static let highlight = SwiftUI.Color(hex: "#E4EBFF")
+        static let premiumBlueGradient = LinearGradient(
+            colors: [premiumBlueStart, premiumBlueEnd],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        static let highlight = SwiftUI.Color(hex: "#E8EEFF")
         static let active = primaryAccent.opacity(0.20)
         static let destructive = SwiftUI.Color(red: 0.79, green: 0.24, blue: 0.22)
+
+        /// Board / creation surfaces — soft pastels (lavender mist, warm paper).
         static let creationSurfaceBase = background
-        static let creationSurfaceCenter = SwiftUI.Color.white.opacity(0.76)
-        static let creationSurfaceEdge = SwiftUI.Color(hex: "#EAF0F9")
-        static let creationSurfaceGrid = SwiftUI.Color.black.opacity(0.03)
-        static let creationCardSurface = SwiftUI.Color(hex: "#F7FAFF").opacity(0.98)
+        static let creationSurfaceCenter = SwiftUI.Color.white.opacity(0.78)
+        static let creationSurfaceEdge = SwiftUI.Color(hex: "#EDE9FE").opacity(0.95)
+        static let creationSurfaceGrid = SwiftUI.Color(hex: "#292524").opacity(0.032)
+        static let creationCardSurface = SwiftUI.Color(hex: "#FAF8FF").opacity(0.98)
         static let creationCardBorder = borderStrong
-        static let homeSidebarSurface = SwiftUI.Color.white.opacity(0.92)
-        static let homeSidebarBorder = SwiftUI.Color(hex: "#E5E7EB")
-        static let homeMainBackground = SwiftUI.Color(hex: "#F8FAFC")
-        static let homeMainBackgroundEdge = SwiftUI.Color(hex: "#F8FAFC")
-        static let homeMainGrid = SwiftUI.Color(hex: "#CBD5E1").opacity(0.16)
-        static let homeGlowBlue = SwiftUI.Color(hex: "#60A5FA").opacity(0.10)
-        static let homeGlowPurple = SwiftUI.Color(hex: "#8B5CF6").opacity(0.06)
-        static let homeChipFill = SwiftUI.Color.white.opacity(0.95)
-        static let homeChipHover = SwiftUI.Color(hex: "#E2E8F0")
+        static let homeSidebarSurface = SwiftUI.Color(hex: "#FFFDF9").opacity(0.94)
+        static let homeSidebarBorder = SwiftUI.Color(hex: "#D8D0C8")
+        static let homeMainBackground = SwiftUI.Color(hex: "#F7F5F1")
+        static let homeMainBackgroundEdge = SwiftUI.Color(hex: "#EFEBE5")
+        static let homeMainGrid = SwiftUI.Color(hex: "#B0A69D").opacity(0.14)
+        static let homeGlowBlue = SwiftUI.Color(hex: "#93C5FD").opacity(0.14)
+        static let homeGlowPurple = SwiftUI.Color(hex: "#C4B5FD").opacity(0.10)
+        static let homeChipFill = SwiftUI.Color(hex: "#FFFDF9").opacity(0.96)
+        static let homeChipHover = SwiftUI.Color(hex: "#E9E2DA")
         static let homeChipActive = SwiftUI.Color(hex: "#DBEAFE")
-        static let homePromptFill = SwiftUI.Color.white.opacity(0.97)
-        static let homePromptBorder = SwiftUI.Color(hex: "#BFDBFE").opacity(0.7)
-        static let homePromptInputFill = SwiftUI.Color(hex: "#F8FAFC")
-        static let homePromptInputBorder = SwiftUI.Color(hex: "#CBD5E1").opacity(0.8)
+        static let homePromptFill = SwiftUI.Color(hex: "#FFFDF9").opacity(0.98)
+        static let homePromptBorder = SwiftUI.Color(hex: "#BFDBFE").opacity(0.65)
+        static let homePromptInputFill = SwiftUI.Color(hex: "#FAFAF9")
+        static let homePromptInputBorder = SwiftUI.Color(hex: "#D8CFC6").opacity(0.85)
     }
 
     struct Elevation {
@@ -97,35 +106,64 @@ struct DS {
     }
 
     struct Typography {
-        static let hero = Font.system(size: 40, weight: .bold, design: .rounded)
-        static let heroTracking: CGFloat = -0.45
+        /// Uses **SF Pro Display** (see `FlowDeskFont`).
+        static let hero = FlowDeskFont.display(size: FlowDeskTypeScale.h1, weight: .bold)
+        static let heroTracking: CGFloat = FlowDeskTypeTracking.displayH1
         static let heroLineSpacing: CGFloat = 2
 
-        static let sectionTitle = Font.system(size: 22, weight: .semibold, design: .rounded)
-        static let sectionTracking: CGFloat = -0.18
+        static let sectionTitle = FlowDeskFont.display(size: FlowDeskTypeScale.h2, weight: .semibold)
+        static let sectionTracking: CGFloat = FlowDeskTypeTracking.displayH2
         static let sectionTopSpacing: CGFloat = DS.Spacing.sm
 
-        static let body = Font.system(size: 14.5, weight: .regular)
+        /// Board name in the editor toolbar — reads like a document title, not a form field.
+        static let boardTitle = FlowDeskFont.display(size: FlowDeskTypeScale.h2 + 3, weight: .semibold)
+        static let boardTitleTracking: CGFloat = FlowDeskTypeTracking.displayH2
+
+        /// Primary body: **SF Pro Text**.
+        static let body = FlowDeskFont.uiText(size: FlowDeskTypeScale.body, weight: .regular)
         static let bodyLineSpacing: CGFloat = 5
 
-        static let label = Font.system(size: 12, weight: .regular)
-        static let labelTracking: CGFloat = 0.6
-        static let caption = Font.system(size: 11.5, weight: .regular)
-        static let toolLabel = Font.system(size: 13, weight: .medium)
+        static let label = FlowDeskFont.uiText(size: 12, weight: .regular)
+        static let labelTracking: CGFloat = FlowDeskTypeTracking.labelUppercase
+        static let caption = FlowDeskFont.uiText(size: FlowDeskTypeScale.caption, weight: .regular)
+        static let toolLabel = FlowDeskFont.uiText(size: FlowDeskTypeScale.label, weight: .medium)
+    }
+
+    struct Icon {
+        /// Standard icon sizing/stroke for primary app chrome and controls.
+        static let standardSize: CGFloat = 13
+        static let standardWeight: Font.Weight = .semibold
+        static let accessorySize: CGFloat = 12
     }
 
     struct Animation {
-        static let quick = FlowDeskMotion.quickEaseOut
-        static let smooth = FlowDeskMotion.smoothEaseOut
-        static let spring = FlowDeskMotion.mellowSpring
+        static let fast = FlowDeskMotion.fastEaseOut
+        static let medium = FlowDeskMotion.mediumEaseOut
+        static let slow = FlowDeskMotion.slowEaseOut
+        static let quick = fast
+        static let smooth = medium
+        static let spring = medium
     }
 
     struct Interaction {
-        static let hoverScale: CGFloat = 1.015
+        /// Subtle hover emphasis for cards / surfaces (paired with motion tokens).
+        static let hoverScale: CGFloat = 1.012
+        /// Slight scale-down on press (instant ease-out, no bounce).
         static let pressScale: CGFloat = 0.98
-        static let hoverDuration: Double = 0.12
-        static let pressDuration: Double = 0.1
-        static let releaseDuration: Double = 0.14
+        /// Vertical lift when hovered (toolbar, plain controls).
+        static let hoverLiftPoints: CGFloat = -1
+        static let hoverDuration: Double = 0.14
+        static let pressDuration: Double = 0.12
+        static let releaseDuration: Double = 0.12
+    }
+}
+
+extension Image {
+    /// Product-wide icon treatment: one stroke weight, one rendering style.
+    func flowDeskStandardIcon(size: CGFloat = DS.Icon.standardSize) -> some View {
+        self
+            .symbolRenderingMode(.monochrome)
+            .font(.system(size: size, weight: DS.Icon.standardWeight))
     }
 }
 

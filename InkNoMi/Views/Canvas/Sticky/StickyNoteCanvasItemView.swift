@@ -49,10 +49,27 @@ struct StickyNoteCanvasItemView: View {
         RoundedRectangle(cornerRadius: CanvasStickyNoteLayout.cornerRadius, style: .continuous)
     }
 
+    private var showsResizeChrome: Bool {
+        isSelected && !isEditing && !selection.isMultiSelection
+    }
+
+    private var showsConnectorChrome: Bool {
+        boardViewModel.canvasTool == .select && showsResizeChrome
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             cardShape
-                .fill(payload.backgroundColor.swiftUIColor)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            FlowDeskTheme.harmonizedColor(payload.backgroundColor.swiftUIColor).opacity(0.98),
+                            FlowDeskTheme.harmonizedColor(payload.backgroundColor.swiftUIColor).opacity(0.93)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .shadow(
                     color: Color.black.opacity(
                         isDragging ? 0.14 : (isSelected ? tokens.canvasItemShadowSelected : tokens.canvasItemShadowNormal)
@@ -65,6 +82,22 @@ struct StickyNoteCanvasItemView: View {
                     cardShape
                         .strokeBorder(Color.white.opacity(0.28), lineWidth: 0.5)
                         .blendMode(.plusLighter)
+                }
+                .overlay {
+                    cardShape
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.36),
+                                    Color.clear,
+                                    Color.black.opacity(0.05)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 0.85
+                        )
+                        .blendMode(.softLight)
                 }
 
             Group {
@@ -87,10 +120,10 @@ struct StickyNoteCanvasItemView: View {
             }
             .padding(CanvasStickyNoteLayout.contentPadding)
 
-            cardShape
-                .strokeBorder(tokens.selectionStrokeColor, lineWidth: tokens.selectionStrokeWidth)
-                .opacity(isSelected ? 1 : 0)
-                .allowsHitTesting(false)
+            CanvasFramedItemSelectionChrome(
+                cornerRadius: CanvasStickyNoteLayout.cornerRadius,
+                isVisible: isSelected && !selection.isMultiSelection
+            )
             RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                 .strokeBorder(DS.Color.accent.opacity(0.2), lineWidth: 1)
                 .opacity(isHovered && !isSelected ? 1 : 0)
@@ -99,28 +132,34 @@ struct StickyNoteCanvasItemView: View {
         .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
         .animation(FlowDeskMotion.smoothEaseOut, value: isSelected && !selection.isMultiSelection)
         .overlay(alignment: .bottomTrailing) {
-            if isSelected, !isEditing, !selection.isMultiSelection {
-                CanvasTextBlockResizeHandle()
-                    .padding(FlowDeskLayout.canvasSelectionChromeInset)
-                    .gesture(resizeGesture)
-                    .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsResizeChrome {
+                    CanvasTextBlockResizeHandle()
+                        .padding(FlowDeskLayout.canvasSelectionChromeInset)
+                        .gesture(resizeGesture)
+                        .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsResizeChrome)
         }
         .overlay {
-            if boardViewModel.canvasTool == .select, isSelected, !isEditing, !selection.isMultiSelection {
-                ShapeConnectorHandlesOverlay(
-                    element: element,
-                    boardViewModel: boardViewModel,
-                    selection: selection
-                )
-                .allowsHitTesting(true)
-                .help("Drag a blue dot to connect to another object (⇧ straight line)")
-                .transition(FlowDeskMotion.handleTransition)
+            Group {
+                if showsConnectorChrome {
+                    ShapeConnectorHandlesOverlay(
+                        element: element,
+                        boardViewModel: boardViewModel,
+                        selection: selection
+                    )
+                    .allowsHitTesting(true)
+                    .help("Drag a blue dot to connect to another object (⇧ straight line)")
+                    .transition(FlowDeskMotion.handleTransition)
+                }
             }
+            .animation(FlowDeskMotion.handleInsertSpring, value: showsConnectorChrome)
         }
         .offset(composedMoveOffset)
         .zIndex(isDragging ? Double(element.zIndex) + 0.1 : Double(element.zIndex))
-        .scaleEffect(isDragging ? 1.01 : 1.0)
+        .scaleEffect(isDragging ? 1.01 : (isHovered ? 1.01 : 1.0))
         .contentShape(cardShape)
         .animation(FlowDeskMotion.quickEaseOut, value: isDragging)
         .highPriorityGesture(
@@ -235,10 +274,11 @@ struct StickyNoteCanvasItemView: View {
                     )
                     moveDragTranslation = .zero
                 } else {
-                    moveDragTranslation = CGSize(
+                    let targetTranslation = CGSize(
                         width: snapped.x - CGFloat(subjectRec.x),
                         height: snapped.y - CGFloat(subjectRec.y)
                     )
+                    moveDragTranslation = moveDragTranslation.smoothedToward(targetTranslation)
                 }
                 boardViewModel.syncGroupMovePreview(leaderId: element.id, translation: moveDragTranslation)
                 boardViewModel.updateAlignmentGuides(guides)

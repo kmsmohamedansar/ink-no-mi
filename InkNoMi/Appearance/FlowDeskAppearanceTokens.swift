@@ -86,17 +86,17 @@ struct DynamicTheme: Equatable {
     static func definition(for preset: VisualTheme) -> CuratedPresetDefinition {
         switch preset {
         case .miroBright:
-            return .init(name: "Miro Bright", appBackground: Color(hex: "#F6F8FC"), canvasBackground: Color(hex: "#EEF3FB"), panelBackground: Color(hex: "#FFFFFF"), cardBackground: Color(hex: "#FFFFFF"), primaryText: Color(hex: "#111827"), secondaryText: Color(hex: "#4B5563"), border: Color(hex: "#D8E0EF"), accent: Color(hex: "#336DFF"), accentSoft: Color(hex: "#336DFF").opacity(0.2), gridColor: Color(hex: "#60708F"), shadowColor: Color.black.opacity(0.14), recommendedFont: .system, recommendedCornerStyle: .rounded, recommendedDensity: .comfortable)
+            return .init(name: "Miro Bright", appBackground: Color(hex: "#F5F2EC"), canvasBackground: Color(hex: "#EBE7DF"), panelBackground: Color(hex: "#FFFDF9"), cardBackground: Color(hex: "#FFFDF9"), primaryText: Color(hex: "#1C1917"), secondaryText: Color(hex: "#57534E"), border: Color(hex: "#D6D3CD"), accent: Color(hex: "#2957EE"), accentSoft: Color(hex: "#2957EE").opacity(0.2), gridColor: Color(hex: "#A8A29E"), shadowColor: Color(hex: "#292524").opacity(0.13), recommendedFont: .system, recommendedCornerStyle: .rounded, recommendedDensity: .comfortable)
         case .applePaper:
-            return .init(name: "Apple Paper", appBackground: Color(hex: "#F8F5EF"), canvasBackground: Color(hex: "#F2EBDD"), panelBackground: Color(hex: "#FBF8F2"), cardBackground: Color(hex: "#FFFDF8"), primaryText: Color(hex: "#1F2937"), secondaryText: Color(hex: "#6B7280"), border: Color(hex: "#DDD3C2"), accent: Color(hex: "#4E7CF6"), accentSoft: Color(hex: "#4E7CF6").opacity(0.18), gridColor: Color(hex: "#76685A"), shadowColor: Color.black.opacity(0.16), recommendedFont: .rounded, recommendedCornerStyle: .soft, recommendedDensity: .comfortable)
+            return .init(name: "Apple Paper", appBackground: Color(hex: "#F8F5EF"), canvasBackground: Color(hex: "#F1EBE0"), panelBackground: Color(hex: "#FBF8F4"), cardBackground: Color(hex: "#FFFDF8"), primaryText: Color(hex: "#1C1917"), secondaryText: Color(hex: "#57534E"), border: Color(hex: "#D9D4CA"), accent: Color(hex: "#4B6BF5"), accentSoft: Color(hex: "#4B6BF5").opacity(0.18), gridColor: Color(hex: "#948C82"), shadowColor: Color(hex: "#292524").opacity(0.14), recommendedFont: .rounded, recommendedCornerStyle: .soft, recommendedDensity: .comfortable)
         case .linearGraphite:
-            return .init(name: "Linear Graphite", appBackground: Color(hex: "#11131A"), canvasBackground: Color(hex: "#0B0F16"), panelBackground: Color(hex: "#171B25"), cardBackground: Color(hex: "#1C2230"), primaryText: Color(hex: "#F5F7FB"), secondaryText: Color(hex: "#C7CFDF"), border: Color(hex: "#31394A"), accent: Color(hex: "#6EA8FF"), accentSoft: Color(hex: "#6EA8FF").opacity(0.22), gridColor: Color(hex: "#738099"), shadowColor: Color.black.opacity(0.45), recommendedFont: .system, recommendedCornerStyle: .rounded, recommendedDensity: .compact)
+            return .init(name: "Linear Graphite", appBackground: Color(hex: "#141210"), canvasBackground: Color(hex: "#0E0D0C"), panelBackground: Color(hex: "#1A1816"), cardBackground: Color(hex: "#201E1C"), primaryText: Color(hex: "#FAFAF9"), secondaryText: Color(hex: "#D6D3D1"), border: Color(hex: "#44403C"), accent: Color(hex: "#7CB4FF"), accentSoft: Color(hex: "#7CB4FF").opacity(0.22), gridColor: Color(hex: "#A8A29E"), shadowColor: Color.black.opacity(0.45), recommendedFont: .system, recommendedCornerStyle: .rounded, recommendedDensity: .compact)
         case .studioNeutral:
-            return .init(name: "Studio Neutral", appBackground: Color(hex: "#EEF1F4"), canvasBackground: Color(hex: "#DDE2E8"), panelBackground: Color(hex: "#F8FAFB"), cardBackground: Color(hex: "#FFFFFF"), primaryText: Color(hex: "#17202A"), secondaryText: Color(hex: "#5C6677"), border: Color(hex: "#CCD3DE"), accent: Color(hex: "#4361EE"), accentSoft: Color(hex: "#4361EE").opacity(0.18), gridColor: Color(hex: "#7A869A"), shadowColor: Color.black.opacity(0.14), recommendedFont: .serif, recommendedCornerStyle: .rounded, recommendedDensity: .spacious)
+            return .init(name: "Studio Neutral", appBackground: Color(hex: "#EDEAE4"), canvasBackground: Color(hex: "#DDD9D2"), panelBackground: Color(hex: "#FAF8F5"), cardBackground: Color(hex: "#FFFDF9"), primaryText: Color(hex: "#1C1917"), secondaryText: Color(hex: "#57534E"), border: Color(hex: "#CAC5BD"), accent: Color(hex: "#3D52F5"), accentSoft: Color(hex: "#3D52F5").opacity(0.18), gridColor: Color(hex: "#94A098"), shadowColor: Color(hex: "#292524").opacity(0.12), recommendedFont: .serif, recommendedCornerStyle: .rounded, recommendedDensity: .spacious)
         case .auroraFocus:
-            return .init(name: "Aurora Focus", appBackground: Color(hex: "#EEF4FF"), canvasBackground: Color(hex: "#E0EAFE"), panelBackground: Color(hex: "#F8FBFF"), cardBackground: Color(hex: "#FFFFFF"), primaryText: Color(hex: "#111827"), secondaryText: Color(hex: "#4B5563"), border: Color(hex: "#CFD9F0"), accent: Color(hex: "#5B6CFF"), accentSoft: Color(hex: "#5B6CFF").opacity(0.2), gridColor: Color(hex: "#6A77A1"), shadowColor: Color.black.opacity(0.14), recommendedFont: .rounded, recommendedCornerStyle: .soft, recommendedDensity: .comfortable)
+            return .init(name: "Aurora Focus", appBackground: Color(hex: "#F2F0FF"), canvasBackground: Color(hex: "#E8E4FF"), panelBackground: Color(hex: "#FBFAFF"), cardBackground: Color(hex: "#FFFDFB"), primaryText: Color(hex: "#1C1917"), secondaryText: Color(hex: "#57534E"), border: Color(hex: "#D4D0E8"), accent: Color(hex: "#5C64F2"), accentSoft: Color(hex: "#5C64F2").opacity(0.2), gridColor: Color(hex: "#9894B8"), shadowColor: Color(hex: "#3730A3").opacity(0.08), recommendedFont: .rounded, recommendedCornerStyle: .soft, recommendedDensity: .comfortable)
         case .founderDesk:
-            return .init(name: "Founder Desk", appBackground: Color(hex: "#F2F4F8"), canvasBackground: Color(hex: "#E7ECF4"), panelBackground: Color(hex: "#F7F9FC"), cardBackground: Color(hex: "#FFFFFF"), primaryText: Color(hex: "#101828"), secondaryText: Color(hex: "#475467"), border: Color(hex: "#C9D2E3"), accent: Color(hex: "#2E5BFF"), accentSoft: Color(hex: "#2E5BFF").opacity(0.2), gridColor: Color(hex: "#627089"), shadowColor: Color.black.opacity(0.16), recommendedFont: .rounded, recommendedCornerStyle: .rounded, recommendedDensity: .comfortable)
+            return .init(name: "Founder Desk", appBackground: Color(hex: "#F3F1EC"), canvasBackground: Color(hex: "#E8E4DC"), panelBackground: Color(hex: "#FAF9F6"), cardBackground: Color(hex: "#FFFDF9"), primaryText: Color(hex: "#1C1917"), secondaryText: Color(hex: "#57534E"), border: Color(hex: "#CEC9C2"), accent: Color(hex: "#2A52F0"), accentSoft: Color(hex: "#2A52F0").opacity(0.2), gridColor: Color(hex: "#908B84"), shadowColor: Color(hex: "#292524").opacity(0.14), recommendedFont: .rounded, recommendedCornerStyle: .rounded, recommendedDensity: .comfortable)
         }
     }
 
@@ -112,7 +112,7 @@ struct DynamicTheme: Equatable {
             preset: preset,
             workspaceBackground: isDark ? preset.appBackground.opacity(0.42) : preset.appBackground,
             canvasWorkspaceBackground: isDark ? preset.canvasBackground.opacity(0.38) : preset.canvasBackground,
-            gridLineOpacity: settings.canvasGridStyle == .none ? 0 : (isDark ? 0.09 : 0.06),
+            gridLineOpacity: settings.canvasGridStyle == .none ? 0 : (isDark ? 0.052 : 0.036),
             canvasGridInk: preset.gridColor,
             canvasBottomDepthOpacity: isDark ? 0.065 : 0.038,
             canvasTopWashOpacity: isDark ? 0.009 : 0.03,
@@ -166,12 +166,48 @@ struct AccentTokens {
 
     static func palette(_ value: AccentPalette) -> AccentTokens {
         switch value {
-        case .blue: return .init(accent: Color(hex: "#336DFF"), accentSoft: Color(hex: "#336DFF").opacity(0.2), gradientStart: Color(hex: "#336DFF"), gradientEnd: Color(hex: "#6F7FF7"))
-        case .violet: return .init(accent: Color(hex: "#7C3AED"), accentSoft: Color(hex: "#7C3AED").opacity(0.2), gradientStart: Color(hex: "#8B5CF6"), gradientEnd: Color(hex: "#C084FC"))
-        case .mint: return .init(accent: Color(hex: "#14B8A6"), accentSoft: Color(hex: "#14B8A6").opacity(0.22), gradientStart: Color(hex: "#14B8A6"), gradientEnd: Color(hex: "#22D3EE"))
-        case .coral: return .init(accent: Color(hex: "#F97316"), accentSoft: Color(hex: "#F97316").opacity(0.2), gradientStart: Color(hex: "#FB7185"), gradientEnd: Color(hex: "#F97316"))
-        case .amber: return .init(accent: Color(hex: "#D97706"), accentSoft: Color(hex: "#D97706").opacity(0.2), gradientStart: Color(hex: "#F59E0B"), gradientEnd: Color(hex: "#F97316"))
-        case .rose: return .init(accent: Color(hex: "#E11D48"), accentSoft: Color(hex: "#E11D48").opacity(0.2), gradientStart: Color(hex: "#F43F5E"), gradientEnd: Color(hex: "#EC4899"))
+        case .blue:
+            return .init(
+                accent: Color(hex: "#2A57F0"),
+                accentSoft: Color(hex: "#2A57F0").opacity(0.22),
+                gradientStart: Color(hex: "#1D3FB5"),
+                gradientEnd: Color(hex: "#B4C9FF")
+            )
+        case .violet:
+            return .init(
+                accent: Color(hex: "#6D4AE8"),
+                accentSoft: Color(hex: "#6D4AE8").opacity(0.22),
+                gradientStart: Color(hex: "#5B21B6"),
+                gradientEnd: Color(hex: "#DDD6FE")
+            )
+        case .mint:
+            return .init(
+                accent: Color(hex: "#0D9488"),
+                accentSoft: Color(hex: "#0D9488").opacity(0.24),
+                gradientStart: Color(hex: "#0F766E"),
+                gradientEnd: Color(hex: "#CCFBF1")
+            )
+        case .coral:
+            return .init(
+                accent: Color(hex: "#EA580C"),
+                accentSoft: Color(hex: "#EA580C").opacity(0.22),
+                gradientStart: Color(hex: "#F97316"),
+                gradientEnd: Color(hex: "#FECDD3")
+            )
+        case .amber:
+            return .init(
+                accent: Color(hex: "#CA6A06"),
+                accentSoft: Color(hex: "#CA6A06").opacity(0.22),
+                gradientStart: Color(hex: "#D97706"),
+                gradientEnd: Color(hex: "#FDE68A")
+            )
+        case .rose:
+            return .init(
+                accent: Color(hex: "#E11D48"),
+                accentSoft: Color(hex: "#E11D48").opacity(0.22),
+                gradientStart: Color(hex: "#BE123C"),
+                gradientEnd: Color(hex: "#FBCFE8")
+            )
         }
     }
 }
@@ -245,8 +281,8 @@ struct MotionTokens: Equatable {
     let smooth: Animation
     let disabled: Bool
 
-    static let full = MotionTokens(quick: .easeOut(duration: 0.12), standard: .easeOut(duration: 0.2), smooth: .easeOut(duration: 0.26), disabled: false)
-    static let reduced = MotionTokens(quick: .easeOut(duration: 0.06), standard: .easeOut(duration: 0.12), smooth: .easeOut(duration: 0.15), disabled: false)
+    static let full = MotionTokens(quick: FlowDeskMotion.fastEaseOut, standard: FlowDeskMotion.mediumEaseOut, smooth: FlowDeskMotion.slowEaseOut, disabled: false)
+    static let reduced = MotionTokens(quick: FlowDeskMotion.fastEaseOut, standard: FlowDeskMotion.fastEaseOut, smooth: FlowDeskMotion.mediumEaseOut, disabled: false)
     static let none = MotionTokens(quick: .linear(duration: 0), standard: .linear(duration: 0), smooth: .linear(duration: 0), disabled: true)
 
     static func tokens(for value: MotionLevel) -> MotionTokens {

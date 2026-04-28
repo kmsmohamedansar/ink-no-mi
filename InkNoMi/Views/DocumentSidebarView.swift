@@ -98,7 +98,7 @@ struct DocumentSidebarView: View {
                 .foregroundStyle(
                     isSelected
                         ? tokens.selectionStrokeColor.opacity(0.92)
-                        : Color.secondary.opacity(0.88)
+                        : DS.Color.accent.opacity(0.62)
                 )
         }
         .labelStyle(.titleAndIcon)
@@ -123,7 +123,7 @@ struct DocumentSidebarView: View {
         .listRowSeparator(.hidden)
         .contentShape(RoundedRectangle(cornerRadius: FlowDeskLayout.sidebarRowSelectionCornerRadius, style: .continuous))
         .onHover { inside in
-            withAnimation(FlowDeskMotion.standardEaseOut) {
+            withAnimation(FlowDeskMotion.hoverEase) {
                 hoveredDocumentID = inside ? document.id : nil
             }
             if inside {
@@ -180,7 +180,7 @@ struct DocumentSidebarView: View {
             .padding(.vertical, 0.5)
             .padding(.horizontal, 6)
             .animation(FlowDeskMotion.standardEaseOut, value: isSelected)
-            .animation(FlowDeskMotion.standardEaseOut, value: isHovered)
+            .animation(FlowDeskMotion.hoverEase, value: isHovered)
     }
 
     private func rowFill(isSelected: Bool, isHovered: Bool) -> Color {
@@ -235,13 +235,7 @@ struct DocumentSidebarView: View {
                     .padding(.vertical, 8)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [DS.Color.accent, DS.Color.accent.opacity(0.88)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(DS.Color.premiumBlueGradient)
                     )
 
                 Button("Template picker", action: onOpenTemplates)
@@ -255,7 +249,7 @@ struct DocumentSidebarView: View {
                             .fill(Color.white.opacity(0.88))
                             .overlay(
                                 Capsule(style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
                             )
                     )
             }

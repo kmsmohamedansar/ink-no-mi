@@ -8,15 +8,28 @@ struct FreehandStrokeShapeView: View {
     let opacity: Double
 
     var body: some View {
-        GeometryReader { geo in
-            let cgPoints = points.map { CGPoint(x: $0.x, y: $0.y) }
-            let path = StrokePathSmoothing.smoothPath(from: cgPoints)
-            path
-                .stroke(
-                    color.swiftUIColor.opacity(opacity),
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        Canvas { context, size in
+            let cgPoints: [CGPoint] = points.map { CGPoint(x: $0.x, y: $0.y) }
+            guard !cgPoints.isEmpty else { return }
+
+            let sampled: [CGPoint] = {
+                if cgPoints.count == 1 { return cgPoints }
+                let perSeg = min(14, max(6, 2000 / max(cgPoints.count, 1)))
+                let sp = StrokePathSmoothing.sampledSmoothPolyline(
+                    from: cgPoints,
+                    samplesPerSegment: perSeg
                 )
-                .frame(width: geo.size.width, height: geo.size.height)
+                return sp.isEmpty ? cgPoints : sp
+            }()
+
+            InkStyleStrokeDrawing.drawInkStroke(
+                context: &context,
+                sampledPoints: sampled,
+                color: color.swiftUIColor,
+                baseLineWidth: lineWidth,
+                baseOpacity: CGFloat(opacity)
+            )
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

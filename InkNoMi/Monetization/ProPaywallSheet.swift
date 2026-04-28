@@ -74,12 +74,12 @@ struct ProPaywallSheet: View {
         .frame(minWidth: 460)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Color.black.opacity(0.04), lineWidth: 0.8)
                 )
-                .shadow(color: Color.black.opacity(0.1), radius: 18, x: 0, y: 8)
+                .flowDeskDepthShadows(FlowDeskDepth.modalChrome)
         )
     }
 
@@ -110,8 +110,14 @@ struct ProPaywallSheet: View {
                 }
                 Spacer()
                 if purchaseManager.isProcessingPurchase {
-                    ProgressView()
-                        .controlSize(.small)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(DS.Color.panel.opacity(0.85))
+                        .frame(width: 18, height: 18)
+                        .flowDeskSkeletonShimmer()
+                        .overlay {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
                 } else {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.caption.weight(.semibold))
@@ -137,7 +143,7 @@ struct ProPaywallSheet: View {
             }
             .scaleEffect(hoveredPlan == plan ? 1.008 : 1)
             .offset(y: hoveredPlan == plan ? -1 : 0)
-            .animation(.easeOut(duration: DS.Interaction.hoverDuration), value: hoveredPlan == plan)
+            .animation(FlowDeskMotion.hoverEase, value: hoveredPlan == plan)
         }
         .buttonStyle(.plain)
         .disabled(purchaseManager.isProcessingPurchase)

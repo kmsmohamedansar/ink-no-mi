@@ -4,6 +4,8 @@ import SwiftUI
 /// Renders the infinite-style board: viewport transform, grid, and element layers.
 struct CanvasBoardView: View {
     static let logicalCanvasSize: CGFloat = 4000
+    private static let connectShapesHintSeenKey = "inkNoMi.hints.dragToConnectShapes.seen"
+    private static let backgroundParallaxPanFactor: CGFloat = 0.98
 
     @Bindable var boardViewModel: CanvasBoardViewModel
     @Bindable var selection: CanvasSelectionModel
@@ -14,6 +16,9 @@ struct CanvasBoardView: View {
     @State private var panDragTranslation: CGSize = .zero
     @State private var panMomentumTask: Task<Void, Never>?
     @State private var draftCanvasPoints: [CGPoint] = []
+    @State private var strokeGlowPoints: [CGPoint] = []
+    @State private var strokeGlowOpacity: Double = 0
+    @State private var strokeGlowFadeTask: Task<Void, Never>?
     @State private var placementDragStart: CGPoint?
     @State private var placementPreviewRect: CGRect?
     @State private var canvasTapRipplePoint: CGPoint = .zero
@@ -23,12 +28,13 @@ struct CanvasBoardView: View {
     @State private var selectionGlowVisible = false
     @State private var snapCueVisible = false
     @State private var snapCueMagnetic = false
+    @State private var alignmentGuidesOpacity: Double = 0
+    @State private var showConnectShapesHint = false
+    @State private var connectShapesHintDismissTask: Task<Void, Never>?
+    @State private var cachedSortedElements: [CanvasElementRecord] = []
+    @State private var idleLuminancePhase = false
 
     private let canvasSize: CGFloat = Self.logicalCanvasSize
-
-    private var sortedElements: [CanvasElementRecord] {
-        boardViewModel.boardState.elements.sorted { $0.zIndex < $1.zIndex }
-    }
 
     private var connectorSnapTargetElementID: UUID? {
         boardViewModel.connectorDragDraft?.snapElementID ?? boardViewModel.connectorEndpointAdjustDraft?.snapElementID
@@ -41,7 +47,7 @@ struct CanvasBoardView: View {
 
             ZStack(alignment: .topLeading) {
                 ZStack(alignment: .topLeading) {
-                    canvasBackgroundLayer(viewport: viewport, selection: selection)
+                    canvasBackgroundLayer(viewport: viewport, selection: selection, geo: geo, scale: scale)
 
                     if showCanvasTapRipple {
                         Circle()
@@ -56,12 +62,13 @@ struct CanvasBoardView: View {
                             .zIndex(120_000)
                     }
 
-                    ForEach(sortedElements) { element in
+                    ForEach(cachedSortedElements) { element in
                         canvasElementView(for: element)
                             .frame(width: CGFloat(element.width), height: CGFloat(element.height))
                             .offset(x: CGFloat(element.x), y: CGFloat(element.y))
                             .opacity(canvasReadabilityOpacity(for: element.id))
-                            .shadow(color: elementShadowColor(for: element), radius: DS.Shadow.soft.radius, x: 0, y: 2)
+                            .shadow(color: elementShadowColor(for: element), radius: 10, x: 0, y: 4)
+                            .flowDeskDepthShadow(FlowDeskDepth.objectAmbient)
                             .zIndex(Double(element.zIndex))
                             .transition(FlowDeskMotion.insertTransition)
                     }
@@ -70,31 +77,15 @@ struct CanvasBoardView: View {
                        let selected = boardViewModel.boardState.elements.first(where: { $0.id == selectedID }),
                        selected.kind != .stroke,
                        selected.kind != .connector {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(
-                                tokens.selectionStrokeColor.opacity(selectionPulse ? 0.32 : 0.22),
-                                lineWidth: selectionPulse ? 1.62 : 1.3
-                            )
-                            .frame(
-                                width: CGFloat(selected.width) + (selectionPulse ? 15 : 10),
-                                height: CGFloat(selected.height) + (selectionPulse ? 15 : 10)
-                            )
-                            .position(
-                                x: CGFloat(selected.x) + CGFloat(selected.width) * 0.5,
-                                y: CGFloat(selected.y) + CGFloat(selected.height) * 0.5
-                            )
-                            .scaleEffect(selectionPulse ? 1.012 : 0.998)
-                            .shadow(
-                                color: tokens.selectionStrokeColor.opacity(selectionGlowVisible ? (selectionPulse ? 0.24 : 0.16) : 0),
-                                radius: selectionPulse ? 22 : 12,
-                                x: 0,
-                                y: 0
-                            )
-                            .opacity(selectionGlowVisible ? (selectionPulse ? 0.95 : 0.88) : 0)
-                            .animation(FlowDeskMotion.selectionPulseOut, value: selectionPulse)
-                            .animation(FlowDeskMotion.selectionGlowIn, value: selectionGlowVisible)
-                            .allowsHitTesting(false)
-                            .zIndex(465_000)
+                        CanvasPrimarySelectionMatte(
+                            width: CGFloat(selected.width),
+                            height: CGFloat(selected.height),
+                            centerX: CGFloat(selected.x) + CGFloat(selected.width) * 0.5,
+                            centerY: CGFloat(selected.y) + CGFloat(selected.height) * 0.5,
+                            selectionPulse: selectionPulse,
+                            selectionGlowVisible: selectionGlowVisible
+                        )
+                        .zIndex(465_000)
                     }
 
                     if let activeContainerRect = boardViewModel.activeContainerRect() {
@@ -107,9 +98,8 @@ struct CanvasBoardView: View {
                     }
 
                     if boardViewModel.boardState.elements.isEmpty {
-                        FlowDeskCanvasWorkspaceHint()
+                        CanvasEmptyWorkspaceOverlay()
                             .position(x: canvasSize * 0.5, y: canvasSize * 0.5)
-                            .allowsHitTesting(false)
                             .zIndex(200_000)
                     }
 
@@ -124,6 +114,7 @@ struct CanvasBoardView: View {
                         guides: boardViewModel.activeAlignmentGuides,
                         canvasSize: canvasSize
                     )
+                    .opacity(alignmentGuidesOpacity)
                     .zIndex(500_000)
 
                     if !boardViewModel.activeAlignmentGuides.isEmpty {
@@ -148,6 +139,18 @@ struct CanvasBoardView: View {
                             .zIndex(480_000)
                     }
 
+                    if !strokeGlowPoints.isEmpty, strokeGlowOpacity > 0.0001 {
+                        CanvasFreehandDraftOverlay(
+                            canvasPoints: strokeGlowPoints,
+                            color: boardViewModel.drawingStrokeColor,
+                            lineWidth: CGFloat(boardViewModel.drawingLineWidth) * 1.9,
+                            opacity: strokeGlowOpacity
+                        )
+                        .frame(width: canvasSize, height: canvasSize)
+                        .allowsHitTesting(false)
+                        .zIndex(209_500)
+                    }
+
                     if !draftCanvasPoints.isEmpty {
                         CanvasFreehandDraftOverlay(
                             canvasPoints: draftCanvasPoints,
@@ -157,15 +160,8 @@ struct CanvasBoardView: View {
                         )
                         .frame(width: canvasSize, height: canvasSize)
                         .allowsHitTesting(false)
+                        .zIndex(210_000)
                     }
-
-                    Rectangle()
-                        .fill(tokens.selectionStrokeColor.opacity(0.06))
-                        .blendMode(.softLight)
-                        .opacity(draftCanvasPoints.isEmpty ? 0 : 1)
-                        .animation(FlowDeskMotion.drawingLiftFade, value: draftCanvasPoints.isEmpty)
-                        .allowsHitTesting(false)
-                        .zIndex(200_100)
 
                     if boardViewModel.canvasTool == .pen
                         || boardViewModel.canvasTool == .pencil {
@@ -194,6 +190,9 @@ struct CanvasBoardView: View {
                             .allowsHitTesting(false)
                             .zIndex(491_000)
                     }
+
+                    canvasFiniteEdgeFadeOverlay
+                        .zIndex(900_000)
                 }
                 .coordinateSpace(name: FlowDeskLayout.canvasInnerCoordinateSpaceName)
                 .frame(width: canvasSize, height: canvasSize)
@@ -207,6 +206,14 @@ struct CanvasBoardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .clipped()
+            .overlay(alignment: .topTrailing) {
+                if showConnectShapesHint {
+                    connectShapesHintCard
+                        .padding(.top, FlowDeskLayout.canvasOnboardingCalloutTopInset)
+                        .padding(.trailing, FlowDeskLayout.canvasOnboardingCalloutTrailingInset)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
             .contentShape(Rectangle())
             .onHover { hovering in
                 guard hovering else {
@@ -227,6 +234,13 @@ struct CanvasBoardView: View {
             .simultaneousGesture(zoomGesture(currentScale: viewport.scale))
             .animation(FlowDeskMotion.standardEaseOut, value: boardViewModel.boardState.elements.map(\.id))
             .task(id: insertionSnapshotTaskID(geo: geo, viewport: viewport, pan: panDragTranslation)) {
+                // Defer frequent viewport snapshot writes during drags/zooms so interaction stays instant.
+                do {
+                    try await Task.sleep(nanoseconds: 90_000_000)
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
                 boardViewModel.syncInsertionViewportSnapshot(
                     CanvasInsertionViewportSnapshot(
                         visibleWidth: Double(geo.size.width),
@@ -249,7 +263,7 @@ struct CanvasBoardView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
                     selectionGlowVisible = true
                     selectionPulse = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         selectionPulse = false
                     }
                 }
@@ -257,6 +271,11 @@ struct CanvasBoardView: View {
             .onChange(of: boardViewModel.activeAlignmentGuides.count) { oldCount, newCount in
                 if newCount > 0, oldCount == 0 {
                     triggerSnapCue()
+                    triggerAlignmentGuideFlash()
+                } else if newCount == 0 {
+                    withAnimation(FlowDeskMotion.fastEaseOut) {
+                        alignmentGuidesOpacity = 0
+                    }
                 }
             }
             .onChange(of: connectorSnapTargetElementID) { oldID, newID in
@@ -264,6 +283,24 @@ struct CanvasBoardView: View {
                     triggerSnapCue()
                 }
             }
+            .onAppear {
+                refreshCachedSortedElements()
+                evaluateConnectShapesHint()
+                alignmentGuidesOpacity = boardViewModel.activeAlignmentGuides.isEmpty ? 0 : 0.56
+            }
+            .onChange(of: boardViewModel.boardState.elements) { _, _ in
+                refreshCachedSortedElements()
+                evaluateConnectShapesHint()
+            }
+            .onDisappear {
+                connectShapesHintDismissTask?.cancel()
+                strokeGlowFadeTask?.cancel()
+                panMomentumTask?.cancel()
+            }
+            .onReceive(Timer.publish(every: 12, on: .main, in: .common).autoconnect()) { _ in
+                idleLuminancePhase.toggle()
+            }
+            .animation(FlowDeskMotion.slowEaseInOut, value: idleLuminancePhase)
         }
     }
 
@@ -280,6 +317,103 @@ struct CanvasBoardView: View {
         @unknown default:
             return .clear
         }
+    }
+
+    private var connectShapesHintCard: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.branch")
+                .flowDeskStandardIcon(size: DS.Icon.accessorySize)
+                .foregroundStyle(DS.Color.accent.opacity(0.62))
+            Text("Drag to connect shapes")
+                .font(DS.Typography.caption.weight(.medium))
+                .foregroundStyle(DS.Color.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            Capsule(style: .continuous)
+                .fill(FlowDeskTheme.surfaceGradient(for: .floating, colorScheme: colorScheme))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(FlowDeskTheme.borderColor(for: .floating, colorScheme: colorScheme).opacity(0.8), lineWidth: 0.8)
+                )
+        )
+        .flowDeskDepthShadows(FlowDeskDepth.floatingChromeScaled(mult1: 0.78, mult2: 0.62, y1: 0.8, y2: 0.85))
+        .allowsHitTesting(false)
+        .accessibilityLabel("Hint: drag to connect shapes")
+    }
+
+    private var hasSeenConnectShapesHint: Bool {
+        UserDefaults.standard.bool(forKey: Self.connectShapesHintSeenKey)
+    }
+
+    private func evaluateConnectShapesHint() {
+        guard !hasSeenConnectShapesHint else { return }
+        let shapeCount = boardViewModel.boardState.elements.filter { $0.kind == .shape }.count
+        let connectorCount = boardViewModel.boardState.elements.filter { $0.kind == .connector }.count
+        let shouldShow = shapeCount >= 2 && connectorCount == 0
+        guard shouldShow, !showConnectShapesHint else { return }
+
+        UserDefaults.standard.set(true, forKey: Self.connectShapesHintSeenKey)
+        withAnimation(FlowDeskMotion.mediumEaseOut) {
+            showConnectShapesHint = true
+        }
+
+        connectShapesHintDismissTask?.cancel()
+        connectShapesHintDismissTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+            } catch {
+                return
+            }
+            withAnimation(FlowDeskMotion.mediumEaseOut) {
+                showConnectShapesHint = false
+            }
+        }
+    }
+
+    private func refreshCachedSortedElements() {
+        cachedSortedElements = boardViewModel.boardState.elements.sorted { $0.zIndex < $1.zIndex }
+    }
+
+    /// Visually dissolves finite canvas bounds so the surface reads as infinite.
+    private var canvasFiniteEdgeFadeOverlay: some View {
+        let edgeFeather: CGFloat = min(max(canvasSize * 0.05, 140), 260)
+        return ZStack {
+            LinearGradient(
+                colors: [Color.white.opacity(0.92), Color.white.opacity(0.0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: edgeFeather)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            LinearGradient(
+                colors: [Color.white.opacity(0.92), Color.white.opacity(0.0)],
+                startPoint: .trailing,
+                endPoint: .leading
+            )
+            .frame(width: edgeFeather)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+
+            LinearGradient(
+                colors: [Color.white.opacity(0.88), Color.white.opacity(0.0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: edgeFeather)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            LinearGradient(
+                colors: [Color.white.opacity(0.9), Color.white.opacity(0.0)],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .frame(height: edgeFeather)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        }
+        .allowsHitTesting(false)
     }
 
     /// While something is selected, deemphasize items that are not the selection, an incident link, or an endpoint of an incident link. Disabled during connector drag/adjust so snap targets stay clear.
@@ -323,8 +457,24 @@ struct CanvasBoardView: View {
     }
 
     @ViewBuilder
-    private func canvasBackgroundLayer(viewport: ViewportState, selection: CanvasSelectionModel) -> some View {
-        let bg = canvasBackground(showGrid: viewport.showGrid)
+    private func canvasBackgroundLayer(viewport: ViewportState, selection: CanvasSelectionModel, geo: GeometryProxy, scale: CGFloat) -> some View {
+        let fadeCenter = gridFadeNormalizedCenter(viewport: viewport, geo: geo, scale: scale)
+        let backgroundParallaxOffset = canvasBackgroundParallaxOffset(viewport: viewport, scale: scale)
+        let isCanvasInteracting =
+            !draftCanvasPoints.isEmpty
+            || placementPreviewRect != nil
+            || boardViewModel.connectorDragDraft != nil
+            || boardViewModel.connectorEndpointAdjustDraft != nil
+            || panDragTranslation != .zero
+        let bg = canvasBackground(
+            showGrid: viewport.showGrid,
+            interactionLift: isCanvasInteracting,
+            spotlightCenter: fadeCenter,
+            zoomScale: scale,
+            idleLuminanceAmount: isCanvasInteracting ? 0 : (idleLuminancePhase ? 1 : -1),
+            gridFadeCenter: fadeCenter
+        )
+            .offset(x: backgroundParallaxOffset.width, y: backgroundParallaxOffset.height)
             .frame(width: canvasSize, height: canvasSize)
             .contentShape(Rectangle())
 
@@ -491,6 +641,9 @@ struct CanvasBoardView: View {
                 if draftCanvasPoints.isEmpty {
                     boardViewModel.stopAllInlineEditing()
                     boardViewModel.configureStrokeStyleForActiveTool()
+                    strokeGlowFadeTask?.cancel()
+                    strokeGlowPoints = []
+                    strokeGlowOpacity = 0
                 }
                 let loc = value.location
                 if let last = draftCanvasPoints.last {
@@ -513,8 +666,29 @@ struct CanvasBoardView: View {
                     selection: selection,
                     delay: 0.2
                 )
+                triggerStrokeGlow(points: draftCanvasPoints)
                 draftCanvasPoints = []
             }
+    }
+
+    private func triggerStrokeGlow(points: [CGPoint]) {
+        guard points.count >= 2 else { return }
+        strokeGlowFadeTask?.cancel()
+        strokeGlowPoints = points
+        strokeGlowOpacity = 0.08
+
+        strokeGlowFadeTask = Task { @MainActor in
+            withAnimation(FlowDeskMotion.mediumEaseOut) {
+                strokeGlowOpacity = 0
+            }
+            do {
+                try await Task.sleep(nanoseconds: 220_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            strokeGlowPoints = []
+        }
     }
 
     @ViewBuilder
@@ -573,7 +747,7 @@ struct CanvasBoardView: View {
         DragGesture()
             .onChanged { value in
                 panMomentumTask?.cancel()
-                panDragTranslation = value.translation
+                panDragTranslation = panDragTranslation.smoothedToward(value.translation)
             }
             .onEnded { value in
                 var next = viewport
@@ -615,13 +789,42 @@ struct CanvasBoardView: View {
     }
 
     @ViewBuilder
-    private func canvasBackground(showGrid: Bool) -> some View {
+    private func canvasBackground(showGrid: Bool, interactionLift: Bool, spotlightCenter: UnitPoint, zoomScale: CGFloat, idleLuminanceAmount: Double, gridFadeCenter: UnitPoint) -> some View {
         FlowDeskTheme.canvasWorkspaceMatBackground(
             tokens: tokens,
             colorScheme: colorScheme,
             showGrid: showGrid,
-            spotlightCenter: .center,
-            includeFilmGrain: true
+            spotlightCenter: spotlightCenter,
+            zoomScale: zoomScale,
+            idleLuminanceAmount: idleLuminanceAmount,
+            gridFadeCenter: gridFadeCenter,
+            includeFilmGrain: true,
+            interactionLift: interactionLift
+        )
+    }
+
+    /// Radial grid fade tracks the viewport center so lines recede away from where you’re working.
+    private func gridFadeNormalizedCenter(viewport: ViewportState, geo: GeometryProxy, scale: CGFloat) -> UnitPoint {
+        let sx = geo.size.width * 0.5
+        let sy = geo.size.height * 0.5
+        let ox = CGFloat(viewport.offsetX) + panDragTranslation.width
+        let oy = CGFloat(viewport.offsetY) + panDragTranslation.height
+        let cx = (sx - ox) / scale
+        let cy = (sy - oy) / scale
+        let nx = min(max(cx / canvasSize, 0.02), 0.98)
+        let ny = min(max(cy / canvasSize, 0.02), 0.98)
+        return UnitPoint(x: nx, y: ny)
+    }
+
+    /// Background layers pan slightly slower than content to create subtle spatial depth.
+    private func canvasBackgroundParallaxOffset(viewport: ViewportState, scale: CGFloat) -> CGSize {
+        let totalX = CGFloat(viewport.offsetX) + panDragTranslation.width
+        let totalY = CGFloat(viewport.offsetY) + panDragTranslation.height
+        let lagFactor = 1 - Self.backgroundParallaxPanFactor // 0.02 when factor is 0.98
+        let safeScale = max(scale, 0.001)
+        return CGSize(
+            width: -(totalX * lagFactor) / safeScale,
+            height: -(totalY * lagFactor) / safeScale
         )
     }
 
@@ -657,6 +860,13 @@ struct CanvasBoardView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
                 snapCueVisible = false
             }
+        }
+    }
+
+    private func triggerAlignmentGuideFlash() {
+        alignmentGuidesOpacity = 1
+        withAnimation(FlowDeskMotion.mediumEaseOut) {
+            alignmentGuidesOpacity = 0.56
         }
     }
 

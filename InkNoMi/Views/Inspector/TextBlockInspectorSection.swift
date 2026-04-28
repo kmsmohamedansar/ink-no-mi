@@ -4,6 +4,14 @@ import SwiftUI
 struct TextBlockInspectorSection: View {
     let elementID: UUID
     @Bindable var canvasViewModel: CanvasBoardViewModel
+    
+    private let textColorPresets: [CanvasRGBAColor] = [
+        CanvasRGBAColor(red: 0.12, green: 0.13, blue: 0.15, opacity: 1),
+        CanvasRGBAColor(red: 0.2, green: 0.35, blue: 0.78, opacity: 1),
+        CanvasRGBAColor(red: 0.15, green: 0.52, blue: 0.39, opacity: 1),
+        CanvasRGBAColor(red: 0.66, green: 0.28, blue: 0.18, opacity: 1),
+        CanvasRGBAColor(red: 0.48, green: 0.24, blue: 0.65, opacity: 1)
+    ]
 
     private var textPayload: TextBlockPayload? {
         guard let el = canvasViewModel.boardState.elements.first(where: { $0.id == elementID }),
@@ -14,37 +22,83 @@ struct TextBlockInspectorSection: View {
 
     var body: some View {
         if let textPayload {
-            Section {
-                LabeledContent("Size") {
-                    Stepper(
-                        value: fontSizeBinding(fallback: textPayload.fontSize),
-                        in: 10 ... 72,
-                        step: 1
-                    ) {
-                        Text("\(Int(textPayload.fontSize)) pt")
-                            .monospacedDigit()
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Text")
+                    .font(FlowDeskTypography.inspectorEyebrow)
+                    .tracking(0.85)
+                    .foregroundStyle(DS.Color.textTertiary)
+
+                InspectorLabeledSlider(
+                    title: "Size",
+                    value: fontSizeBinding(fallback: textPayload.fontSize),
+                    range: 10 ... 72,
+                    step: 1,
+                    valueLabel: "\(Int(textPayload.fontSize)) pt"
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Font")
+                        .font(inspectorLabelFont)
+                        .tracking(0.65)
+                        .textCase(.uppercase)
+                        .foregroundStyle(inspectorLabelColor)
+                    Picker("", selection: fontFamilyBinding(fallback: textPayload.fontFamily)) {
+                        ForEach(TextBlockFontFamily.allCases, id: \.self) { family in
+                            Text(family.displayName).tag(family)
+                        }
                     }
-                }
-
-                Toggle("Bold", isOn: boldBinding(fallback: textPayload.isBold))
-
-                LabeledContent("Color") {
-                    ColorPicker(
-                        "",
-                        selection: colorBinding(fallback: textPayload.color),
-                        supportsOpacity: true
-                    )
+                    .pickerStyle(.segmented)
                     .labelsHidden()
                 }
 
-                Picker("Align", selection: alignmentBinding(fallback: textPayload.alignment)) {
-                    Text("Leading").tag(TextBlockAlignment.leading)
-                    Text("Center").tag(TextBlockAlignment.center)
-                    Text("Trailing").tag(TextBlockAlignment.trailing)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Weight")
+                        .font(inspectorLabelFont)
+                        .tracking(0.65)
+                        .textCase(.uppercase)
+                        .foregroundStyle(inspectorLabelColor)
+                    Picker("", selection: fontWeightBinding(fallback: textPayload.fontWeight)) {
+                        Text("Regular").tag(TextBlockFontWeight.regular)
+                        Text("Medium").tag(TextBlockFontWeight.medium)
+                        Text("Semibold").tag(TextBlockFontWeight.semibold)
+                        Text("Bold").tag(TextBlockFontWeight.bold)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-            } header: {
-                FlowDeskInspectorSectionHeader("Text")
+
+                InspectorColorPreviewRow(title: "Color", color: colorBinding(fallback: textPayload.color), supportsOpacity: true)
+                HStack(spacing: 8) {
+                    ForEach(Array(textColorPresets.enumerated()), id: \.offset) { _, preset in
+                        Button {
+                            canvasViewModel.updateTextPayload(id: elementID) { $0.color = preset }
+                        } label: {
+                            Circle()
+                                .fill(preset.swiftUIColor)
+                                .frame(width: 18, height: 18)
+                                .overlay {
+                                    Circle().strokeBorder(Color.black.opacity(0.12), lineWidth: 0.5)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .help("Apply text palette color")
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Alignment")
+                        .font(inspectorLabelFont)
+                        .tracking(0.65)
+                        .textCase(.uppercase)
+                        .foregroundStyle(inspectorLabelColor)
+                    Picker("", selection: alignmentBinding(fallback: textPayload.alignment)) {
+                        Text("Left").tag(TextBlockAlignment.leading)
+                        Text("Center").tag(TextBlockAlignment.center)
+                        Text("Right").tag(TextBlockAlignment.trailing)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
             }
         }
     }
@@ -61,14 +115,29 @@ struct TextBlockInspectorSection: View {
         )
     }
 
-    private func boldBinding(fallback: Bool) -> Binding<Bool> {
+    private func fontWeightBinding(fallback: TextBlockFontWeight) -> Binding<TextBlockFontWeight> {
         Binding(
             get: {
-                canvasViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().isBold
+                canvasViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().fontWeight
                     ?? fallback
             },
             set: { newValue in
-                canvasViewModel.updateTextPayload(id: elementID) { $0.isBold = newValue }
+                canvasViewModel.updateTextPayload(id: elementID) {
+                    $0.fontWeight = newValue
+                    $0.isBold = (newValue == .semibold || newValue == .bold)
+                }
+            }
+        )
+    }
+
+    private func fontFamilyBinding(fallback: TextBlockFontFamily) -> Binding<TextBlockFontFamily> {
+        Binding(
+            get: {
+                canvasViewModel.boardState.elements.first { $0.id == elementID }?.resolvedTextPayload().fontFamily
+                    ?? fallback
+            },
+            set: { newValue in
+                canvasViewModel.updateTextPayload(id: elementID) { $0.fontFamily = newValue }
             }
         )
     }
@@ -103,5 +172,13 @@ struct TextBlockInspectorSection: View {
             return .defaultText
         }
         return CanvasRGBAColor(nsColor: ns)
+    }
+
+    private var inspectorLabelFont: Font {
+        .system(size: 10, weight: .semibold)
+    }
+
+    private var inspectorLabelColor: Color {
+        DS.Color.textTertiary.opacity(0.92)
     }
 }
